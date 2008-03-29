@@ -268,6 +268,9 @@ class fotooManager
 
         $id = $this->db->lastInsertRowid();
 
+        if (!$id)
+            return false;
+
         foreach ($tags as $tag)
         {
             $this->db->unbufferedQuery("INSERT INTO tags (name, photo)
