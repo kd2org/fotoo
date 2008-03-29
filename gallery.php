@@ -138,8 +138,10 @@ class fotooManager
         {
             $this->cleanInfos($pic['id'], $pic['hash']);
 
-            if ($from_list || !($pic = $this->addInfos($filename, $path)))
-                return false;
+            if (!$from_list && $pic = $this->addInfos($filename, $path))
+                return $pic;
+
+            return false;
         }
 
         $tags = $this->db->arrayQuery('SELECT name FROM tags
@@ -284,6 +286,7 @@ class fotooManager
             'year'  =>  date('Y', $date),
             'month' =>  date('m', $date),
             'day'   =>  date('d', $date),
+            'tags'  =>  $tags,
         );
     }
 
