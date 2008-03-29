@@ -1,0 +1,55 @@
+    +-----------------------------------------------------------+
+    |   Fotoo Gallery v2                                        |
+    |   Copyright 2004-2008 BohwaZ - http://dev.kd2.org/        |
+    |   Licensed under the GNU AGPLv3                           |
+    +-----------------------------------------------------------+
+
+    LICENSE
+    -------
+
+        This software is free software: you can redistribute it and/or modify
+        it under the terms of the GNU Affero General Public License as published by
+        the Free Software Foundation, either version 3 of the License, or
+        (at your option) any later version.
+
+        This software is distributed in the hope that it will be useful,
+        but WITHOUT ANY WARRANTY; without even the implied warranty of
+        MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+        GNU General Public License for more details.
+
+        You should have received a copy of the GNU Affero General Public License
+        along with this software. If not, see <http://www.gnu.org/licenses/>.
+
+    REQUIREMENTS
+    ------------
+
+        * PHP >= 5.2
+        * SQLite native extension
+        * (optional) PHP Imagick or PHP Imlib extension (it will make thumbnail generation faster)
+
+    INSTALLATION
+    ------------
+
+        Just copy the file 'gallery.php' to 'index.php' at the root of your pictures directory.
+
+        Make sure the script can write to the pictures cache directory ([root of gallery]/cache).
+
+    THUMBNAILS
+    ----------
+
+        Some softwares or cameras can mess up with the EXIF thumbnails (eg. the thumbnail
+        is correctly rotated, but not the picture).
+
+        If so, I suggest you to run this little shell line in your photos directory:
+
+        $ find . -iname *.jpg | xargs exiftran -gip
+
+        (yeah it will be a bit slow with big pictures)
+
+    CHANGING DATES
+    -------------
+    
+        If your pictures dates are messed up but you have named your images like '2000-Me_on_beach.jpg'
+        you can try some shell line like this one :
+        
+        for i in 20??-*.jpg; do DATE=`echo $i | sed -r 's/([0-9])-.*/\1/'`; touch -d "${DATE}-01-01 01:01:01" $i; done;
