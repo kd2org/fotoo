@@ -706,7 +706,7 @@ p.info { border: 2px solid #cc6; background-color: #ffc; clear: both; }
 ul.dates li.year { clear: left; }
 ul.dates li.day, ul.dates li.month { clear: left; padding-top: 1em; }
 ul.dates ul { margin-left: 2em; }
-ul.dates h3 { display: inline; }
+ul.dates h3, ul.dates h2 { display: inline; }
 ul.dates p.more { display: inline; margin-left: 2em; }
 
 a:link { color: darkblue; }
@@ -717,7 +717,7 @@ exit;
 }
 
 // Update or add a file to database
-if (!empty($_GET['updateFile']) && !empty($_GET['updateDir']))
+if (!empty($_GET['updateFile']) && isset($_GET['updateDir']))
 {
     $f->addInfos($_GET['updateFile'], $_GET['updateDir']);
 
@@ -770,16 +770,16 @@ else
     $mode = 'dir';
     $title = false;
 
-    if (!empty($_SERVER['argv']) && preg_match('!^(.*)(?:/([^/]+)[_.](jpe?g))?$!Ui', urldecode($_SERVER['argv'][0]), $match))
+    if (!empty($_SERVER['argv']) && preg_match('!^(.*)(?:/?([^/]+)[_.](jpe?g))?$!Ui', urldecode($_SERVER['argv'][0]), $match))
     {
         $selected_dir = $match[1];
-        $title = str_replace('/', ' / ', htmlspecialchars($match[1]));
+        $title = strtr(htmlspecialchars($match[1]), array('/' => ' / ', '_' => ' '));
 
         if (!empty($match[2]))
         {
             $selected_file = $match[2] . '.' . $match[3];
             $mode = 'pic';
-            $title = strtr(htmlspecialchars($match[2]), '_-', '  ');
+            $title = strtr(htmlspecialchars($match[2]), array('_' => ' ', '-' => ' - '));
         }
     }
     else
@@ -872,10 +872,14 @@ if ($mode == 'date')
                 echo '<li class="year">';
 
                 if (!$year)
+                {
                     echo '<h2><a href="'.SELF_URL.'?date='.$pic['year'].'">'.$pic['year'].'</a></h2>';
 
-                if (!$year)
+                    if (isset($pic['more']))
+                        echo '<p class="more"><a href="'.SELF_URL.'?date='.$pic['year'].'">'.sprintf(__("(%s more pictures)"), $pic['more']).'</a></p>';
+
                     echo '<ul class="pics">';
+                }
                 else
                     echo '<ul>';
 
@@ -921,7 +925,7 @@ elseif ($mode == 'tags')
 
     $tags = $f->getTagList();
 
-    if (empty($pics))
+    if (empty($tags))
         echo '<p class="info">'.__('No tag found.').'</p>';
     else
     {
@@ -1013,15 +1017,18 @@ elseif ($mode == 'pic')
     <div id="header">'.$menu.'
         <h4><strong><a href="'.SELF_URL.'">'.__('My Pictures')."</a></strong>\n";
 
-    $current = '';
-    $dir = explode('/', $selected_dir);
-
-    foreach ($dir as $d)
+    if (!empty($selected_dir))
     {
-        if ($current) $current .= '/';
-        $current .= $d;
+        $current = '';
+        $dir = explode('/', $selected_dir);
 
-        echo '  <a href="'.SELF_URL.'?'.$current.'">'.strtr($d, '_-', '  ')."</a>\n";
+        foreach ($dir as $d)
+        {
+            if ($current) $current .= '/';
+            $current .= $d;
+
+            echo '  <a href="'.SELF_URL.'?'.$current.'">'.strtr($d, '_-', '  ')."</a>\n";
+        }
     }
 
     echo "</h4>\n</div>\n";
@@ -1132,7 +1139,7 @@ else
         {
             echo '  <li><a href="'.SELF_URL.'?'
                 .(!empty($selected_dir) ? $selected_dir.'/'.$dir : $dir)
-                .'">'.htmlspecialchars($dir)."</a></li>\n";
+                .'">'.htmlspecialchars(strtr($dir, '_', ' '))."</a></li>\n";
         }
         echo "</ul>\n";
     }
