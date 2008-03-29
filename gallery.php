@@ -672,6 +672,7 @@ ul { list-style-type: none; }
 body { font-family: Sans-serif; background: #fff; color: #000; padding: 1em; }
 h1 { font-size: 2em; }
 hr { visibility: hidden; clear: both; }
+a img { border: none; }
 
 #header { border: 1px solid #ccc; background: #eef; padding: 0.2em; height: 1.4em; margin-bottom: 0.5em; }
 #header h4, #header h5 { font-weight: normal; }
