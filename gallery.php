@@ -32,9 +32,7 @@ if (!class_exists('SQLiteDatabase'))
 class fotooManager
 {
     private $db = false;
-    public $html_tags = array(
-        'wp:fr' =>  'http://fr.wikipedia.org/wiki/',
-        'wp'    =>  'http://en.wikipedia.org/wiki/');
+    public $html_tags = array('wp' => 'http://en.wikipedia.org/wiki/{KEYWORD}');
 
     public function getThumbPath($hash)
     {
@@ -469,8 +467,9 @@ class fotooManager
 
         foreach ($this->html_tags as $tag=>$url)
         {
-            $text = preg_replace('#(^|\s)'.preg_quote($tag, '#').':([^\s,.]+)#im',
-                '\\1<a href="'.$url.'\\2" class="'.preg_replace('[^a-zA-Z0-9_]', '_', $tag).'">\\2</a>\\3', $text);
+            $tag_class = preg_replace('![^a-zA-Z0-9_]!', '_', $tag);
+            $text = preg_replace('#(^|\s)'.preg_quote($tag, '#').':([^\s,.]+)#iem',
+                "'\\1<a href=\"'.str_replace('{KEYWORD}', urlencode('\\2'), \$url).'\" class=\"'.\$tag_class.'\">\\2</a>\\3'", $text);
         }
 
         $text = nl2br($text);
@@ -793,8 +792,8 @@ if (file_exists(BASE_DIR . '/user_style.css'))
 else
     $css = SELF_URL . '?style.css';
 
-$f->html_tags['tag'] = SELF_URL . '?tag=';
-$f->html_tags['date'] = SELF_URL . '?date=';
+$f->html_tags['tag'] = SELF_URL . '?tag={KEYWORD}';
+$f->html_tags['date'] = SELF_URL . '?date={KEYWORD}';
 $menu = '<h5><a class="home" href="'.SELF_URL.'">'.__('My Pictures').'</a>
     <a class="tags" href="'.SELF_URL.'?tags">'.__('By tags').'</a>
     <a class="date" href="'.SELF_URL.'?date">'.__('By date').'</a></h5>';

@@ -33,6 +33,12 @@
         Just copy the file 'gallery.php' to 'index.php' at the root of your pictures directory.
 
         Make sure the script can write to the pictures cache directory ([root of gallery]/cache).
+        
+    TAGS IN COMMENTS
+    ----------------
+    
+        Try tag:My_tag in an image comments, it will link to the "My_tag" pictures list.
+        You can add your tags, take a look at the example user_config.php
 
     THUMBNAILS
     ----------

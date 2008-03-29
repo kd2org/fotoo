@@ -24,6 +24,9 @@
  * (here it's french)
  */
 
+if (!class_exists('fotooManager'))
+    die('Just config');
+
 /**
 * User configuration
 * You can set those constants to what you need
@@ -38,6 +41,14 @@
 // Generate a resized copy of images for small view (600x600)
 // WARNING GENERATING IMAGES IS REALLY SLOW AND IT MAY KILL YOU WEBSERVER!
 //define('GEN_SMALL', true);
+
+// Shortcut tags in album and pictures comments
+// eg. if you type wp:Belgium in your comment tag, it will make a link to wikipedia
+// You can add anything you want
+$f->html_tags = array(
+    'wp:fr' =>  'http://fr.wikipedia.org/wiki/{KEYWORD}',
+    'wp'    =>  'http://en.wikipedia.org/wiki/{KEYWORD}',
+);
 
 // Strings translation
 $french_strings = array(
