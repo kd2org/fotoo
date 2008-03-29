@@ -1,34 +1,22 @@
 <?php
-/**
- * Fotoo Gallery v2
- * (C) 2004-2008 BohwaZ - http://dev.kd2.org/
- * Licensed under the GNU AGPLv3
- *
- */
-
 /*
-    I suggest you to run this little shell line in your photos directory,
-    this will correct erroneous thumbnails (like rotation problems)
+    Fotoo Gallery v2
+    Copyright 2004-2008 BohwaZ - http://dev.kd2.org/
+    Licensed under the GNU AGPLv3
 
-    find . -iname *.jpg | xargs exiftran -g -i
+    This software is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
 
-    (it's a bit slow but it will help)
+    This software is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this software. If not, see <http://www.gnu.org/licenses/>.
 */
-
-/**
- * User configuration
- * You can set those constants to what you need
- * Let them commented to get the defaults
- */
-
-//define('BASE_DIR', dirname(__FILE__));
-//define('CACHE_DIR', BASE_DIR . '/cache');
-//define('BASE_URL', 'http://myserver.tld/pics/');
-//define('SELF_URL', BASE_URL . 'gallery.php');
-
-// Generate a resized copy of images for small view (600x600)
-// WARNING GENERATING IMAGES IS REALLY SLOW AND IT MAY KILL YOU WEBSERVER!
-//define('GEN_SMALL', true);
 
 // This check is useless, if you have PHP < 5 you will get a parse error
 if (phpversion() < 5)
@@ -74,7 +62,18 @@ class fotooManager
 
         if (!file_exists(CACHE_DIR))
         {
-            mkdir(CACHE_DIR, 0700);
+            if (!mkdir(CACHE_DIR, 0700))
+            {
+                echo '<hr />';
+                echo 'Please create the directory '.CACHE_DIR.' and make it writable by this script.';
+                exit;
+            }
+        }
+
+        if (!is_writable(CACHE_DIR))
+        {
+            echo 'Please make the directory '.CACHE_DIR.' writable by this script.';
+            exit;
         }
 
         if (!file_exists(CACHE_DIR . '/photos.db'))
@@ -300,7 +299,7 @@ class fotooManager
         else
             $dir_path = BASE_DIR . '/' . $path . '/';
 
-        $dir = dir($dir_path);
+        $dir = @dir($dir_path);
         if (!$dir) return false;
 
         $dirs = array();
@@ -460,6 +459,11 @@ class fotooManager
     public function formatText($text)
     {
         $text = $this->intelligent_utf8_encode($text);
+        $text = htmlspecialchars($text);
+
+        // Allow simple, correctly closed, html tags (<strong>, <em>, <code>...)
+        $text = preg_replace('!&lt;([a-z]+)&gt;(.*)&lt;/\\1&gt;!isU', '<\\1>\\2</\\1>', $text);
+
         $text = preg_replace('#(^|\s)([a-z]+://([^\s\w/]?[\w/])*)(\s|$)#im', '\\1<a href="\\2">\\2</a>\\4', $text);
         $text = str_replace('\http:', 'http:', $text);
 
@@ -831,6 +835,9 @@ if ($mode == 'date')
 
     $pics = $f->getByDate($year, $month, $day);
 
+    if (empty($pics))
+        echo '<p class="info">'.__('No picture found.').'</p>';
+
     if ($day)
     {
         echo '<ul class="pics">'."\n";
@@ -912,23 +919,29 @@ elseif ($mode == 'tags')
         '.$menu.'
     </div>';
 
-    echo '<p class="tags">';
-
     $tags = $f->getTagList();
-    $max = max(array_values($tags));
-    $min = min(array_values($tags));
-    $spread = $max - $min;
-    if ($spread == 0) $spread = 1;
-    $step = 100 / $spread;
 
-    foreach ($tags as $tag=>$nb)
+    if (empty($pics))
+        echo '<p class="info">'.__('No tag found.').'</p>';
+    else
     {
-        $size = 100 + round(($nb - $min) * $step);
-        echo '<a href="'.SELF_URL.'?tag='.urlencode($tag).'" style="font-size: '.$size.'%;">'
-            .htmlspecialchars($tag).'</a> <small>('.$nb.')</small> ';
-    }
+        $max = max(array_values($tags));
+        $min = min(array_values($tags));
+        $spread = $max - $min;
+        if ($spread == 0) $spread = 1;
+        $step = 100 / $spread;
 
-    echo '</p>';
+        echo '<p class="tags">';
+
+        foreach ($tags as $tag=>$nb)
+        {
+            $size = 100 + round(($nb - $min) * $step);
+            echo '<a href="'.SELF_URL.'?tag='.urlencode($tag).'" style="font-size: '.$size.'%;">'
+                .htmlspecialchars($tag).'</a> <small>('.$nb.')</small> ';
+        }
+
+        echo '</p>';
+    }
 }
 elseif ($mode == 'tag')
 {
@@ -941,14 +954,15 @@ elseif ($mode == 'tag')
     </div>';
 
     $tags = $f->getNearTags($tag);
-    $max = max(array_values($tags));
-    $min = min(array_values($tags));
-    $spread = $max - $min;
-    if ($spread == 0) $spread = 1;
-    $step = 50 / $spread;
 
     if (!empty($tags))
     {
+        $max = max(array_values($tags));
+        $min = min(array_values($tags));
+        $spread = $max - $min;
+        if ($spread == 0) $spread = 1;
+        $step = 50 / $spread;
+
         echo '<p class="related_tags">'.sprintf(__("Other tags related to '%s':"), $tag).' ';
         foreach ($tags as $ttag=>$nb)
         {
@@ -961,19 +975,23 @@ elseif ($mode == 'tag')
 
     $pics = $f->getByTag($tag);
 
-    echo '<ul class="pics">'."\n";
-
-    foreach ($pics as &$pic)
+    if (empty($pics))
+        echo '<p class="info">'.__('No picture found.').'</p>';
     {
-        echo '  <li>'
-            .'<a class="thumb" href="'.SELF_URL.'?'
-            .(!empty($pic['photos.path']) ? $pic['photos.path'].'/'.$pic['photos.filename'] : $pic['photos.filename'])
-            .'"><img src="'.BASE_URL.'cache/'.$pic['photos.hash'][0].'/'
-            .$pic['photos.hash'].'_thumb.jpg" alt="'.htmlspecialchars($pic['photos.filename']).'" /></a>'
-            ."</li>\n";
-    }
+        echo '<ul class="pics">'."\n";
 
-    echo "</ul>\n";
+        foreach ($pics as &$pic)
+        {
+            echo '  <li>'
+                .'<a class="thumb" href="'.SELF_URL.'?'
+                .(!empty($pic['photos.path']) ? $pic['photos.path'].'/'.$pic['photos.filename'] : $pic['photos.filename'])
+                .'"><img src="'.BASE_URL.'cache/'.$pic['photos.hash'][0].'/'
+                .$pic['photos.hash'].'_thumb.jpg" alt="'.htmlspecialchars($pic['photos.filename']).'" /></a>'
+                ."</li>\n";
+        }
+
+        echo "</ul>\n";
+    }
 }
 elseif ($mode == 'pic')
 {
@@ -1067,7 +1085,7 @@ elseif ($mode == 'pic')
 }
 else
 {
-    list($dirs, $pics, $update, $desc) = $f->getDirectory($selected_dir, true);
+    $pics = $dirs = $update = $desc = false;
 
     echo "<h1>".$title."</h1>\n";
 
@@ -1091,6 +1109,13 @@ else
 
     echo "</h4>
     </div>\n";
+
+    $list = $f->getDirectory($selected_dir, true);
+
+    if ($list === false)
+        echo '<p class="info">'.__('No picture found.').'</p>';
+    else
+        list($dirs, $pics, $update, $desc) = $list;
 
     if (!empty($update))
         echo '<p class="info">'.__('Updating database, please wait, more pictures will appear in a while...').'</p>';
