@@ -38,7 +38,7 @@
     ----------------
     
         Try tag:My_tag in an image comments, it will link to the "My_tag" pictures list.
-        You can add your tags, take a look at the example user_config.php
+        You can add your own tags, take a look at the example user_config.php
 
     THUMBNAILS
     ----------

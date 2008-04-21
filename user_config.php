@@ -103,6 +103,10 @@ $french_strings = array(
         =>  "Aucune image n'a &eacute;t&eacute; trouv&eacute;e.",
     'No tag found.'
         =>  "Aucun mot-cl&eacute; n'a &eacute;t&eacute; trouv&eacute;.",
+    'Previous'
+        =>  "Pr&eacute;c&eacute;dente",
+    'Next'
+        =>  "Suivante",
 );
 
 // Days of the week translations

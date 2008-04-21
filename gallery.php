@@ -156,6 +156,31 @@ class fotooManager
         return $res[0];
     }
 
+    public function getPrevAndNext($dir, $file)
+    {
+        $prev = $this->db->arrayQuery('SELECT id, hash, path, filename FROM photos
+            WHERE path="'.sqlite_escape_string($dir).'"
+            AND filename < "'.sqlite_escape_string($file).'"
+            ORDER BY filename DESC LIMIT 0,1;', SQLITE_ASSOC);
+
+        if (!empty($prev[0]))
+            $prev = $prev[0];
+        else
+            $prev = false;
+
+        $next = $this->db->arrayQuery('SELECT id, hash, path, filename FROM photos
+            WHERE path="'.sqlite_escape_string($dir).'"
+            AND filename > "'.sqlite_escape_string($file).'"
+            ORDER BY filename ASC LIMIT 0,1;', SQLITE_ASSOC);
+
+        if (!empty($next[0]))
+            $next = $next[0];
+        else
+            $next = false;
+
+        return array($prev, $next);
+    }
+
     // Delete photo informations and thumb
     private function cleanInfos($id, $hash)
     {
@@ -171,6 +196,22 @@ class fotooManager
             unlink($small);
 
         return true;
+    }
+
+    // Delete all photos in DB which are deleted in filesystem
+    public function cleanDB()
+    {
+        $res = $this->db->arrayQuery('SELECT id, hash, path, filename FROM photos ORDER BY id;');
+        foreach ($res as &$row)
+        {
+            $file = BASE_DIR . '/' . ($row['path'] ? $row['path'] . '/' : '') . $row['filename'];
+
+            if (!file_exists($file))
+            {
+                $this->cleanInfos($row['id'], $row['hash']);
+            }
+        }
+        unset($res);
     }
 
     private function getHash($file, $path, $size, $time)
@@ -422,9 +463,21 @@ class fotooManager
 
     public function getByTag($tag)
     {
-        return $this->db->arrayQuery('SELECT photos.* FROM photos, tags
+        $pics = $this->db->arrayQuery('SELECT photos.* FROM photos, tags
             WHERE photos.id = tags.photo AND tags.name = \''.sqlite_escape_string($tag).'\'
             ORDER BY photos.filename;', SQLITE_ASSOC);
+
+        foreach ($pics as &$pic)
+        {
+            foreach ($pic as $field=>$value)
+            {
+                $name = str_replace('photos.', '', $field);
+                $pic[$name] = $value;
+                unset($pic[$field]);
+            }
+        }
+
+        return $pics;
     }
 
     public function getNearTags($tag)
@@ -560,6 +613,16 @@ class fotooManager
     }
 }
 
+function thumb_url($pic)
+{
+    return BASE_URL . 'cache/' . $pic['hash'][0] . '/' . $pic['hash'] . '_thumb.jpg';
+}
+
+function img_page_url($pic)
+{
+    return SELF_URL . '?' . (empty($pic['path']) ? '' : $pic['path'].'/') . $pic['filename'];
+}
+
 error_reporting(E_ALL);
 
 // Against bad configurations
@@ -662,6 +725,8 @@ exit;
 
 if (isset($_GET['style_css']))
 {
+    header('Content-Type: text/css');
+
     $img_home = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAgVBMVEX%2F%2F%2F%2F%2B%2Ffr%2F%2F%2F%2Fx5svn06W%2FrYL06tPw48T69%2B769er17drv4sH%2B%2Fv39%2Bvb48uT2793s27SzoXn38ODq163r163q2Kzp2Kzz6dLz6M%2Fv4sP38eHu4L748eLz6dHt3Lfs3Ljw4sPu4L3s3Lfy6M%2Ft3bhmXEXMuIv%2FgICdjmvMAAD8%2BfNB06UXAAAAAXRSTlMAQObYZgAAAAFiS0dEAIgFHUgAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQfUDB4RJBdfkpQSAAAAfElEQVR42o3MyRKCQAxF0WaeZwFRAQdId%2Fj%2FDzQNVEpc8Xb3VCVCbJNSHCYR5V8fhNq2f4S6qS41C3X%2BHqch34X6HnWe94xemyCCdW1dt%2F9YgLjeQJiVj1uZhbA%2FhTRQtCBl8Bc1z2rxGRJDg5EwxKYGM2ZwCv2jcECc2ReExg8II8b%2F0AAAAABJRU5ErkJggg%3D%3D';
     $img_tag = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8%2F9hAAAABmJLR0QA%2FwD%2FAP%2BgvaeTAAAAE3RFWHRBdXRob3IATWF1cmljZSBTdmF52MWWvwAAAaNJREFUeNrEU7FOAkEQnb2QGBIRKS38E402BgtCIXaCDedhDJY0WmlLSYgNiSIhWPER%2FIM%2FoAbt5E4SE%2FZ2x5nZQ6%2BncJLh3ezNvHszOyhEhFXMgxUt83HRBCAVlpUYg%2FJsDdAPWGMACZHRWHdOiITWxJKT4Ra27rowDc4xF%2FiSQG9BxTETiitGipnIYyTns9f7PmQUILw3qPisDmYWUkEsyRAziQallzG7Bksxn3uFAoklQiTt6%2FU6xGEkkph5s1QSVNbJhaWblBMR1dIQuWeWRMnf47H0zJavHJHUVEEiW9mkNb2gUsp98wMMJxOcBg3keSSIs9EIZ4NHXFrU7WLa5p0OPu%2FtIykgmSQnWy7LLLLFA3c%2F9PV8tQZRr%2Bdi45R9tdsuXjgFPAM3IOoxe1ikARnXQvVEcMP3BXOXTYetVooA%2BRqtioZDzB9Xkp4tRIOBuyqt3XWyyzPvg4bc1bXErN7jyW%2F3H9Tn6EkOFE%2BbmHmojH8O8sW1nV2Y395I26xevdROfzeON9Gmtk420LoYZPuYlGOU%2FrlG%2FfufaWWCHwEGAEtagFSXeJBuAAAAAElFTkSuQmCC';
     $img_date = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAflBMVEX%2F%2F%2F%2Bbm5vuExPuJSXuUlPuWlnuLi7uSkruQULuNzjuHBzDwsPJysnuDAyZmpqampq3t7eamZqqq6u%2Fvr%2B6urrGxsa%2Bv76fn5%2Bnp6ecnJy9vL2%2Bvr6cm5uam5q5urmzs7Ovr6%2FHxsebnJyjo6PKycruX1%2FMzMyZmZn%2F%2F%2F%2FuAAALeyOvAAAAAXRSTlMAQObYZgAAAAFiS0dEAIgFHUgAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQfUDB4RJToDVvkmAAAAZElEQVR42oWNRw6AMBADQ%2B%2B99x6S%2F38QFhBEAQn7Nh7JCL2zLIqs6YYqmSKlHHDopxGTJyuAiOC969EAgMUYHoDkWqECgJkxagCYN2zGGAEM945Pg31pAKRV2fpdH%2BZTVrjoPxuqaxRtezAMLwAAAABJRU5ErkJggg%3D%3D';
@@ -702,6 +767,13 @@ dl.metas dt.tags { background-image: url({$img_tag}); }
 dl.metas dt.date { background-image: url({$img_date}); }
 dl.metas dt.comment { background-image: url({$img_info}); }
 dl.metas dd { margin: 0.2em 0 1em; }
+ul.goPrevNext { margin-left: 620px; margin-top: 1em; }
+ul.goPrevNext li { float: left; position: relative; width: 50%; text-align: center; min-height: 1px; }
+ul.goPrevNext li a { display: block; width: 100%; opacity: 0.50; }
+ul.goPrevNext li span { position: absolute; width: 100%; height: 70px; display: block; top: 0; left: 0; }
+ul.goPrevNext li a:hover { opacity: 1.0; }
+ul.goPrevNext li.goPrev span { background: no-repeat left 5px url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACUAAAAkAgMAAABzrBs1AAAAAXNSR0IArs4c6QAAAAxQTFRFAAAAAAAAgICA////d1gD9QAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH2AQVEjswpTedBQAAABl0RVh0Q29tbWVudABDcmVhdGVkIHdpdGggR0lNUFeBDhcAAACNSURBVBjTddCxDQMxCAVQrvAI7EOK9FcYN9SpPV1qT0VaQnCkfOkUV0/o2waI/p1DifgsNhXSXmSV40t9SBt9R5/CVmzDRWeRzW+6ijr9PqJXdLlasY1wnUW25CpmxUd8mNFwK2Y0fG5mxddmVl5xIQR+1+Ax+AI/hnagSWgdB4IxYXhYCS4K1gdLvZ43iKd3z/wdnx4AAAAASUVORK5CYII=); }
+ul.goPrevNext li.goNext span { background: no-repeat right 5px url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACUAAAAkAgMAAABzrBs1AAAAAXNSR0IArs4c6QAAAAxQTFRFAAAAAAAAgICA////d1gD9QAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH2AQVEjs2TFQ4MAAAABl0RVh0Q29tbWVudABDcmVhdGVkIHdpdGggR0lNUFeBDhcAAACUSURBVBjTbZDBDcMwCEXJgRG6T0bwwZQJOkQu9RRWJrQygy+mhETylxpOT/LDwCd6rEWIXimQZSXJNyYSufCT6e0vJ25CWkPmr6zaQuZSk3a5sGUdIXPpohYyl+EYMheraiE7NrWQHbtayI7D8ZQdbTfrNx5m4x+nAG3wGYyYg2EdWBJWnwfBmXA8RAJBzfgg1Mf6Ab4Vd5O1T2UuAAAAAElFTkSuQmCC); }
 
 p.tags, p.related_tags { margin: 1em; }
 p.tags small, p.related_tags small { margin-right: 1em; }
@@ -775,6 +847,13 @@ else
 {
     $mode = 'dir';
     $title = false;
+
+    if (isset($_GET['cleanUpdate']))
+    {
+        $cleanUpdate = true;
+        unset($_GET['cleanUpdate']);
+        $_SERVER['argv'][0] = '';
+    }
 
     if (!empty($_SERVER['argv']) && preg_match('!^(.*)(?:/?([^/]+)[_.](jpe?g))?$!Ui', urldecode($_SERVER['argv'][0]), $match))
     {
@@ -851,10 +930,8 @@ if ($mode == 'date')
         foreach ($pics as &$pic)
         {
             echo '  <li>'
-                .'<a class="thumb" href="'.SELF_URL.'?'
-                .(!empty($pic['path']) ? $pic['path'].'/'.$pic['filename'] : $pic['filename'])
-                .'"><img src="'.BASE_URL.'cache/'.$pic['hash'][0].'/'
-                .$pic['hash'].'_thumb.jpg" alt="'.htmlspecialchars($pic['filename']).'" /></a>'
+                .'<a class="thumb" href="'.img_page_url($pic).'"><img src="'
+                .thumb_url($pic).'" alt="'.htmlspecialchars($pic['filename']).'" /></a>'
                 ."</li>\n";
         }
 
@@ -912,10 +989,8 @@ if ($mode == 'date')
                 $current = $month ? $pic['day'] : $pic['month'];
             }
 
-            echo '  <li><a class="thumb" href="'.SELF_URL.'?'
-                .(!empty($pic['path']) ? $pic['path'].'/'.$pic['filename'] : $pic['filename'])
-                .'"><img src="'.BASE_URL.'cache/'.$pic['hash'][0].'/'
-                .$pic['hash'].'_thumb.jpg" alt="'.htmlspecialchars($pic['filename']).'" /></a>'
+            echo '  <li><a class="thumb" href="'.img_page_url($pic).'"><img src="'
+                .thumb_url($pic).'" alt="'.htmlspecialchars($pic['filename']).'" /></a>'
                 ."</li>\n";
         }
 
@@ -993,10 +1068,8 @@ elseif ($mode == 'tag')
         foreach ($pics as &$pic)
         {
             echo '  <li>'
-                .'<a class="thumb" href="'.SELF_URL.'?'
-                .(!empty($pic['photos.path']) ? $pic['photos.path'].'/'.$pic['photos.filename'] : $pic['photos.filename'])
-                .'"><img src="'.BASE_URL.'cache/'.$pic['photos.hash'][0].'/'
-                .$pic['photos.hash'].'_thumb.jpg" alt="'.htmlspecialchars($pic['photos.filename']).'" /></a>'
+                .'<a class="thumb" href="'.img_page_url($pic)
+                .'"><img src="'.thumb_url($pic).'" alt="'.htmlspecialchars($pic['filename']).'" /></a>'
                 ."</li>\n";
         }
 
@@ -1095,6 +1168,22 @@ elseif ($mode == 'pic')
         <dt class="date">'.__('Date:').'</dt>
         <dd class="date">'.$date.'</dd>
     </dl>';
+
+    list($prev, $next) = $f->getPrevAndNext($selected_dir, $selected_file);
+
+    echo '
+    <ul class="goPrevNext">
+        <li class="goPrev">' .
+        ($prev ?
+            '<a href="' . img_page_url($prev) . '" title="' . __('Previous') . '"><img src="' .
+            thumb_url($prev) . '" alt="' . __('Previous') . '" /><span></span></a>' : '') .
+        '</li>
+        <li class="goNext">' .
+        ($next ?
+            '<a href="' . img_page_url($next) . '" title="' . __('Next') . '"><img src="' .
+            thumb_url($next) . '" alt="' . __('Next') . '" /><span></span></a>' : '') .
+        '</li>
+    </ul>';
 }
 else
 {
@@ -1157,10 +1246,8 @@ else
         foreach ($pics as &$pic)
         {
             echo '  <li>'
-                .'<a class="thumb" href="'.SELF_URL.'?'
-                .(!empty($pic['path']) ? $pic['path'].'/'.$pic['filename'] : $pic['filename'])
-                .'"><img src="'.BASE_URL.'cache/'.$pic['hash'][0].'/'
-                .$pic['hash'].'_thumb.jpg" alt="'.htmlspecialchars($pic['filename']).'" /></a>'
+                .'<a class="thumb" href="'.img_page_url($pic)
+                .'"><img src="'.thumb_url($pic).'" alt="'.htmlspecialchars($pic['filename']).'" /></a>'
                 ."</li>\n";
         }
 
@@ -1193,6 +1280,12 @@ else
     echo '
 </body>
 </html>';
+}
+
+if ((time() % 100 == 0) || isset($cleanUpdate))
+{
+    flush();
+    $f->cleanDB();
 }
 
 ?>
