@@ -77,7 +77,7 @@ class fotooManager
         if (!file_exists(CACHE_DIR . '/photos.db'))
             $init = true;
 
-        $this->db = new SQLiteDatabase(CACHE_DIR . '/photos.db', 600);
+        $this->db = new SQLiteDatabase(CACHE_DIR . '/photos.db', 0600);
 
         if ($init)
             $this->initDB();
@@ -300,7 +300,7 @@ class fotooManager
         if (GEN_SMALL)
             $this->resizeImage($file, $this->getSmallPath($hash), $width, $height, 600);
 
-        $this->db->unbufferedQuery("INSERT INTO photos
+        @$this->db->unbufferedQuery("INSERT INTO photos
             (id, filename, path, width, height, year, month, day, time, comment, hash)
             VALUES (NULL, '".sqlite_escape_string($filename)."', '".sqlite_escape_string($path)."',
             '".(int)$width."', '".(int)$height."', '".date('Y', $date)."',
@@ -657,6 +657,8 @@ $mode = false;
 
 if (isset($_GET['update_js']))
 {
+    header('Content-Type: text/javascript');
+
 echo <<<EOF_UPDATE_JS
 if (typeof need_update != 'undefined')
 {
@@ -689,16 +691,16 @@ if (typeof need_update != 'undefined')
 
         if (update_done >= need_update.length)
         {
-            window.location = window.location;
+            window.setTimeout('window.location = window.location', 100);
             return;
         }
 
         var file = need_update[update_done];
         var img = document.createElement('img');
         img.src = update_url + '?updateDir=' + escape(update_dir) + '&updateFile=' + escape(file);
-        img.alt = '';
+        img.alt = update_done + '/' + need_update.length;
         img.width = Math.round(update_done * 5);
-        img.height = 0;
+        img.height = 1;
         img.style.borderBottom = "2px solid #000099";
         img.style.verticalAlign = "middle";
         img.style.margin = "0 10px";
@@ -772,8 +774,8 @@ ul.goPrevNext li { float: left; position: relative; width: 50%; text-align: cent
 ul.goPrevNext li a { display: block; width: 100%; opacity: 0.50; }
 ul.goPrevNext li span { position: absolute; width: 100%; height: 70px; display: block; top: 0; left: 0; }
 ul.goPrevNext li a:hover { opacity: 1.0; }
-ul.goPrevNext li.goPrev span { background: no-repeat left 5px url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACUAAAAkAgMAAABzrBs1AAAAAXNSR0IArs4c6QAAAAxQTFRFAAAAAAAAgICA////d1gD9QAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH2AQVEjswpTedBQAAABl0RVh0Q29tbWVudABDcmVhdGVkIHdpdGggR0lNUFeBDhcAAACNSURBVBjTddCxDQMxCAVQrvAI7EOK9FcYN9SpPV1qT0VaQnCkfOkUV0/o2waI/p1DifgsNhXSXmSV40t9SBt9R5/CVmzDRWeRzW+6ijr9PqJXdLlasY1wnUW25CpmxUd8mNFwK2Y0fG5mxddmVl5xIQR+1+Ax+AI/hnagSWgdB4IxYXhYCS4K1gdLvZ43iKd3z/wdnx4AAAAASUVORK5CYII=); }
-ul.goPrevNext li.goNext span { background: no-repeat right 5px url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACUAAAAkAgMAAABzrBs1AAAAAXNSR0IArs4c6QAAAAxQTFRFAAAAAAAAgICA////d1gD9QAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH2AQVEjs2TFQ4MAAAABl0RVh0Q29tbWVudABDcmVhdGVkIHdpdGggR0lNUFeBDhcAAACUSURBVBjTbZDBDcMwCEXJgRG6T0bwwZQJOkQu9RRWJrQygy+mhETylxpOT/LDwCd6rEWIXimQZSXJNyYSufCT6e0vJ25CWkPmr6zaQuZSk3a5sGUdIXPpohYyl+EYMheraiE7NrWQHbtayI7D8ZQdbTfrNx5m4x+nAG3wGYyYg2EdWBJWnwfBmXA8RAJBzfgg1Mf6Ab4Vd5O1T2UuAAAAAElFTkSuQmCC); }
+ul.goPrevNext li.goPrev span { background: no-repeat left 5px url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwBAMAAAClLOS0AAAAAXNSR0IArs4c6QAAAA9QTFRFGQAAAAEASkxJiIqH%2Ff%2F8u4XNPgAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAACXBIWXMAAA9hAAAPYQGoP6dpAAAAB3RJTUUH2AQWDzkfOptdEwAAAQVJREFUOMt11NGRwzAIBFDTwUGuAc%2FRwaUDq%2F%2BaIgFawBPnK5sHSSwhHUd5%2FeAd1Y8PSuAGDKAGlMANGEANKIEbMIAaUAI3YAA1mOk%2FgPl1cml4XQ6z5J2wUsAsGQkrOaySBEsOqyTBkoGVADwZWAnA0wIv2RBpgZdsiDQhSgJ2mhAlATtda43eCbvBwEsckC40bPgFyBj1qyQ7dLQfV4BU2C32r3S0B1Q8h1SIFn9yHW0RFWslFbwlVldH2yjFfkgFa9k7qKMNg2LPpcJqwZToaAOnmCupMFtyEvVsQ%2F2H2ZXz6zHo014Pzg3o4UTVw3kDeji19QK4AT3cDPWSucHxcPu01wfKhVDzxmZ5WAAAAABJRU5ErkJggg%3D%3D); }
+ul.goPrevNext li.goNext span { background: no-repeat right 5px url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwBAMAAAClLOS0AAAAAXNSR0IArs4c6QAAAA9QTFRFGQAAAAEASkxJiIqH%2Ff%2F8u4XNPgAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAACXBIWXMAAA9hAAAPYQGoP6dpAAAAB3RJTUUH2AQWEAAYvQGhRwAAAPhJREFUOMuFlMEVAyEIRLUD2A4oIck2ENz%2Ba4oognPwxdu87%2BwqDJZCZa1aYHECQhCyMgJOQAgoACPgBISAAjACTkAIKMBm4evlsvJnt%2FDVXFa%2BX5uFr8dlB22zdOCyg2ezdODSwGYxMKWBzWJgygHSMsCQA6RlgCEnCMsEJicIywQmHSyLg2aFup%2FN4sCkA7cs0AK4ZYFHAnwBaDoEPiUBFH6ueSqB40rcQ%2BGCmjcXKIlErRSKqFldgbJL9EOhUZodFGitRM8VwqCZEoH4SORKIXCaSRSIqER23xBqSDud5uM0UXSawdPU0mnOTy8Dnd4SfGRw2%2F%2F1A2QkUuJFNEBvAAAAAElFTkSuQmCC); }
 
 p.tags, p.related_tags { margin: 1em; }
 p.tags small, p.related_tags small { margin-right: 1em; }
