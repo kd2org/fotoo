@@ -737,8 +737,7 @@ if (isset($_GET['style_css']) || isset($_GET['slideshow_css']))
     $img_dir = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAABa1BMVEX%2F%2F%2F%2F%2F92v%2F8GPp1CPklwrjjgX%2F9Wn%2F5FX%2F7F7%2F%2FXH%2F%2Bm7%2F%2FnL%2F6lz%2F6Fr%2F82bj1oXlpRDjkAfmpxDkmQrnuRj110jnuxniigP%2F82f1zz71zT3%2F51nozCD%2F%2B2%2Fkkgf16l7jiQPmsxbmshXp1STlqBD14lXmsRTlqxLjigTp0yP%2F72LihgL120zp0iP%2F30%2FpzyLnxR3%2F%2B3D1zDv%2F8mX%2F%2FXLo0SL%2F2UnoxR717mL11Ub%2F92z%2F7mHp0CLntxf%2F%2BW3loA7%2F4FHnvhr%2F%2BG3%2F51jjkQb%2F5FbmrhP%2F4VHihQH%2F41PozSH%2F4FDknw3knAzlow7mrBP182f%2F%2BW7nwRviiAP%2F617jlAj%2F7WD%2F%2F3P10EHlnAvoyh%2F%2F8WTkmwvkoQ7131HoyB7%2F3Ev%2F9Gf%2F7V%2F%2F4lPo0CHbxj%2FklQj10kP151r%2F5Vf%2F%2B3HnvRr%2F%2FnP%2F3U7owBvowxzmthf18WXpzSH%2F41X%2F6Fn%2F3E319Wr%2F%2F3Tp1CTmqPETAAAAAXRSTlMAQObYZgAAAAFiS0dEAIgFHUgAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQfUDB4RJC2Znk2gAAAAtElEQVR42mNgIAJUVGjaFCHxmSvKysqizPPECtTUBexBAkB%2BQKGFfIZqnI5oJAODMrNuikx8vqOIopuKn6Uw0ITy8nBOLkY%2BJo4Sdp%2F0NLAAt6ETW3QYT2ZyTIQLA4NpeQ5nICOfVoh0sTeLJCsDg365iaxVIlMSr6t7bqiUBgODF3eWHZuxNY%2Bzp16CoFEwAwO%2FARejBBMHL7tDqVmqggfQHUHZtkr%2BQrG%2BLHKs4tr8DGQAAGf6I1yfqMWaAAAAAElFTkSuQmCC';
     $img_forward = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAulBMVEX%2F%2F%2F9ylekzTY42VZt3muyIp%2FSIp%2FV0mOuRr%2Fp3me10l%2Bo0TpA0UJR9n%2B%2BNrPczTpA4W6Q0UJOVsvw0UJUvQX4vQn04W6V5nO41UpcwQn6KqfZxlumPrvlxlemFpvM1U5g2VJkvQXw5XacySYkySog1UpYxSIY4XqiCovIyTI02V54xRoSHp%2FUwRYE2VZowRYIuQXwxSIcySIgvQn6AoPCTsfs4XKc2VJo3WKA3WqMzTY81VJmCo%2FKFpfPmpKZIAAAAAXRSTlMAQObYZgAAAAFiS0dEAIgFHUgAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQfUDB4RITX3hSGzAAAAgklEQVR42mNgIAKom4FIZnm4gJKQJZC0ZhWECYiZcmgxMKja2mhCBQQ4ZPjMGXhsTHgNoSIWfFKswgxMvOIs%2BlARPR05GyYGIxYuRgMwn5nNFshX4WSXVYTzrRiUObmkRSEaFGw1uBkY1NgZRaAmSNgA%2BQzajMYwd%2FDwg0hdSQZyAQCimAm2dQJutQAAAABJRU5ErkJggg%3D%3D';
     $img_info = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAABGlBMVEX%2F%2F%2F90tf93t%2F%2FL4%2F%2FI4v81lf9Aqvw8p%2FxAmv9csv8%2Bmf9gtv%2BOw%2F9Drfw7mf9uwf9qvf5Io%2F%2BBz%2F5gtf9PqP82o%2Fwzofx0xf5TrP9Gr%2FxBnv9asf5Mpv89mf80lP84pPyD0f5Ervw1lP89ov1Kpf5luf5Ko%2F99zP5Tqv9vwv5qvf9Qsf1BrPxQqf9Yr%2F6E0f5zxP5KpP9TrP5JpP5Bq%2Fx3yP5Urf5mu%2F5Wrv57y%2F43lv9UrP9buv1Psv06pvyB0P5Wtf00ofyAzv4%2BqfxXr%2F5Krf13x%2F9SrP50xP5uwf6Az%2F57yv49m%2F9YuP1tv%2F40k%2F9Yr%2F9Pqf9htf9zxf55yP5nu%2F9fvf13x%2F5luv5Bpf2Nw%2F8zk%2F%2F%2F%2F%2F9%2Bzf4NgFg2AAAAAXRSTlMAQObYZgAAAAFiS0dEAIgFHUgAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQfUDB4RJAzV913%2BAAAAx0lEQVR42o2P1RaCUBBFAQEFCwU7ELu7u7tbGP7%2FN7zWu%2Fvt7DWz1jkYhtAQOkXRERrsi4HyOIbqtkoZPlleVwJXl7TJ10zy%2B54656wugLSZ44OvL8ITsKoSAJ2M6EsEEqyjp7aNZTp11zMzFgllqa6MAKA9Mnun8hKxxq1PA3SZcTGzQ8KXmJ7MIwAx2xKiPiTw%2BnzR0QLYHoLXjSNBUhcOZQC71%2BIn38VM%2FES0DewhS1P%2BVg2G485Dwe2Xf2NIHI1jcRL7iycAMB5ogC93MwAAAABJRU5ErkJggg%3D%3D';
-    $img_prev = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwBAMAAAClLOS0AAAAAXNSR0IArs4c6QAAAA9QTFRFGQAAAAEASkxJiIqH%2Ff%2F8u4XNPgAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAACXBIWXMAAA9hAAAPYQGoP6dpAAAAB3RJTUUH2AQWDzkfOptdEwAAAQVJREFUOMt11NGRwzAIBFDTwUGuAc%2FRwaUDq%2F%2BaIgFawBPnK5sHSSwhHUd5%2FeAd1Y8PSuAGDKAGlMANGEANKIEbMIAaUAI3YAA1mOk%2FgPl1cml4XQ6z5J2wUsAsGQkrOaySBEsOqyTBkoGVADwZWAnA0wIv2RBpgZdsiDQhSgJ2mhAlATtda43eCbvBwEsckC40bPgFyBj1qyQ7dLQfV4BU2C32r3S0B1Q8h1SIFn9yHW0RFWslFbwlVldH2yjFfkgFa9k7qKMNg2LPpcJqwZToaAOnmCupMFtyEvVsQ%2F2H2ZXz6zHo014Pzg3o4UTVw3kDeji19QK4AT3cDPWSucHxcPu01wfKhVDzxmZ5WAAAAABJRU5ErkJggg%3D%3D';
-    $img_next = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwBAMAAAClLOS0AAAAAXNSR0IArs4c6QAAAA9QTFRFGQAAAAEASkxJiIqH%2Ff%2F8u4XNPgAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAACXBIWXMAAA9hAAAPYQGoP6dpAAAAB3RJTUUH2AQWEAAYvQGhRwAAAPhJREFUOMuFlMEVAyEIRLUD2A4oIck2ENz%2Ba4oognPwxdu87%2BwqDJZCZa1aYHECQhCyMgJOQAgoACPgBISAAjACTkAIKMBm4evlsvJnt%2FDVXFa%2BX5uFr8dlB22zdOCyg2ezdODSwGYxMKWBzWJgygHSMsCQA6RlgCEnCMsEJicIywQmHSyLg2aFup%2FN4sCkA7cs0AK4ZYFHAnwBaDoEPiUBFH6ueSqB40rcQ%2BGCmjcXKIlErRSKqFldgbJL9EOhUZodFGitRM8VwqCZEoH4SORKIXCaSRSIqER23xBqSDud5uM0UXSawdPU0mnOTy8Dnd4SfGRw2%2F%2F1A2QkUuJFNEBvAAAAAElFTkSuQmCC';
+    $img_back = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAyCAYAAACd+7GKAAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A/wD/oL2nkwAAADVJREFUCNeFjUEOACAMwiqT/3/Zm3OJUw5NyBjAKQmYG672hoxEtf5/tNfowu3au8oChgASC4cWARUDoKzWAAAAAElFTkSuQmCC';
 
     if (isset($_GET['style_css']))
     {
@@ -778,11 +777,9 @@ dl.metas dt.comment { background-image: url({$img_info}); }
 dl.metas dd { margin: 0.2em 0 1em; }
 ul.goPrevNext { margin-left: 620px; margin-top: 1em; }
 ul.goPrevNext li { float: left; position: relative; width: 50%; text-align: center; min-height: 1px; }
-ul.goPrevNext li a { display: block; width: 100%; opacity: 0.50; }
-ul.goPrevNext li span { position: absolute; width: 100%; height: 70px; display: block; top: 0; left: 0; }
+ul.goPrevNext li a { display: block; width: 100%; color: #000; text-decoration: none; opacity: 0.50; }
+ul.goPrevNext li span { display: block; width: 100%; font-size: 50px; line-height: 40px; }
 ul.goPrevNext li a:hover { opacity: 1.0; }
-ul.goPrevNext li.goPrev span { background: no-repeat left 5px url({$img_prev}); }
-ul.goPrevNext li.goNext span { background: no-repeat right 5px url({$img_next}); }
 
 p.tags, p.related_tags { margin: 1em; }
 p.tags small, p.related_tags small { margin-right: 1em; }
@@ -803,26 +800,29 @@ EOF_STYLE_CSS;
     }
     else
     {
-        $img_pause = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABcAAAAgAgMAAACEOwsmAAAAAXNSR0IArs4c6QAAAAxQTFRFAQQAdXd0rK6r%2FP%2F7JCXQZAAAAAFiS0dEAIgFHUgAAAAJcEhZcwAAB0wAAAdMAQ7b9LEAAAAfSURBVAjXY2DABhj%2FH%2BD%2Fx8DANEQoxlUNXCuxeoQBANu1R%2FyXXF%2FBAAAAAElFTkSuQmCC';
-        $img_play = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABEAAAAfBAMAAADzSTu5AAAAAXNSR0IArs4c6QAAAA9QTFRFGQAAAgUBMjQxvb+8+vz40L9hrgAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAACXBIWXMAAAjzAAAI8wF7DtCyAAAAW0lEQVQY022QwQ3AMAgDMwIWE3SErFB1/5magGvnUV6nUwKGgRgswBQimEJEibwokTcl8qFcRLmIclPLTS2LShaVbJoiOb/TX/fTDM9VFudTZu9x7vZzA93lUy+WPhShqiJMJQAAAABJRU5ErkJggg==';
-
         echo <<<EOF_SLIDESHOW_CSS
 * { margin: 0; padding: 0; }
-body { background: #000; font-family: Sans-serif; position: absolute; top: 0; left: 0; bottom: 0; right: 0;  }
+body { background: #000; font-family: Sans-serif; position: absolute; top: 0; left: 0; bottom: 0; right: 0; font-size: 12px;}
 ul { list-style-type: none; }
+body.loading { cursor: wait; }
 
-#controlBar { position: absolute; bottom: 20px; left: 20px; right: 20px; text-align: center; width: 25em; margin: 0 auto; padding-bottom: 0.5em; }
-#controlBar li { float: left; margin: 0 0.5em; }
-#controlBar li a { display: block; opacity: 0.50; }
+#slideshow img { position: absolute; top: 0; left: 0; }
+
+#controlBar { position: absolute; bottom: 0px; left: 0px; right: 0px; z-index: 100;
+    background: repeat-x bottom left url({$img_back}); height: 40px; width: 100%; padding-top: 10px;}
+#controlBar li { float: left; padding: 0 7%; height: }
+#controlBar li a { display: block; opacity: 0.50; color: #fff; text-decoration: none; font-size: 2em;
+    line-height: 20px; width: 50px; text-align: center; }
 #controlBar li a:hover { opacity: 1.0; }
+#controlBar li.back a { font-size: 2em; font-weight: bold; }
+#controlBar li.next a, #controlBar li.prev a { font-size: 4em; }
+#controlBar li.play a { font-size: 3em; }
 
-#controlBar li.prev a, #controlBar li.next a, #controlBar li#playPause a { width: 50px; height: 50px; background: no-repeat center center; text-indent: -70em; overflow: hidden; }
-#controlBar li.prev a { background-image: url({$img_prev}); }
-#controlBar li.next a { background-image: url({$img_next}); }
-#controlBar li#playPause a.pause { background-image: url({$img_pause}); }
-#controlBar li#playPause a.play { background-image: url({$img_play}); }
+#controlBar.playing li.play { display: none; }
+#controlBar.pause li.pause { display: none; }
 
-#controlBar li.back a { color: white; padding: 0.5em; font-size: 1.5em; text-decoration: none; font-weight: bold; }
+#controlBar li.loading { color: #fff; font-size: 4em; line-height: 20px; visibility: hidden; }
+body.loading #controlBar li.loading  { visibility: visible; }
 
 EOF_SLIDESHOW_CSS;
     }
@@ -1219,12 +1219,12 @@ elseif ($mode == 'pic')
         <li class="goPrev">' .
         ($prev ?
             '<a href="' . img_page_url($prev) . '" title="' . __('Previous') . '"><img src="' .
-            thumb_url($prev) . '" alt="' . __('Previous') . '" /><span></span></a>' : '') .
+            thumb_url($prev) . '" alt="' . __('Previous') . '" /><span>&#11013;</span></a>' : '') .
         '</li>
         <li class="goNext">' .
         ($next ?
             '<a href="' . img_page_url($next) . '" title="' . __('Next') . '"><img src="' .
-            thumb_url($next) . '" alt="' . __('Next') . '" /><span></span></a>' : '') .
+            thumb_url($next) . '" alt="' . __('Next') . '" /><span>&#10145;</span></a>' : '') .
         '</li>
     </ul>';
 }
@@ -1248,32 +1248,30 @@ elseif ($mode == 'slideshow')
         var max_width = 0;
         var max_height = 0;
 
-        function hidePrevious(previous)
-        {
+        function hidePrevious(previous) {
             if (!document.getElementById("picture_"+previous))
                 return;
 
+            document.getElementById("picture_"+previous).style.zIndex = "1";
             document.getElementById("picture_"+previous).style.display = "none";
         }
 
-        function loadPicture(nb, previous)
-        {
-            if (typeof(previous) != "undefined")
-                hidePrevious(previous);
-
+        function loadPicture(nb, previous) {
             var pic_id = "picture_"+nb;
+            document.body.className = "loading"
+
+            if (typeof(previous) != "undefined" && document.getElementById("picture_"+previous))
+                document.getElementById("picture_"+previous).style.zIndex = "2";
 
             if (slideEvent)
                 window.clearTimeout(slideEvent);
 
-            if (!document.getElementById(pic_id))
-            {
+            if (!document.getElementById(pic_id)) {
                 var width = parseInt(pictures[nb][2]);
                 var height = parseInt(pictures[nb][3]);
                 var ratio = false;
 
-                if(width > max_width)
-                {
+                if(width > max_width) {
                     if(height <= width)
                         ratio = max_width / width;
                     else
@@ -1283,12 +1281,8 @@ elseif ($mode == 'slideshow')
                     height = Math.round(height * ratio);
                 }
 
-                if (height > max_height)
-                {
-                    if(height >= width)
-                        ratio = max_width / width;
-                    else
-                        ratio = max_height / height;
+                if (height > max_height) {
+                    ratio = max_height / height;
 
                     width = Math.round(width * ratio);
                     height = Math.round(height * ratio);
@@ -1297,6 +1291,7 @@ elseif ($mode == 'slideshow')
                 var img = document.createElement("img");
                 img.id = pic_id;
                 img.style.display = "block";
+                img.style.zIndex = "1";
                 img.style.margin = Math.round((max_height - height) / 2) + "px 0px 0px " + Math.round((max_width - width) / 2) + "px";
                 img.width = width;
                 img.height = height;
@@ -1304,42 +1299,48 @@ elseif ($mode == 'slideshow')
 
                 document.getElementById("slideshow").appendChild(img);
 
-                if (playing)
                 document.getElementById(pic_id).onload = function() {
-                    slideEvent = window.setTimeout(goNext, time_slide * 1000);
+                    if (playing)
+                        slideEvent = window.setTimeout(goNext, time_slide * 1000);
+
+                    if (typeof(previous) != "undefined")
+                        hidePrevious(previous);
+
+                    document.body.className = "";
                 }
             }
-            else
-            {
+            else {
                 document.getElementById(pic_id).style.display = "block";
-                slideEvent = window.setTimeout(goNext, time_slide * 1000);
+
+                if (playing)
+                    slideEvent = window.setTimeout(goNext, time_slide * 1000);
+
+                if (typeof(previous) != "undefined")
+                    hidePrevious(previous);
+
+                document.body.className = "";
             }
 
             window.location.href = "#" + nb;
         }
 
-
-        function playPause()
-        {
+        function playPause() {
             max_width = document.body.offsetWidth;
             max_height = document.body.offsetHeight;
 
-            if (playing)
-            {
+            if (playing) {
                 playing = false;
-                document.getElementById("playPause").firstChild.className = "play";
+                document.getElementById("controlBar").className = "pause";
             }
-            else
-            {
+            else {
                 playing = true;
-                document.getElementById("playPause").firstChild.className = "pause";
+                document.getElementById("controlBar").className = "playing";
             }
 
-            loadPicture(current, current);
+            loadPicture(current);
         }
 
-        function goNext()
-        {
+        function goNext() {
             var previous = current;
             current++;
 
@@ -1349,8 +1350,7 @@ elseif ($mode == 'slideshow')
             loadPicture(current, previous);
         }
 
-        function goPrev()
-        {
+        function goPrev() {
             var previous = current;
             current--;
 
@@ -1386,10 +1386,12 @@ elseif ($mode == 'slideshow')
         <div id="slideshow">
         </div>
 
-        <ul id="controlBar">
-            <li class="prev"><a href="#" onclick="goPrev(); return false;">'.__('Previous').'</a></li>
-            <li id="playPause"><a href="#" class="pause" onclick="playPause(); return false;">'.__('Play/pause').'</a></li>
-            <li class="next"><a href="#" onclick="goNext(); return false;">'.__('Next').'</a></li>
+        <ul id="controlBar" class="playing">
+            <li class="loading">&#8986;</li>
+            <li class="prev"><a href="#" onclick="goPrev(); return false;" title="'.__('Previous').'">&#11013;</a></li>
+            <li class="pause"><a href="#" onclick="playPause(); return false;" title="'.__('Pause').'">&#9612;&#9612;</a></li>
+            <li class="play"><a href="#" onclick="playPause(); return false;" title="'.__('Restart').'">&#9654;</a></li>
+            <li class="next"><a href="#" onclick="goNext(); return false;" title="'.__('Next').'">&#10145;</a></li>
             <li class="back"><a href="'.SELF_URL.'?'.$selected_dir.'">'.__('Retour').'</a></li>
         </ul>
         ';
