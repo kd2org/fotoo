@@ -109,6 +109,10 @@ $french_strings = array(
         =>  "Photo suivante",
     'Slideshow'
         =>  'Diaporama',
+    'Pause'
+        =>  'Mettre en pause',
+    'Restart'
+        =>  'Reprendre',
 );
 
 // Days of the week translations
