@@ -758,7 +758,7 @@ a img { border: none; }
 #header h5 a.date { background-image: url({$img_date}); }
 #header h5 a.tags { background-image: url({$img_tag}); }
 #header h4 a { padding-left: 2em; background: no-repeat 0.2em 0 url({$img_forward}); }
-#header h4 small a { background: none; color: #999; padding: 0; }
+#header h4 small a { background-image: url({$img_dir}); color: #999; margin-left: 2em; }
 
 ul.pics { clear: left; }
 ul.pics li { float: left; margin: 0.5%; width: 19%; height: 160px; text-align: center; }
@@ -1413,7 +1413,7 @@ else
     }
 
     if (!empty($list[1]))
-        echo '  <script type="text/javascript"> document.write("<small><a class=\\"slideshow\\" href=\\"'.SELF_URL.'?slideshow='.$selected_dir.'\\">'.__('(Slideshow)').'</a></small>"); </script>';
+        echo '  <script type="text/javascript"> document.write("<small><a class=\\"slideshow\\" href=\\"'.SELF_URL.'?slideshow='.$selected_dir.'\\">'.__('Slideshow').'</a></small>"); </script>';
 
     echo "</h4>
     </div>\n";
