@@ -473,7 +473,9 @@ class fotooManager
             {
                 $name = str_replace('photos.', '', $field);
                 $pic[$name] = $value;
-                unset($pic[$field]);
+
+                if ($field != $name)
+                    unset($pic[$field]);
             }
         }
 
