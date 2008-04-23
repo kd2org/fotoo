@@ -1263,6 +1263,9 @@ elseif ($mode == 'slideshow')
 
             var pic_id = "picture_"+nb;
 
+            if (slideEvent)
+                window.clearTimeout(slideEvent);
+
             if (!document.getElementById(pic_id))
             {
                 var width = parseInt(pictures[nb][2]);
@@ -1300,18 +1303,19 @@ elseif ($mode == 'slideshow')
                 img.src = pictures[current][0];
 
                 document.getElementById("slideshow").appendChild(img);
+
+                if (playing)
+                document.getElementById(pic_id).onload = function() {
+                    slideEvent = window.setTimeout(goNext, time_slide * 1000);
+                }
             }
-
-            document.getElementById(pic_id).style.display = "block";
-            window.location.href = "#" + nb;
-
-            if (slideEvent)
-                window.clearTimeout(slideEvent);
-
-            if (playing)
+            else
             {
+                document.getElementById(pic_id).style.display = "block";
                 slideEvent = window.setTimeout(goNext, time_slide * 1000);
             }
+
+            window.location.href = "#" + nb;
         }
 
 
