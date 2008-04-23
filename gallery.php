@@ -727,7 +727,7 @@ EOF_UPDATE_JS;
 exit;
 }
 
-if (isset($_GET['style_css']))
+if (isset($_GET['style_css']) || isset($_GET['slideshow_css']))
 {
     header('Content-Type: text/css');
 
@@ -737,8 +737,12 @@ if (isset($_GET['style_css']))
     $img_dir = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAABa1BMVEX%2F%2F%2F%2F%2F92v%2F8GPp1CPklwrjjgX%2F9Wn%2F5FX%2F7F7%2F%2FXH%2F%2Bm7%2F%2FnL%2F6lz%2F6Fr%2F82bj1oXlpRDjkAfmpxDkmQrnuRj110jnuxniigP%2F82f1zz71zT3%2F51nozCD%2F%2B2%2Fkkgf16l7jiQPmsxbmshXp1STlqBD14lXmsRTlqxLjigTp0yP%2F72LihgL120zp0iP%2F30%2FpzyLnxR3%2F%2B3D1zDv%2F8mX%2F%2FXLo0SL%2F2UnoxR717mL11Ub%2F92z%2F7mHp0CLntxf%2F%2BW3loA7%2F4FHnvhr%2F%2BG3%2F51jjkQb%2F5FbmrhP%2F4VHihQH%2F41PozSH%2F4FDknw3knAzlow7mrBP182f%2F%2BW7nwRviiAP%2F617jlAj%2F7WD%2F%2F3P10EHlnAvoyh%2F%2F8WTkmwvkoQ7131HoyB7%2F3Ev%2F9Gf%2F7V%2F%2F4lPo0CHbxj%2FklQj10kP151r%2F5Vf%2F%2B3HnvRr%2F%2FnP%2F3U7owBvowxzmthf18WXpzSH%2F41X%2F6Fn%2F3E319Wr%2F%2F3Tp1CTmqPETAAAAAXRSTlMAQObYZgAAAAFiS0dEAIgFHUgAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQfUDB4RJC2Znk2gAAAAtElEQVR42mNgIAJUVGjaFCHxmSvKysqizPPECtTUBexBAkB%2BQKGFfIZqnI5oJAODMrNuikx8vqOIopuKn6Uw0ITy8nBOLkY%2BJo4Sdp%2F0NLAAt6ETW3QYT2ZyTIQLA4NpeQ5nICOfVoh0sTeLJCsDg365iaxVIlMSr6t7bqiUBgODF3eWHZuxNY%2Bzp16CoFEwAwO%2FARejBBMHL7tDqVmqggfQHUHZtkr%2BQrG%2BLHKs4tr8DGQAAGf6I1yfqMWaAAAAAElFTkSuQmCC';
     $img_forward = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAulBMVEX%2F%2F%2F9ylekzTY42VZt3muyIp%2FSIp%2FV0mOuRr%2Fp3me10l%2Bo0TpA0UJR9n%2B%2BNrPczTpA4W6Q0UJOVsvw0UJUvQX4vQn04W6V5nO41UpcwQn6KqfZxlumPrvlxlemFpvM1U5g2VJkvQXw5XacySYkySog1UpYxSIY4XqiCovIyTI02V54xRoSHp%2FUwRYE2VZowRYIuQXwxSIcySIgvQn6AoPCTsfs4XKc2VJo3WKA3WqMzTY81VJmCo%2FKFpfPmpKZIAAAAAXRSTlMAQObYZgAAAAFiS0dEAIgFHUgAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQfUDB4RITX3hSGzAAAAgklEQVR42mNgIAKom4FIZnm4gJKQJZC0ZhWECYiZcmgxMKja2mhCBQQ4ZPjMGXhsTHgNoSIWfFKswgxMvOIs%2BlARPR05GyYGIxYuRgMwn5nNFshX4WSXVYTzrRiUObmkRSEaFGw1uBkY1NgZRaAmSNgA%2BQzajMYwd%2FDwg0hdSQZyAQCimAm2dQJutQAAAABJRU5ErkJggg%3D%3D';
     $img_info = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAABGlBMVEX%2F%2F%2F90tf93t%2F%2FL4%2F%2FI4v81lf9Aqvw8p%2FxAmv9csv8%2Bmf9gtv%2BOw%2F9Drfw7mf9uwf9qvf5Io%2F%2BBz%2F5gtf9PqP82o%2Fwzofx0xf5TrP9Gr%2FxBnv9asf5Mpv89mf80lP84pPyD0f5Ervw1lP89ov1Kpf5luf5Ko%2F99zP5Tqv9vwv5qvf9Qsf1BrPxQqf9Yr%2F6E0f5zxP5KpP9TrP5JpP5Bq%2Fx3yP5Urf5mu%2F5Wrv57y%2F43lv9UrP9buv1Psv06pvyB0P5Wtf00ofyAzv4%2BqfxXr%2F5Krf13x%2F9SrP50xP5uwf6Az%2F57yv49m%2F9YuP1tv%2F40k%2F9Yr%2F9Pqf9htf9zxf55yP5nu%2F9fvf13x%2F5luv5Bpf2Nw%2F8zk%2F%2F%2F%2F%2F9%2Bzf4NgFg2AAAAAXRSTlMAQObYZgAAAAFiS0dEAIgFHUgAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQfUDB4RJAzV913%2BAAAAx0lEQVR42o2P1RaCUBBFAQEFCwU7ELu7u7tbGP7%2FN7zWu%2Fvt7DWz1jkYhtAQOkXRERrsi4HyOIbqtkoZPlleVwJXl7TJ10zy%2B54656wugLSZ44OvL8ITsKoSAJ2M6EsEEqyjp7aNZTp11zMzFgllqa6MAKA9Mnun8hKxxq1PA3SZcTGzQ8KXmJ7MIwAx2xKiPiTw%2BnzR0QLYHoLXjSNBUhcOZQC71%2BIn38VM%2FES0DewhS1P%2BVg2G485Dwe2Xf2NIHI1jcRL7iycAMB5ogC93MwAAAABJRU5ErkJggg%3D%3D';
+    $img_prev = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwBAMAAAClLOS0AAAAAXNSR0IArs4c6QAAAA9QTFRFGQAAAAEASkxJiIqH%2Ff%2F8u4XNPgAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAACXBIWXMAAA9hAAAPYQGoP6dpAAAAB3RJTUUH2AQWDzkfOptdEwAAAQVJREFUOMt11NGRwzAIBFDTwUGuAc%2FRwaUDq%2F%2BaIgFawBPnK5sHSSwhHUd5%2FeAd1Y8PSuAGDKAGlMANGEANKIEbMIAaUAI3YAA1mOk%2FgPl1cml4XQ6z5J2wUsAsGQkrOaySBEsOqyTBkoGVADwZWAnA0wIv2RBpgZdsiDQhSgJ2mhAlATtda43eCbvBwEsckC40bPgFyBj1qyQ7dLQfV4BU2C32r3S0B1Q8h1SIFn9yHW0RFWslFbwlVldH2yjFfkgFa9k7qKMNg2LPpcJqwZToaAOnmCupMFtyEvVsQ%2F2H2ZXz6zHo014Pzg3o4UTVw3kDeji19QK4AT3cDPWSucHxcPu01wfKhVDzxmZ5WAAAAABJRU5ErkJggg%3D%3D';
+    $img_next = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwBAMAAAClLOS0AAAAAXNSR0IArs4c6QAAAA9QTFRFGQAAAAEASkxJiIqH%2Ff%2F8u4XNPgAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAACXBIWXMAAA9hAAAPYQGoP6dpAAAAB3RJTUUH2AQWEAAYvQGhRwAAAPhJREFUOMuFlMEVAyEIRLUD2A4oIck2ENz%2Ba4oognPwxdu87%2BwqDJZCZa1aYHECQhCyMgJOQAgoACPgBISAAjACTkAIKMBm4evlsvJnt%2FDVXFa%2BX5uFr8dlB22zdOCyg2ezdODSwGYxMKWBzWJgygHSMsCQA6RlgCEnCMsEJicIywQmHSyLg2aFup%2FN4sCkA7cs0AK4ZYFHAnwBaDoEPiUBFH6ueSqB40rcQ%2BGCmjcXKIlErRSKqFldgbJL9EOhUZodFGitRM8VwqCZEoH4SORKIXCaSRSIqER23xBqSDud5uM0UXSawdPU0mnOTy8Dnd4SfGRw2%2F%2F1A2QkUuJFNEBvAAAAAElFTkSuQmCC';
 
-echo <<<EOF_STYLE_CSS
+    if (isset($_GET['style_css']))
+    {
+        echo <<<EOF_STYLE_CSS
 * { margin: 0; padding: 0; }
 ul { list-style-type: none; }
 body { font-family: Sans-serif; background: #fff; color: #000; padding: 1em; }
@@ -754,6 +758,7 @@ a img { border: none; }
 #header h5 a.date { background-image: url({$img_date}); }
 #header h5 a.tags { background-image: url({$img_tag}); }
 #header h4 a { padding-left: 2em; background: no-repeat 0.2em 0 url({$img_forward}); }
+#header h4 small a { background: none; color: #999; padding: 0; }
 
 ul.pics { clear: left; }
 ul.pics li { float: left; margin: 0.5%; width: 19%; height: 160px; text-align: center; }
@@ -776,8 +781,8 @@ ul.goPrevNext li { float: left; position: relative; width: 50%; text-align: cent
 ul.goPrevNext li a { display: block; width: 100%; opacity: 0.50; }
 ul.goPrevNext li span { position: absolute; width: 100%; height: 70px; display: block; top: 0; left: 0; }
 ul.goPrevNext li a:hover { opacity: 1.0; }
-ul.goPrevNext li.goPrev span { background: no-repeat left 5px url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwBAMAAAClLOS0AAAAAXNSR0IArs4c6QAAAA9QTFRFGQAAAAEASkxJiIqH%2Ff%2F8u4XNPgAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAACXBIWXMAAA9hAAAPYQGoP6dpAAAAB3RJTUUH2AQWDzkfOptdEwAAAQVJREFUOMt11NGRwzAIBFDTwUGuAc%2FRwaUDq%2F%2BaIgFawBPnK5sHSSwhHUd5%2FeAd1Y8PSuAGDKAGlMANGEANKIEbMIAaUAI3YAA1mOk%2FgPl1cml4XQ6z5J2wUsAsGQkrOaySBEsOqyTBkoGVADwZWAnA0wIv2RBpgZdsiDQhSgJ2mhAlATtda43eCbvBwEsckC40bPgFyBj1qyQ7dLQfV4BU2C32r3S0B1Q8h1SIFn9yHW0RFWslFbwlVldH2yjFfkgFa9k7qKMNg2LPpcJqwZToaAOnmCupMFtyEvVsQ%2F2H2ZXz6zHo014Pzg3o4UTVw3kDeji19QK4AT3cDPWSucHxcPu01wfKhVDzxmZ5WAAAAABJRU5ErkJggg%3D%3D); }
-ul.goPrevNext li.goNext span { background: no-repeat right 5px url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwBAMAAAClLOS0AAAAAXNSR0IArs4c6QAAAA9QTFRFGQAAAAEASkxJiIqH%2Ff%2F8u4XNPgAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAACXBIWXMAAA9hAAAPYQGoP6dpAAAAB3RJTUUH2AQWEAAYvQGhRwAAAPhJREFUOMuFlMEVAyEIRLUD2A4oIck2ENz%2Ba4oognPwxdu87%2BwqDJZCZa1aYHECQhCyMgJOQAgoACPgBISAAjACTkAIKMBm4evlsvJnt%2FDVXFa%2BX5uFr8dlB22zdOCyg2ezdODSwGYxMKWBzWJgygHSMsCQA6RlgCEnCMsEJicIywQmHSyLg2aFup%2FN4sCkA7cs0AK4ZYFHAnwBaDoEPiUBFH6ueSqB40rcQ%2BGCmjcXKIlErRSKqFldgbJL9EOhUZodFGitRM8VwqCZEoH4SORKIXCaSRSIqER23xBqSDud5uM0UXSawdPU0mnOTy8Dnd4SfGRw2%2F%2F1A2QkUuJFNEBvAAAAAElFTkSuQmCC); }
+ul.goPrevNext li.goPrev span { background: no-repeat left 5px url({$img_prev}); }
+ul.goPrevNext li.goNext span { background: no-repeat right 5px url({$img_next}); }
 
 p.tags, p.related_tags { margin: 1em; }
 p.tags small, p.related_tags small { margin-right: 1em; }
@@ -795,7 +800,33 @@ a:link { color: darkblue; }
 a:visited { color: black; }
 a:hover { color: darkred; }
 EOF_STYLE_CSS;
-exit;
+    }
+    else
+    {
+        $img_pause = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABcAAAAgAgMAAACEOwsmAAAAAXNSR0IArs4c6QAAAAxQTFRFAQQAdXd0rK6r%2FP%2F7JCXQZAAAAAFiS0dEAIgFHUgAAAAJcEhZcwAAB0wAAAdMAQ7b9LEAAAAfSURBVAjXY2DABhj%2FH%2BD%2Fx8DANEQoxlUNXCuxeoQBANu1R%2FyXXF%2FBAAAAAElFTkSuQmCC';
+        $img_play = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABEAAAAfBAMAAADzSTu5AAAAAXNSR0IArs4c6QAAAA9QTFRFGQAAAgUBMjQxvb+8+vz40L9hrgAAAAF0Uk5TAEDm2GYAAAABYktHRACIBR1IAAAACXBIWXMAAAjzAAAI8wF7DtCyAAAAW0lEQVQY022QwQ3AMAgDMwIWE3SErFB1/5magGvnUV6nUwKGgRgswBQimEJEibwokTcl8qFcRLmIclPLTS2LShaVbJoiOb/TX/fTDM9VFudTZu9x7vZzA93lUy+WPhShqiJMJQAAAABJRU5ErkJggg==';
+
+        echo <<<EOF_SLIDESHOW_CSS
+* { margin: 0; padding: 0; }
+body { background: #000; font-family: Sans-serif; position: absolute; top: 0; left: 0; bottom: 0; right: 0;  }
+ul { list-style-type: none; }
+
+#controlBar { position: absolute; bottom: 20px; left: 20px; right: 20px; text-align: center; width: 25em; margin: 0 auto; padding-bottom: 0.5em; }
+#controlBar li { float: left; margin: 0 0.5em; }
+#controlBar li a { display: block; opacity: 0.50; }
+#controlBar li a:hover { opacity: 1.0; }
+
+#controlBar li.prev a, #controlBar li.next a, #controlBar li#playPause a { width: 50px; height: 50px; background: no-repeat center center; text-indent: -70em; overflow: hidden; }
+#controlBar li.prev a { background-image: url({$img_prev}); }
+#controlBar li.next a { background-image: url({$img_next}); }
+#controlBar li#playPause a.pause { background-image: url({$img_pause}); }
+#controlBar li#playPause a.play { background-image: url({$img_play}); }
+
+#controlBar li.back a { color: white; padding: 0.5em; font-size: 1.5em; text-decoration: none; font-weight: bold; }
+
+EOF_SLIDESHOW_CSS;
+    }
+    exit;
 }
 
 // Update or add a file to database
@@ -847,6 +878,12 @@ elseif (!empty($_GET['tag']))
     $tag = $_GET['tag'];
     $title = sprintf(__('Pictures in tag %s'), htmlspecialchars($tag));
 }
+elseif (isset($_GET['slideshow']))
+{
+    $mode = 'slideshow';
+    $selected_dir = $_GET['slideshow'];
+    $title = __('Slideshow');
+}
 else
 {
     $mode = 'dir';
@@ -877,7 +914,9 @@ else
     }
 }
 
-if (file_exists(BASE_DIR . '/user_style.css'))
+if ($mode == 'slideshow')
+    $css = SELF_URL . '?slideshow.css';
+elseif (file_exists(BASE_DIR . '/user_style.css'))
     $css = BASE_URL . 'user_style.css';
 else
     $css = SELF_URL . '?style.css';
@@ -888,7 +927,7 @@ $menu = '<h5><a class="home" href="'.SELF_URL.'">'.__('My Pictures').'</a>
     <a class="tags" href="'.SELF_URL.'?tags">'.__('By tags').'</a>
     <a class="date" href="'.SELF_URL.'?date">'.__('By date').'</a></h5>';
 
-if (file_exists(BASE_DIR . '/user_header.php'))
+if ($mode != 'slideshow' && file_exists(BASE_DIR . '/user_header.php'))
     require BASE_DIR . '/user_header.php';
 else
 {
@@ -1189,9 +1228,169 @@ elseif ($mode == 'pic')
         '</li>
     </ul>';
 }
+elseif ($mode == 'slideshow')
+{
+    $list = $f->getDirectory($selected_dir, true);
+
+    if ($list === false || empty($list[1]))
+        echo '<p class="info">'.__('No picture found.').'</p>';
+    else
+    {
+        echo '<script type="text/javascript">
+        var slideEvent = false;
+        var time_slide = 5;
+        var playing = false;
+        var current = 0;
+
+        var max_width = 0;
+        var max_height = 0;
+
+        function hidePrevious(previous)
+        {
+            if (!document.getElementById("picture_"+previous))
+                return;
+
+            document.getElementById("picture_"+previous).style.display = "none";
+        }
+
+        function loadPicture(nb, previous)
+        {
+            if (typeof(previous) != "undefined")
+                hidePrevious(previous);
+
+            var pic_id = "picture_"+nb;
+
+            if (!document.getElementById(pic_id))
+            {
+                var width = parseInt(pictures[nb][2]);
+                var height = parseInt(pictures[nb][3]);
+                var ratio = false;
+
+                if(width > max_width)
+                {
+                    if(height <= width)
+                        ratio = max_width / width;
+                    else
+                        ratio = max_height / height;
+
+                    width = Math.round(width * ratio);
+                    height = Math.round(height * ratio);
+                }
+
+                if (height > max_height)
+                {
+                    if(height >= width)
+                        ratio = max_width / width;
+                    else
+                        ratio = max_height / height;
+
+                    width = Math.round(width * ratio);
+                    height = Math.round(height * ratio);
+                }
+
+                var img = document.createElement("img");
+                img.id = pic_id;
+                img.style.display = "block";
+                img.style.margin = Math.round((max_height - height) / 2) + "px 0px 0px " + Math.round((max_width - width) / 2) + "px";
+                img.width = width;
+                img.height = height;
+                img.src = pictures[current][0];
+
+                document.getElementById("slideshow").appendChild(img);
+            }
+
+            document.getElementById(pic_id).style.display = "block";
+
+            if (slideEvent)
+                window.clearTimeout(slideEvent);
+
+            if (playing)
+            {
+                slideEvent = window.setTimeout(goNext, time_slide * 1000);
+            }
+        }
+
+
+        function playPause()
+        {
+            max_width = document.body.offsetWidth;
+            max_height = document.body.offsetHeight;
+
+            if (playing)
+            {
+                playing = false;
+                document.getElementById("playPause").firstChild.className = "play";
+            }
+            else
+            {
+                playing = true;
+                document.getElementById("playPause").firstChild.className = "pause";
+            }
+
+            loadPicture(current, current);
+        }
+
+        function goNext()
+        {
+            var previous = current;
+            current++;
+
+            if (current >= pictures.length)
+            {
+                current = 0;
+            }
+
+            loadPicture(current, previous);
+        }
+
+        function goPrev()
+        {
+            var previous = current;
+            current--;
+
+            if (current < 0)
+            {
+                current = pictures.length - 1;
+            }
+
+            loadPicture(current, previous);
+        }
+
+        window.onload = playPause;
+
+        var pictures = new Array();
+        ';
+
+        foreach ($list[1] as &$pic)
+        {
+            $path = BASE_URL . (empty($pic['path']) ? '' : $pic['path'].'/') . $pic['filename'];
+            echo '
+            pictures.push(new Array("'.htmlspecialchars($path).'", "'
+                . htmlspecialchars($pic['comment']).'", '.$pic['width'].', '.$pic['height'].'));';
+        }
+
+        reset($list[1]);
+        $pic = current($list[1]);
+        $path = BASE_URL . (empty($pic['path']) ? '' : $pic['path'].'/') . $pic['filename'];
+
+        echo '
+        </script>
+        <div id="slideshow">
+        </div>
+
+        <ul id="controlBar">
+            <li class="prev"><a href="#" onclick="goPrev(); return false;">'.__('Previous').'</a></li>
+            <li id="playPause"><a href="#" class="pause" onclick="playPause(); return false;">'.__('Play/pause').'</a></li>
+            <li class="next"><a href="#" onclick="goNext(); return false;">'.__('Next').'</a></li>
+            <li class="back"><a href="'.SELF_URL.'?'.$selected_dir.'">'.__('Retour').'</a></li>
+        </ul>
+        ';
+    }
+}
 else
 {
     $pics = $dirs = $update = $desc = false;
+    $list = $f->getDirectory($selected_dir, true);
 
     echo "<h1>".$title."</h1>\n";
 
@@ -1213,10 +1412,11 @@ else
         }
     }
 
+    if (!empty($list[1]))
+        echo '  <script type="text/javascript"> document.write("<small><a class=\\"slideshow\\" href=\\"'.SELF_URL.'?slideshow='.$selected_dir.'\\">'.__('(Slideshow)').'</a></small>"); </script>';
+
     echo "</h4>
     </div>\n";
-
-    $list = $f->getDirectory($selected_dir, true);
 
     if ($list === false)
         echo '<p class="info">'.__('No picture found.').'</p>';
