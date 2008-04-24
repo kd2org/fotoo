@@ -806,7 +806,6 @@ body { background: #000; font-family: Sans-serif; position: absolute; top: 0; le
 ul { list-style-type: none; }
 body.loading { cursor: wait; }
 
-#slideshow { z-index: 20; background: #000; position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
 #slideshow img { position: absolute; top: 0; left: 0; }
 
 #controlBar { position: absolute; bottom: 0px; left: 0px; right: 0px; z-index: 100;
@@ -1288,11 +1287,17 @@ elseif ($mode == 'slideshow')
                 var img = document.createElement("img");
                 img.id = pic_id;
                 img.style.display = "block";
-                img.style.zIndex = "-100";
                 img.style.margin = Math.round((max_height - height) / 2) + "px 0px 0px " + Math.round((max_width - width) / 2) + "px";
-                img.width = width;
-                img.height = height;
                 img.src = pictures[current][0];
+
+                if (typeof(previous) != "undefined") {
+                    img.width = "1";
+                    img.height = "1";
+                }
+                else {
+                    img.width = width;
+                    img.height = height;
+                }
 
                 document.getElementById("slideshow").appendChild(img);
 
@@ -1300,7 +1305,8 @@ elseif ($mode == 'slideshow')
                     if (playing)
                         slideEvent = window.setTimeout(goNext, time_slide * 1000);
 
-                    this.style.zIndex = "30";
+                    img.width = width;
+                    img.height = height;
 
                     if (typeof(previous) != "undefined")
                         hidePrevious(previous);
