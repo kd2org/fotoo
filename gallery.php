@@ -806,6 +806,8 @@ body { background: #000; font-family: Sans-serif; position: absolute; top: 0; le
 ul { list-style-type: none; }
 body.loading { cursor: wait; }
 
+p.info { color: #fff; padding: 1em; }
+
 #slideshow img { position: absolute; top: 0; left: 0; }
 
 #controlBar { position: absolute; bottom: 0px; left: 0px; right: 0px; z-index: 100;
