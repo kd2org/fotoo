@@ -806,7 +806,7 @@ body { background: #000; font-family: Sans-serif; position: absolute; top: 0; le
 ul { list-style-type: none; }
 body.loading { cursor: wait; }
 
-#slideshow img { position: absolute; top: 0; left: 0; }
+#slideshow img { position: absolute; top: 0; left: 0; display: block; }
 
 #controlBar { position: absolute; bottom: 0px; left: 0px; right: 0px; z-index: 100;
     background: repeat-x bottom left url({$img_back}); height: 40px; width: 100%; padding-top: 10px;}
@@ -1252,16 +1252,12 @@ elseif ($mode == 'slideshow')
             if (!document.getElementById("picture_"+previous))
                 return;
 
-            document.getElementById("picture_"+previous).style.zIndex = "1";
-            document.getElementById("picture_"+previous).style.display = "none";
+            document.getElementById("picture_"+previous).style.visibility = "hidden";
         }
 
         function loadPicture(nb, previous) {
             var pic_id = "picture_"+nb;
             document.body.className = "loading"
-
-            if (typeof(previous) != "undefined" && document.getElementById("picture_"+previous))
-                document.getElementById("picture_"+previous).style.zIndex = "2";
 
             if (slideEvent)
                 window.clearTimeout(slideEvent);
@@ -1290,8 +1286,7 @@ elseif ($mode == 'slideshow')
 
                 var img = document.createElement("img");
                 img.id = pic_id;
-                img.style.display = "block";
-                img.style.zIndex = "1";
+                img.style.visibility = "hidden";
                 img.style.margin = Math.round((max_height - height) / 2) + "px 0px 0px " + Math.round((max_width - width) / 2) + "px";
                 img.width = width;
                 img.height = height;
@@ -1303,6 +1298,8 @@ elseif ($mode == 'slideshow')
                     if (playing)
                         slideEvent = window.setTimeout(goNext, time_slide * 1000);
 
+                    this.style.visibility = "visible";
+
                     if (typeof(previous) != "undefined")
                         hidePrevious(previous);
 
@@ -1310,7 +1307,7 @@ elseif ($mode == 'slideshow')
                 }
             }
             else {
-                document.getElementById(pic_id).style.display = "block";
+                document.getElementById(pic_id).style.visibility = "visible";
 
                 if (playing)
                     slideEvent = window.setTimeout(goNext, time_slide * 1000);
