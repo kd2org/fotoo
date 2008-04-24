@@ -802,10 +802,11 @@ EOF_STYLE_CSS;
     {
         echo <<<EOF_SLIDESHOW_CSS
 * { margin: 0; padding: 0; }
-body { background: #000; font-family: Sans-serif; position: absolute; top: 0; left: 0; bottom: 0; right: 0; font-size: 12px;}
+body { background: #000; font-family: Sans-serif; position: absolute; top: 0; left: 0; bottom: 0; right: 0; font-size: 12px; }
 ul { list-style-type: none; }
 body.loading { cursor: wait; }
 
+#slideshow { z-index: 20; background: #000; position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
 #slideshow img { position: absolute; top: 0; left: 0; }
 
 #controlBar { position: absolute; bottom: 0px; left: 0px; right: 0px; z-index: 100;
@@ -1252,16 +1253,12 @@ elseif ($mode == 'slideshow')
             if (!document.getElementById("picture_"+previous))
                 return;
 
-            document.getElementById("picture_"+previous).style.zIndex = "1";
             document.getElementById("picture_"+previous).style.display = "none";
         }
 
         function loadPicture(nb, previous) {
             var pic_id = "picture_"+nb;
             document.body.className = "loading"
-
-            if (typeof(previous) != "undefined" && document.getElementById("picture_"+previous))
-                document.getElementById("picture_"+previous).style.zIndex = "2";
 
             if (slideEvent)
                 window.clearTimeout(slideEvent);
@@ -1291,7 +1288,7 @@ elseif ($mode == 'slideshow')
                 var img = document.createElement("img");
                 img.id = pic_id;
                 img.style.display = "block";
-                img.style.zIndex = "-10";
+                img.style.zIndex = "-100";
                 img.style.margin = Math.round((max_height - height) / 2) + "px 0px 0px " + Math.round((max_width - width) / 2) + "px";
                 img.width = width;
                 img.height = height;
@@ -1302,6 +1299,8 @@ elseif ($mode == 'slideshow')
                 document.getElementById(pic_id).onload = function() {
                     if (playing)
                         slideEvent = window.setTimeout(goNext, time_slide * 1000);
+
+                    this.style.zIndex = "30";
 
                     if (typeof(previous) != "undefined")
                         hidePrevious(previous);
