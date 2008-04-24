@@ -1221,12 +1221,12 @@ elseif ($mode == 'pic')
         <li class="goPrev">' .
         ($prev ?
             '<a href="' . img_page_url($prev) . '" title="' . __('Previous') . '"><img src="' .
-            thumb_url($prev) . '" alt="' . __('Previous') . '" /><span>&#11013;</span></a>' : '') .
+            thumb_url($prev) . '" alt="' . __('Previous') . '" /><span>&larr;</span></a>' : '') .
         '</li>
         <li class="goNext">' .
         ($next ?
             '<a href="' . img_page_url($next) . '" title="' . __('Next') . '"><img src="' .
-            thumb_url($next) . '" alt="' . __('Next') . '" /><span>&#10145;</span></a>' : '') .
+            thumb_url($next) . '" alt="' . __('Next') . '" /><span>&rarr;</span></a>' : '') .
         '</li>
     </ul>';
 }
@@ -1395,10 +1395,10 @@ elseif ($mode == 'slideshow')
 
         <ul id="controlBar" class="playing">
             <li class="loading">&#8986;</li>
-            <li class="prev"><a href="#" onclick="goPrev(); return false;" title="'.__('Previous').'">&#11013;</a></li>
+            <li class="prev"><a href="#" onclick="goPrev(); return false;" title="'.__('Previous').'">&larr;</a></li>
             <li class="pause"><a href="#" onclick="playPause(); return false;" title="'.__('Pause').'">&#9612;&#9612;</a></li>
             <li class="play"><a href="#" onclick="playPause(); return false;" title="'.__('Restart').'">&#9654;</a></li>
-            <li class="next"><a href="#" onclick="goNext(); return false;" title="'.__('Next').'">&#10145;</a></li>
+            <li class="next"><a href="#" onclick="goNext(); return false;" title="'.__('Next').'">&rarr;</a></li>
             <li class="back"><a href="'.SELF_URL.'?'.$selected_dir.'">'.__('Retour').'</a></li>
         </ul>
         ';
