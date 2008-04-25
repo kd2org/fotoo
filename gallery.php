@@ -895,10 +895,10 @@ else
     {
         $cleanUpdate = true;
         unset($_GET['cleanUpdate']);
-        $_SERVER['argv'][0] = '';
+        $_SERVER['QUERY_STRING'] = '';
     }
 
-    if (!empty($_SERVER['argv']) && preg_match('!^(.*)(?:/?([^/]+)[_.](jpe?g))?$!Ui', urldecode($_SERVER['argv'][0]), $match))
+    if (!empty($_SERVER['QUERY_STRING']) && preg_match('!^(.*)(?:/?([^/]+)[_.](jpe?g))?$!Ui', urldecode($_SERVER['QUERY_STRING']), $match))
     {
         $selected_dir = $match[1];
         $title = strtr(htmlspecialchars($match[1]), array('/' => ' / ', '_' => ' '));
