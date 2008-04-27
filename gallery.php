@@ -592,15 +592,14 @@ class fotooManager
         if (extension_loaded('imagick') && function_exists('imagick_readimage'))
         {
             $handle = imagick_readimage($source);
-            if (imagick_resize($handle, $new_width, $new_height, IMAGICK_FILTER_UNKNOWN, 1))
-            {
-                imagick_convert($handle,'JPEG');
-                if (file_exists($dest)) @unlink($dest);
-                imagick_writeimage($handle, $dest);
-                imagick_free($handle);
+            imagick_resize($handle, $new_width, $new_height, IMAGICK_FILTER_UNKNOWN, 1);
+            imagick_convert($handle,'JPEG');
+            if (file_exists($dest)) @unlink($dest);
+            imagick_writeimage($handle, $dest);
+            imagick_free($handle);
+
+            if (file_exists($dest))
                 return true;
-            }
-            @imagick_free($handle);
         }
 
         // GD >= 2.0 (slow)
