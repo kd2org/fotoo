@@ -574,7 +574,7 @@ class fotooManager
             }
         }
 
-        if (extension_loaded('imagick'))
+        if (extension_loaded('imagick') && class_exists('Imagick'))
         {
             $im = new Imagick;
             if ($im->readImage($source) && $im->resizeImage($new_width, $new_height, Imagick::FILTER_UNDEFINED, 1))
