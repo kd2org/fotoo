@@ -470,7 +470,7 @@ class fotooManager
     public function getByTag($tag)
     {
         $pics = $this->db->arrayQuery('SELECT photos.* FROM photos, tags
-            WHERE photos.id = tags.photo AND tags.name = \''.sqlite_escape_string($tag).'\'
+            WHERE photos.id = tags.photo AND tags.name LIKE \''.sqlite_escape_string($tag).'\'
             ORDER BY photos.filename;', SQLITE_ASSOC);
 
         foreach ($pics as &$pic)
