@@ -554,6 +554,7 @@ class fotooManager
         if ($new_width == $width && $new_height == $height)
             return true;
 
+        // IMLib (fast!)
         if (extension_loaded('imlib'))
         {
             $src = @imlib_load_image($source);
@@ -574,6 +575,7 @@ class fotooManager
             }
         }
 
+        // Imagick >= 2.0 API (quite fast)
         if (extension_loaded('imagick') && class_exists('Imagick'))
         {
             $im = new Imagick;
@@ -586,6 +588,22 @@ class fotooManager
             }
         }
 
+        // Imagick <= 2.0 API (quite fast)
+        if (extension_loaded('imagick') && function_exists('imagick_readimage'))
+        {
+            $handle = imagick_readimage($source);
+            if (imagick_resize($handle, $new_width, $new_height, IMAGICK_FILTER_UNKNOWN, 1))
+            {
+                imagick_convert($handle,'JPEG');
+                if (file_exists($dest)) @unlink($dest);
+                imagick_writeimage($handle, $dest);
+                imagick_free($handle);
+                return true;
+            }
+            @imagick_free($handle);
+        }
+
+        // GD >= 2.0 (slow)
         if (function_exists('imagecopyresampled') && extension_loaded('gd'))
         {
             $sourceImage = @imagecreatefromjpeg($source);
