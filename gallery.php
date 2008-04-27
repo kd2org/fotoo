@@ -372,7 +372,7 @@ class fotooManager
             {
                 continue;
             }
-            elseif ($pic = $this->getInfos($file, $path))
+            elseif ($pic = $this->getInfos($file, $path, true))
             {
                 if (is_array($pic)) $pictures[$file] = $pic;
             }
