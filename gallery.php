@@ -153,6 +153,12 @@ class fotooManager
             $pic['tags'][] = $row[0];
         }
 
+        $small_path = $this->getSmallPath($hash);
+        if (GEN_SMALL == 2 && !$from_list && !file_exists($small_path))
+        {
+            $this->resizeImage($file, $small_path, $pic['width'], $pic['height'], 600);
+        }
+
         return $res[0];
     }
 
@@ -297,7 +303,7 @@ class fotooManager
             $this->resizeImage($file, $this->getThumbPath($hash), $width, $height, 160);
         }
 
-        if (GEN_SMALL)
+        if (GEN_SMALL == 1)
             $this->resizeImage($file, $this->getSmallPath($hash), $width, $height, 600);
 
         @$this->db->unbufferedQuery("INSERT INTO photos
@@ -640,7 +646,7 @@ if (!defined('BASE_DIR'))   define('BASE_DIR', dirname(__FILE__));
 if (!defined('CACHE_DIR'))  define('CACHE_DIR', BASE_DIR . '/cache');
 if (!defined('BASE_URL'))   define('BASE_URL', 'http://'.$_SERVER['HTTP_HOST'].dirname($_SERVER['SCRIPT_NAME']).'/');
 if (!defined('SELF_URL'))   define('SELF_URL', BASE_URL . (basename($_SERVER['SCRIPT_NAME']) == 'index.php' ? '' : basename($_SERVER['SCRIPT_NAME'])));
-if (!defined('GEN_SMALL'))  define('GEN_SMALL', false);
+if (!defined('GEN_SMALL'))  define('GEN_SMALL', 0);
 
 if (!function_exists('__'))
 {

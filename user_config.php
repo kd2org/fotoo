@@ -38,9 +38,14 @@ if (!class_exists('fotooManager'))
 //define('BASE_URL', 'http://myserver.tld/pics/');
 //define('SELF_URL', BASE_URL . 'gallery.php');
 
-// Generate a resized copy of images for small view (600x600)
+// Generate a resized copy of images for small view (600x600), disabled by default
 // WARNING GENERATING IMAGES IS REALLY SLOW AND IT MAY KILL YOU WEBSERVER!
-//define('GEN_SMALL', true);
+
+// Generate all small images in directory update process (slow)
+//define('GEN_SMALL', 1);
+
+// Generate small image when an image page is viewed (less slow)
+//define('GEN_SMALL', 2);
 
 // Shortcut tags in album and pictures comments
 // eg. if you type wp:Belgium in your comment tag, it will make a link to wikipedia
