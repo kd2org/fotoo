@@ -588,7 +588,7 @@ class fotooManager
             }
         }
 
-        // Imagick <= 2.0 API (quite fast)
+        // Imagick < 2.0 API (quite fast)
         if (extension_loaded('imagick') && function_exists('imagick_readimage'))
         {
             $handle = imagick_readimage($source);
