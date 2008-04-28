@@ -243,6 +243,7 @@ class fotooManager
         $height = $size[1];
         $comment = '';
         $tags = array();
+        $date = false;
 
         // IPTC contains tags
         if (!empty($infos['APP13']))
@@ -266,16 +267,12 @@ class fotooManager
         $exif = exif_read_data($file, 0, true, true);
         if (!empty($exif))
         {
-            if (!empty($exif['IFD0']['DateTime']))
-            {
+            if (!empty($exif['IFD0']['DateTimeOriginal']))
+                $date = strtotime($exif['IDF0']['DateTimeOriginal']);
+            elseif (!empty($exif['IFD0']['DateTime']))
                 $date = strtotime($exif['IFD0']['DateTime']);
-            }
-
-            if (!isset($date) && !empty($exif['FILE']['FileDateTime']))
-            {
-                exec('echo "Date fichier trouvée dans '.$filename.'" >> /tmp/log');
+            elseif (!empty($exif['FILE']['FileDateTime']))
                 $date = (int) $exif['FILE']['FileDateTime'];
-            }
 
             if (!empty($exif['COMMENT']))
             {
@@ -291,7 +288,7 @@ class fotooManager
 
         unset($exif);
 
-        if (empty($date))
+        if (!$date)
             $date = $file_time;
 
         if (isset($thumb))
