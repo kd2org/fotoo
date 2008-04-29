@@ -29,6 +29,11 @@ if (!class_exists('SQLiteDatabase'))
     die("You don't have SQLite native extension, please install it.");
 }
 
+if (strpos($_SERVER['HTTP_HOST'], '.free.fr'))
+{
+    die("Free.fr n'est pas compatible avec Fotoo Gallery (bug dans SQLite)");
+}
+
 class fotooManager
 {
     private $db = false;
