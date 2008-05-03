@@ -954,6 +954,8 @@ $menu = '<h5><a class="home" href="'.SELF_URL.'">'.__('My Pictures').'</a>
     <a class="tags" href="'.SELF_URL.'?tags">'.__('By tags').'</a>
     <a class="date" href="'.SELF_URL.'?date">'.__('By date').'</a></h5>';
 
+header('Content-Type: text/html; charset=UTF-8');
+
 if ($mode != 'slideshow' && file_exists(BASE_DIR . '/user_header.php'))
     require BASE_DIR . '/user_header.php';
 else
