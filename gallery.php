@@ -131,7 +131,7 @@ class fotooManager
     {
         if ($upgrade == 'TAGS_ID')
         {
-            $res = $this->db->arrayQuery('SELECT name, photo FROM tags GROUP BY name;');
+            $res = $this->db->arrayQuery('SELECT name, photo FROM tags;');
 
             $this->db->queryExec('
             DROP TABLE tags;
