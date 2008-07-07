@@ -23,9 +23,11 @@
     REQUIREMENTS
     ------------
 
-        * PHP >= 5.2
+        * PHP >= 5.2.0
         * SQLite native extension
         * (optional) PHP Imagick or PHP Imlib extension (it will make thumbnail generation faster)
+        * GD (if Imagick and Imlib are not installed), used for thumbnail generation when there is no
+          Exif thumbnail available
        
         Note: this application will throw an error on Free.fr hosting service because their SQLite
         version is broken (see http://www.aduf.org/viewtopic.php?t=170585 for details).

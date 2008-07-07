@@ -59,6 +59,15 @@ class fotooManager
         return $dir . '/' . $hash . '_small.jpg';
     }
 
+    public function getTagId($name)
+    {
+        $name = htmlentities($name);
+        $name = preg_replace('!&([aeiouyAEIOUYNcC]|ae)(?:circ|grave|acute|circ|tilde|uml|ring|slash|cedil|lig);!', '\\1', $name);
+        $name = html_entity_decode($name);
+        $name = strtolower($name);
+        return $name;
+    }
+
     public function __construct()
     {
         $init = false;
@@ -112,9 +121,38 @@ class fotooManager
 
         CREATE TABLE tags (
             name VARCHAR(255) NOT NULL,
+            name_id VARCHAR(255) NOT NULL,
             photo INTEGER UNSIGNED,
-            PRIMARY KEY (name, photo)
+            PRIMARY KEY (name_id, photo)
         );');
+    }
+
+    private function upgradeDB($upgrade)
+    {
+        if ($upgrade == 'TAGS_ID')
+        {
+            $res = $this->db->arrayQuery('SELECT name, photo FROM tags GROUP BY name;');
+
+            $this->db->queryExec('
+            DROP TABLE tags;
+            CREATE TABLE tags (
+                name VARCHAR(255) NOT NULL,
+                name_id VARCHAR(255) NOT NULL,
+                photo INTEGER UNSIGNED,
+                PRIMARY KEY (name_id, photo)
+            );');
+
+
+            foreach ($res as $row)
+            {
+                $name_id = $this->getTagId($row['name']);
+                $this->db->unbufferedQuery("INSERT INTO tags (name, name_id, photo)
+                    VALUES ('".sqlite_escape_string($row['name'])."',
+                        '".sqlite_escape_string($name_id)."', '".(int)$row['photo']."');");
+            }
+        }
+
+        die('<p style="color: red; background: white; padding: 5px;">Upgrade to new version has been done with success. Reload the page.</p>');
     }
 
     // Returns informations on a photo
@@ -149,13 +187,18 @@ class fotooManager
             return false;
         }
 
-        $tags = $this->db->arrayQuery('SELECT name FROM tags
-            WHERE photo="'.(int)$pic['id'].'";', SQLITE_NUM);
+        $tags = @$this->db->arrayQuery('SELECT name, name_id FROM tags
+            WHERE photo="'.(int)$pic['id'].'";', SQLITE_ASSOC);
+
+        if ($this->db->lastError() && ($error = error_get_last()) && preg_match('!no such column: name_id!', $error['message']))
+        {
+            $this->upgradeDB('TAGS_ID');
+        }
 
         $pic['tags'] = array();
         foreach ($tags as $row)
         {
-            $pic['tags'][] = $row[0];
+            $pic['tags'][$row['name_id']] = $row['name'];
         }
 
         $small_path = $this->getSmallPath($hash);
@@ -322,8 +365,9 @@ class fotooManager
 
         foreach ($tags as $tag)
         {
-            $this->db->unbufferedQuery("INSERT INTO tags (name, photo)
-                VALUES ('".sqlite_escape_string($tag)."', '".(int)$id."');");
+            $this->db->unbufferedQuery("INSERT INTO tags (name, name_id, photo)
+                VALUES ('".sqlite_escape_string($tag)."',
+                '".sqlite_escape_string($this->getTagId($tag))."', '".(int)$id."');");
         }
 
         return array(
@@ -457,7 +501,7 @@ class fotooManager
 
     public function getTagList()
     {
-        $res = $this->db->arrayQuery('SELECT COUNT(photo) AS nb, name FROM tags
+        $res = $this->db->arrayQuery('SELECT COUNT(photo) AS nb, name, name_id FROM tags
             GROUP BY name ORDER BY name;', SQLITE_ASSOC);
 
         $tags = array();
@@ -471,8 +515,9 @@ class fotooManager
 
     public function getByTag($tag)
     {
+        $tag = $this->getTagId($tag);
         $pics = $this->db->arrayQuery('SELECT photos.* FROM photos, tags
-            WHERE photos.id = tags.photo AND tags.name LIKE \''.sqlite_escape_string($tag).'\'
+            WHERE photos.id = tags.photo AND tags.name_id = \''.sqlite_escape_string($tag).'\'
             ORDER BY photos.filename;', SQLITE_ASSOC);
 
         foreach ($pics as &$pic)
@@ -492,8 +537,9 @@ class fotooManager
 
     public function getNearTags($tag)
     {
+        $tag = $this->getTagId($tag);
         $res = $this->db->arrayQuery('SELECT tags.name AS name, COUNT(photos.id) AS nb
-            FROM photos, tags, tags AS tago WHERE tago.name = \''.sqlite_escape_string($tag).'\'
+            FROM photos, tags, tags AS tago WHERE tago.name_id = \''.sqlite_escape_string($tag).'\'
             AND tago.photo = photos.id AND tago.name != tags.name AND tags.photo = photos.id
             GROUP BY tags.name ORDER BY nb DESC;');
 
@@ -1121,10 +1167,10 @@ elseif ($mode == 'tag')
         $step = 50 / $spread;
 
         echo '<p class="related_tags">'.sprintf(__("Other tags related to '%s':"), $tag).' ';
-        foreach ($tags as $ttag=>$nb)
+        foreach ($tags as $name=>$nb)
         {
             $size = 100 + round(($nb - $min) * $step);
-            echo '<a href="'.SELF_URL.'?tag='.urlencode($ttag).'" style="font-size: '.$size.'%;">'.htmlspecialchars($ttag).'</a> ';
+            echo '<a href="'.SELF_URL.'?tag='.urlencode($name).'" style="font-size: '.$size.'%;">'.htmlspecialchars($name).'</a> ';
             echo '<small>('.$nb.')</small> ';
         }
         echo '</p>';
@@ -1223,8 +1269,8 @@ elseif ($mode == 'pic')
         <dt class="tags">'.__('Tags:').'</dt>
         <dd class="tags">';
 
-        foreach ($pic['tags'] as $tag)
-            echo '<a href="'.SELF_URL.'?tag='.urlencode($tag).'">'.htmlspecialchars($tag).'</a> ';
+        foreach ($pic['tags'] as $tag_id=>$tag)
+            echo '<a href="'.SELF_URL.'?tag='.urlencode($tag_id).'">'.htmlspecialchars($tag).'</a> ';
 
         echo '</dd>';
     }
