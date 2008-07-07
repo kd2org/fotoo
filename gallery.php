@@ -518,7 +518,7 @@ class fotooManager
         $tag = $this->getTagId($tag);
         $pics = $this->db->arrayQuery('SELECT photos.* FROM photos, tags
             WHERE photos.id = tags.photo AND tags.name_id = \''.sqlite_escape_string($tag).'\'
-            ORDER BY photos.filename;', SQLITE_ASSOC);
+            ORDER BY photos.time, photos.filename;', SQLITE_ASSOC);
 
         foreach ($pics as &$pic)
         {
