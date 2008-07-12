@@ -100,6 +100,8 @@ $french_strings = array(
         .   "Patientez, dans quelques instants d'autres images appara&icirc;tront.",
     'Updating'
         =>  'Mise &agrave; jour',
+    'Update done.'
+        =>  'Mise &agrave; jour termin&eacute;e.',
     'Picture not found'
         =>  'Photo non trouv&eacute;e',
     'Back to homepage'

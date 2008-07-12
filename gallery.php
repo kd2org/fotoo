@@ -915,6 +915,81 @@ if (!empty($_GET['updateFile']) && isset($_GET['updateDir']))
     exit;
 }
 
+if (isset($_GET['index_all']))
+{
+    function update_dir($dir)
+    {
+        global $f;
+
+        $pics = $dirs = $update = $desc = false;
+        $list = $f->getDirectory($dir, true);
+
+        if (empty($list))
+            return false;
+        else
+            list($dirs, $pics, $update, $desc) = $list;
+
+        if (!empty($update))
+        {
+            return array($dir, $update);
+        }
+
+        foreach ($dirs as $subdir)
+        {
+            $subdir = (!empty($dir) ? $dir . '/' : '') . $subdir;
+            $res = update_dir($subdir);
+
+            if ($res)
+                return $res;
+        }
+
+        return false;
+    }
+
+    $res = update_dir('');
+
+    echo '<html><body>';
+
+    if ($res)
+    {
+        list($dir, $update_list) = $res;
+
+        echo "<script type=\"text/javascript\">\n"
+            .'var update_msg = "'.__('Updating')."\";\n"
+            .'var update_dir = "'.htmlspecialchars($dir)."\";\n"
+            .'var update_url = "'.SELF_URL."\";\n"
+            ."var need_update = new Array();\n";
+
+        foreach ($update_list as $file)
+        {
+            echo 'need_update.push("'.htmlspecialchars($file)."\");\n";
+        }
+
+        echo "</script>\n"
+            .'<script type="text/javascript" src="'.SELF_URL.'?update.js"></script>';
+    }
+
+    echo '<p style="margin: 20% auto; width: 50%; border: 2px solid #ccc; padding: 2%; font-family: Sans-serif;">';
+
+    if ($res)
+    {
+        echo '
+        <strong>'.__('Updating').'</strong><br />
+        ... '.$dir;
+    }
+    else
+    {
+        echo '<a href="'.SELF_URL.'">'.__('Update done.').'</a>';
+    }
+
+    echo '
+        </p>
+    </body>
+    </html>';
+
+    exit;
+}
+
 // Get which display mode is asked
 if (isset($_GET['date']))
 {
