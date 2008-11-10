@@ -268,6 +268,11 @@ class fotooManager
         unset($res);
     }
 
+    public function getNewPhotos($nb=10)
+    {
+        return $this->db->arrayQuery('SELECT * FROM photos ORDER BY time DESC LIMIT 0,'.(int)$nb.';', SQLITE_ASSOC);
+    }
+
     private function getHash($file, $path, $size, $time)
     {
         return md5($file . $path . $size . $time);
@@ -706,9 +711,19 @@ function thumb_url($pic)
     return BASE_URL . 'cache/' . $pic['hash'][0] . '/' . $pic['hash'] . '_thumb.jpg';
 }
 
+function small_url($pic)
+{
+    return BASE_URL.'cache/'.$pic['hash'][0].'/'.$pic['hash'].'_small.jpg';
+}
+
 function img_page_url($pic)
 {
     return SELF_URL . '?' . (empty($pic['path']) ? '' : $pic['path'].'/') . $pic['filename'];
+}
+
+function image_url($pic)
+{
+    return BASE_URL . (empty($pic['path']) ? '' : $pic['path'].'/') . $pic['filename'];
 }
 
 error_reporting(E_ALL);
@@ -722,12 +737,6 @@ if (get_magic_quotes_gpc())
 if (file_exists(dirname(__FILE__) . '/user_config.php'))
     require dirname(__FILE__) . '/user_config.php';
 
-if (!defined('BASE_DIR'))   define('BASE_DIR', dirname(__FILE__));
-if (!defined('CACHE_DIR'))  define('CACHE_DIR', BASE_DIR . '/cache');
-if (!defined('BASE_URL'))   define('BASE_URL', 'http://'.$_SERVER['HTTP_HOST'].dirname($_SERVER['SCRIPT_NAME']).'/');
-if (!defined('SELF_URL'))   define('SELF_URL', BASE_URL . (basename($_SERVER['SCRIPT_NAME']) == 'index.php' ? '' : basename($_SERVER['SCRIPT_NAME'])));
-if (!defined('GEN_SMALL'))  define('GEN_SMALL', 0);
-
 if (!function_exists('__'))
 {
     function __($str, $time=false) {
@@ -737,6 +746,13 @@ if (!function_exists('__'))
             return $str;
     }
 }
+
+if (!defined('BASE_DIR'))   define('BASE_DIR', dirname(__FILE__));
+if (!defined('CACHE_DIR'))  define('CACHE_DIR', BASE_DIR . '/cache');
+if (!defined('BASE_URL'))   define('BASE_URL', 'http://'.$_SERVER['HTTP_HOST'].dirname($_SERVER['SCRIPT_NAME']).'/');
+if (!defined('SELF_URL'))   define('SELF_URL', BASE_URL . (basename($_SERVER['SCRIPT_NAME']) == 'index.php' ? '' : basename($_SERVER['SCRIPT_NAME'])));
+if (!defined('GEN_SMALL'))  define('GEN_SMALL', 0);
+if (!defined('GALLERY_TITLE')) define('GALLERY_TITLE', __('My pictures'));
 
 if (!isset($f) || !($f instanceOf fotooManager))
     $f = new fotooManager;
@@ -811,6 +827,85 @@ if (typeof need_update != 'undefined')
 }
 EOF_UPDATE_JS;
 exit;
+}
+
+if (isset($_GET['feed']))
+{
+    $last = $f->getNewPhotos(20);
+    $last_update = $last[0]['time'];
+
+    header('Content-Type: text/xml');
+
+    echo  '<?xml version="1.0" encoding="utf-8" ?>
+    <rdf:RDF
+      xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+      xmlns:dc="http://purl.org/dc/elements/1.1/"
+      xmlns:sy="http://purl.org/rss/1.0/modules/syndication/"
+      xmlns:content="http://purl.org/rss/1.0/modules/content/"
+      xmlns:media="http://search.yahoo.com/mrss/"
+      xmlns="http://purl.org/rss/1.0/">
+
+    <channel rdf:about="'.SELF_URL.'">
+      <title>'.GALLERY_TITLE.'</title>
+      <description>Last pictures added in &quot;'.GALLERY_TITLE.'&quot;</description>
+      <link>'.SELF_URL.'</link>
+      <dc:language></dc:language>
+      <dc:creator></dc:creator>
+      <dc:rights></dc:rights>
+      <dc:date>'.date(DATE_RSS, $last_update).'</dc:date>
+
+      <sy:updatePeriod>daily</sy:updatePeriod>
+      <sy:updateFrequency>1</sy:updateFrequency>
+      <sy:updateBase>'.date(DATE_RSS, $last_update).'</sy:updateBase>
+
+      <items>
+      <rdf:Seq>
+        ';
+
+    foreach ($last as &$photo)
+    {
+        echo '<rdf:li rdf:resource="'.img_page_url($photo).'" />
+        ';
+    }
+
+    echo '
+      </rdf:Seq>
+      </items>
+    </channel>';
+
+    foreach ($last as &$photo)
+    {
+        if (file_exists($f->getSmallPath($photo['hash'])))
+            $small_url = small_url($photo);
+        else
+            $small_url = thumb_url($photo);
+
+        $content = '<p><a href="'.img_page_url($photo).'">'
+            . '<img src="'.$small_url.'" alt="'.htmlspecialchars($photo['filename']).'" /></a></p>'
+            . '<p>'.$f->formatText($photo['comment']).'</p>';
+
+        echo '
+            <item rdf:about="'.img_page_url($photo).'">
+                <title>'.htmlspecialchars($photo['filename']).'</title>
+                <link>'.img_page_url($photo).'</link>
+                <dc:date>'.date(DATE_RSS, $photo['time']).'</dc:date>
+                <dc:language></dc:language>
+                <dc:creator></dc:creator>
+                <dc:subject>picoBlog</dc:subject>
+                <description>'.htmlspecialchars($content).'</description>
+                <content:encoded>
+                    <![CDATA['.$content.']]>
+                </content:encoded>
+                <media:content url="'.image_url($photo).'" type="image/jpeg" height="'.$photo['height'].'" width="'.$photo['width'].'" />
+                <media:title>'.htmlspecialchars($photo['filename']).'</media:title>
+                <media:thumbnail url="'.thumb_url($photo).'" />
+                <media:keywords>'.implode(', ', $photo['tags']).'</media:keywords>
+            </item>';
+    }
+
+    echo '
+    </rdf:RDF>';
+    exit;
 }
 
 if (isset($_GET['style_css']) || isset($_GET['slideshow_css']))
@@ -1096,7 +1191,8 @@ if ($mode != 'slideshow' && file_exists(BASE_DIR . '/user_header.php'))
     require BASE_DIR . '/user_header.php';
 else
 {
-    if (!$title) $title = __('My Pictures');
+    if (!$title) $title = GALLERY_TITLE;
+    else $title .= ' - '.GALLERY_TITLE;
     echo '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
@@ -1222,7 +1318,7 @@ elseif ($mode == 'tags')
         $min = min(array_values($tags));
         $spread = $max - $min;
         if ($spread == 0) $spread = 1;
-        $step = 100 / $spread;
+        $step = 200 / $spread;
 
         echo '<p class="tags">';
 
@@ -1254,7 +1350,7 @@ elseif ($mode == 'tag')
         $min = min(array_values($tags));
         $spread = $max - $min;
         if ($spread == 0) $spread = 1;
-        $step = 50 / $spread;
+        $step = 100 / $spread;
 
         echo '<p class="related_tags">'.sprintf(__("Other tags related to '%s':"), $tag).' ';
         foreach ($tags as $name=>$nb)
@@ -1320,11 +1416,11 @@ elseif ($mode == 'pic')
 
     echo "</h4>\n</div>\n";
 
-    $orig_url = BASE_URL . (empty($pic['path']) ? '' : $pic['path'].'/') . $pic['filename'];
+    $orig_url = image_url($pic);
     $wh = '';
 
     if (file_exists($f->getSmallPath($pic['hash'])))
-        $small_url = BASE_URL.'cache/'.$pic['hash'][0].'/'.$pic['hash'].'_small.jpg';
+        $small_url = small_url($pic);
     else
     {
         $small_url = $orig_url;

@@ -7,7 +7,6 @@ if (!class_exists('fotooManager'))
 
 $website_url = 'http://bohwaz.net/';
 $website_name = 'bohwaz.net';
-$gallery_title = 'bohwaz.net/photos';
 
 echo '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
@@ -21,8 +20,5 @@ echo '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.or
 <div id="mywebsite">
     <a href="'.$website_url.'">'.$website_name.'</a>
 </div>';
-
-if (!$title)
-    $title = $gallery_title;
 
 ?>

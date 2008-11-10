@@ -38,6 +38,9 @@ if (!class_exists('fotooManager'))
 //define('BASE_URL', 'http://myserver.tld/pics/');
 //define('SELF_URL', BASE_URL . 'gallery.php');
 
+// Gallery title, change it to what you prefer
+define('GALLERY_TITLE', 'My own photo gallery');
+
 // Generate a resized copy of images for small view (600x600), disabled by default
 // WARNING GENERATING IMAGES IS REALLY SLOW AND IT MAY KILL YOU WEBSERVER!
 
