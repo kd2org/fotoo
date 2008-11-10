@@ -515,33 +515,48 @@ class fotooManager
 
     public function getByTag($tag)
     {
+        // Can't use SQL JOIN here because SQLite is too slow with JOIN queries
+
         $tag = $this->getTagId($tag);
-        $pics = $this->db->arrayQuery('SELECT photos.* FROM photos, tags
-            WHERE photos.id = tags.photo AND tags.name_id = \''.sqlite_escape_string($tag).'\'
+        $res = $this->db->arrayQuery('SELECT photo FROM tags WHERE name_id = \''.sqlite_escape_string($tag).'\';', SQLITE_ASSOC);
+        $photos = array();
+
+        foreach ($res as $row)
+        {
+            $photos[] = (int) $row['photo'];
+        }
+
+        unset($res);
+
+        $pics = $this->db->arrayQuery('SELECT * FROM photos
+            WHERE id IN (\''.implode("','", $photos).'\')
             ORDER BY photos.time, photos.filename;', SQLITE_ASSOC);
 
-        foreach ($pics as &$pic)
-        {
-            foreach ($pic as $field=>$value)
-            {
-                $name = str_replace('photos.', '', $field);
-                $pic[$name] = $value;
-
-                if ($field != $name)
-                    unset($pic[$field]);
-            }
-        }
+        unset($photos);
 
         return $pics;
     }
 
     public function getNearTags($tag)
     {
+        // Can't use SQL JOIN here because SQLite is too slow with JOIN queries
+
         $tag = $this->getTagId($tag);
-        $res = $this->db->arrayQuery('SELECT tags.name AS name, COUNT(photos.id) AS nb
-            FROM photos, tags, tags AS tago WHERE tago.name_id = \''.sqlite_escape_string($tag).'\'
-            AND tago.photo = photos.id AND tago.name != tags.name AND tags.photo = photos.id
-            GROUP BY tags.name ORDER BY nb DESC;');
+        $res = $this->db->arrayQuery('SELECT photo FROM tags WHERE name_id = \''.sqlite_escape_string($tag).'\';', SQLITE_ASSOC);
+
+        $orig = array();
+
+        foreach ($res as $row)
+        {
+            $orig[] = (int) $row['photo'];
+        }
+
+        $res = $this->db->arrayQuery('SELECT name, COUNT(photo) AS nb FROM tags
+            WHERE photo IN (\''.implode("','", $orig).'\')
+                AND name_id != \''.sqlite_escape_string($tag).'\'
+            GROUP BY name_id ORDER BY nb DESC;', SQLITE_ASSOC);
+
+        unset($orig);
 
         $tags = array();
         foreach ($res as &$row)
