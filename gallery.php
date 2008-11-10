@@ -1202,6 +1202,7 @@ else
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <title>'.$title.'</title>
     <link rel="stylesheet" href="'.$css.'" type="text/css" />
+    <link rel="alternate" type="application/rss+xml" title="RSS" href="'.SELF_URL.'?feed" />
 </head>
 
 <body>';

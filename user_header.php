@@ -14,6 +14,7 @@ echo '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.or
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <title>'.($title ? $title.' - '.$website_name : $website_name).'</title>
     <link rel="stylesheet" href="'.$css.'" type="text/css" />
+    <link rel="alternate" type="application/rss+xml" title="RSS" href="'.SELF_URL.'?feed" />
 </head>
 
 <body>
