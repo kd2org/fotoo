@@ -852,11 +852,11 @@ if (isset($_GET['feed']))
       <dc:language></dc:language>
       <dc:creator></dc:creator>
       <dc:rights></dc:rights>
-      <dc:date>'.date(DATE_RSS, $last_update).'</dc:date>
+      <dc:date>'.date(DATE_W3C, $last_update).'</dc:date>
 
       <sy:updatePeriod>daily</sy:updatePeriod>
       <sy:updateFrequency>1</sy:updateFrequency>
-      <sy:updateBase>'.date(DATE_RSS, $last_update).'</sy:updateBase>
+      <sy:updateBase>'.date(DATE_W3C, $last_update).'</sy:updateBase>
 
       <items>
       <rdf:Seq>
@@ -888,7 +888,7 @@ if (isset($_GET['feed']))
             <item rdf:about="'.img_page_url($photo).'">
                 <title>'.htmlspecialchars($photo['filename']).'</title>
                 <link>'.img_page_url($photo).'</link>
-                <dc:date>'.date(DATE_RSS, $photo['time']).'</dc:date>
+                <dc:date>'.date(DATE_W3C, $photo['time']).'</dc:date>
                 <dc:language></dc:language>
                 <dc:creator></dc:creator>
                 <dc:subject>picoBlog</dc:subject>
@@ -896,7 +896,7 @@ if (isset($_GET['feed']))
                 <content:encoded>
                     <![CDATA['.$content.']]>
                 </content:encoded>
-                <media:content url="'.image_url($photo).'" type="image/jpeg" height="'.$photo['height'].'" width="'.$photo['width'].'" />
+                <media:content medium="image" url="'.image_url($photo).'" type="image/jpeg" height="'.$photo['height'].'" width="'.$photo['width'].'" />
                 <media:title>'.htmlspecialchars($photo['filename']).'</media:title>
                 <media:thumbnail url="'.thumb_url($photo).'" />
                 <media:keywords>'.htmlspecialchars(implode(', ', $photo['tags'])).'</media:keywords>
