@@ -884,14 +884,17 @@ if (isset($_GET['feed']))
             . '<img src="'.$small_url.'" alt="'.htmlspecialchars($photo['filename']).'" /></a></p>'
             . '<p>'.$f->formatText($photo['comment']).'</p>';
 
+        $title = $photo['path'] ? strtr($photo['path'] . '/' . $photo['filename'], array('/' => ' / ', '_' => ' ')) : $photo['filename'];
+        $title = preg_replace('!\.[a-z]+$!i', '', $title);
+
         echo '
             <item rdf:about="'.img_page_url($photo).'">
-                <title>'.htmlspecialchars($photo['filename']).'</title>
+                <title>'.htmlspecialchars($title).'</title>
                 <link>'.img_page_url($photo).'</link>
                 <dc:date>'.date(DATE_W3C, $photo['time']).'</dc:date>
                 <dc:language></dc:language>
                 <dc:creator></dc:creator>
-                <dc:subject>picoBlog</dc:subject>
+                <dc:subject></dc:subject>
                 <description>'.htmlspecialchars($content).'</description>
                 <content:encoded>
                     <![CDATA['.$content.']]>
