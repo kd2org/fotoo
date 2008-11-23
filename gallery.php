@@ -737,8 +737,8 @@ function embed_url($pic)
 function embed_tag($pic)
 {
     $url = embed_url($pic);
-    $html = '<object type="text/html" width="600" height="400" data="'.$url.'">'
-        .   '<iframe src="'.$url.'" width="600" height="400" frameborder="0" scrolling="no"></iframe>'
+    $html = '<object type="text/html" width="600" height="450" data="'.$url.'">'
+        .   '<iframe src="'.$url.'" width="600" height="450" frameborder="0" scrolling="no"></iframe>'
         .   '</object>';
     return $html;
 }
@@ -1012,13 +1012,11 @@ body { background: #000; font-family: Sans-serif; position: absolute; top: 0; le
 ul { list-style-type: none; }
 body.loading { cursor: wait; }
 
-div.comment { position: absolute; top: 0; left: 0; right: 0; text-align: left; padding: 0.5em; width: 100%; }
-div.comment p { opacity: 0.50; text-shadow: 0 0 5px #000; color: #fff; }
-div.comment:hover { background: url({$img_bg}); }
-div.comment:hover p { opacity: 1.0; }
+div.comment { position: absolute; top: 0; left: 0; right: 0; padding: 0.5em; background: url({$img_bg}); display: none; color: #fff; }
+body.hover div.comment { display: block; }
 
 #controlBar { position: absolute; bottom: 0px; left: 0px; right: 0px; z-index: 100;
-    background: repeat-x bottom left url({$img_back}); height: 30px; width: 100%; padding-top: 30px;}
+    background: repeat-x bottom left url({$img_back}); height: 30px; width: 100%; padding-top: 20px;}
 #controlBar li { float: left; padding: 0 3%; }
 #controlBar li a { display: block; opacity: 0.50; color: #fff; text-decoration: none; font-size: 2em;
     line-height: 20px; width: 50px; text-align: center; }
@@ -1026,7 +1024,7 @@ div.comment:hover p { opacity: 1.0; }
 #controlBar li.back a { font-size: 1.2em; font-weight: bold; width: 280px; }
 #controlBar li.next a, #controlBar li.prev a { font-size: 4em; }
 
-#controlBar li.current { color: #fff; font-size: 1.5em; line-height: 20px; opacity: 0.50; width: 70px; }
+#controlBar li.current { color: #fff; font-size: 1.5em; line-height: 20px; opacity: 0.75; width: 70px; }
 EOF_EMBED_CSS;
     }
     else
@@ -1776,22 +1774,24 @@ elseif ($mode == 'embed')
         $wh = 'width="'.$nw.'" height="'.$nh.'"';
     }
 
-    if ($nh > 400 && $nh > $nw)
+    if ($nh > 450 && $nh > $nw)
     {
-        list($nw, $nh) = $f->getNewSize($pic['width'], $pic['height'], 400);
+        list($nw, $nh) = $f->getNewSize($pic['width'], $pic['height'], 450);
         $wh = 'width="'.$nw.'" height="'.$nh.'"';
     }
 
     echo '
+    <p class="pic">
+        <img src="'.$small_url.'" alt="'.$pic['filename'].'" '.$wh.' id="picture" />
+    </p>
     <script type="text/javascript">
     function changePic()
     {
         document.body.className = "loading";
     }
-    </script>
-    <p class="pic">
-        <img src="'.$small_url.'" alt="'.$pic['filename'].'" '.$wh.' />
-    </p>';
+    window.onmouseover = function () { document.body.className = "hover"; }
+    window.onmouseout = function () { document.body.className = ""; }
+    </script>';
 
     if (!empty($pic['comment']))
     {
