@@ -41,6 +41,9 @@ if (!class_exists('fotooManager'))
 // Gallery title, change it to what you prefer
 define('GALLERY_TITLE', 'My own photo gallery');
 
+// Allow embedding of your pictures ?
+define('ALLOW_EMBED', true);
+
 // Generate a resized copy of images for small view (600x600), disabled by default
 // WARNING GENERATING IMAGES IS REALLY SLOW AND IT MAY KILL YOU WEBSERVER!
 
@@ -96,6 +99,8 @@ $french_strings = array(
         =>  'Mots-cl&eacute;s :',
     'Date:'
         =>  'Date :',
+    'Embed:'
+        =>  'Int&eacute;grer dans un site :',
     '%A <a href="%1">%d</a> <a href="%2">%B</a> <a href="%3">%Y</a> at %H:%M'
         =>  '%A <a href="%1">%d</a> <a href="%2">%B</a> <a href="%3">%Y</a> &agrave; %H:%M',
     'Updating database, please wait, more pictures will appear in a while...'

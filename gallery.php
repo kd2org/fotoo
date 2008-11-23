@@ -726,6 +726,23 @@ function image_url($pic)
     return BASE_URL . (empty($pic['path']) ? '' : $pic['path'].'/') . $pic['filename'];
 }
 
+function embed_url($pic)
+{
+    if (is_string($pic))
+        return SELF_URL . '?embed=' . $pic;
+    else
+        return SELF_URL . '?embed=' . (empty($pic['path']) ? '' : $pic['path'].'/') . $pic['filename'];
+}
+
+function embed_tag($pic)
+{
+    $url = embed_url($pic);
+    $html = '<object type="text/html" width="600" height="400" data="'.$url.'">'
+        .   '<iframe src="'.$url.'" width="600" height="400" frameborder="0" scrolling="no"></iframe>'
+        .   '</object>';
+    return $html;
+}
+
 error_reporting(E_ALL);
 
 // Against bad configurations
@@ -752,7 +769,8 @@ if (!defined('CACHE_DIR'))  define('CACHE_DIR', BASE_DIR . '/cache');
 if (!defined('BASE_URL'))   define('BASE_URL', 'http://'.$_SERVER['HTTP_HOST'].dirname($_SERVER['SCRIPT_NAME']).'/');
 if (!defined('SELF_URL'))   define('SELF_URL', BASE_URL . (basename($_SERVER['SCRIPT_NAME']) == 'index.php' ? '' : basename($_SERVER['SCRIPT_NAME'])));
 if (!defined('GEN_SMALL'))  define('GEN_SMALL', 0);
-if (!defined('GALLERY_TITLE')) define('GALLERY_TITLE', __('My pictures'));
+if (!defined('GALLERY_TITLE'))  define('GALLERY_TITLE', __('My pictures'));
+if (!defined('ALLOW_EMBED'))    define('ALLOW_EMBED', true);
 
 if (!isset($f) || !($f instanceOf fotooManager))
     $f = new fotooManager;
@@ -911,7 +929,7 @@ if (isset($_GET['feed']))
     exit;
 }
 
-if (isset($_GET['style_css']) || isset($_GET['slideshow_css']))
+if (isset($_GET['style_css']) || isset($_GET['slideshow_css']) || isset($_GET['embed_css']))
 {
     header('Content-Type: text/css');
 
@@ -958,6 +976,8 @@ dl.metas dt { font-weight: bold; padding-left: 1.7em; background: no-repeat 0.1e
 dl.metas dt.tags { background-image: url({$img_tag}); }
 dl.metas dt.date { background-image: url({$img_date}); }
 dl.metas dt.comment { background-image: url({$img_info}); }
+dl.metas dt.embed { background-image: url({$img_forward}); }
+dl.metas dd.embed input { padding: 0.2em; width: 97%; }
 dl.metas dd { margin: 0.2em 0 1em; }
 ul.goPrevNext { margin-left: 620px; margin-top: 1em; }
 ul.goPrevNext li { float: left; position: relative; width: 50%; text-align: center; min-height: 1px; }
@@ -982,6 +1002,27 @@ a:visited { color: black; }
 a:hover { color: darkred; }
 EOF_STYLE_CSS;
     }
+    elseif (isset($_GET['embed_css']))
+    {
+        echo <<<EOF_EMBED_CSS
+* { margin: 0; padding: 0; }
+body { background: #000; font-family: Sans-serif; position: absolute; top: 0; left: 0; bottom: 0; right: 0;
+    font-size: 12px; overflow: hidden; text-align: center; }
+ul { list-style-type: none; }
+body.loading { cursor: wait; }
+
+#controlBar { position: absolute; bottom: 0px; left: 0px; right: 0px; z-index: 100;
+    background: repeat-x bottom left url({$img_back}); height: 30px; width: 100%; padding-top: 30px;}
+#controlBar li { float: left; padding: 0 3%; }
+#controlBar li a { display: block; opacity: 0.50; color: #fff; text-decoration: none; font-size: 2em;
+    line-height: 20px; width: 50px; text-align: center; }
+#controlBar li a:hover { opacity: 1.0; text-shadow: 0px 0px 5px #000; }
+#controlBar li.back a { font-size: 1.2em; font-weight: bold; width: 280px; }
+#controlBar li.next a, #controlBar li.prev a { font-size: 4em; }
+
+#controlBar li.current { color: #fff; font-size: 1.5em; line-height: 20px; opacity: 0.50; width: 70px; }
+EOF_EMBED_CSS;
+    }
     else
     {
         echo <<<EOF_SLIDESHOW_CSS
@@ -996,10 +1037,10 @@ p.info { color: #fff; padding: 1em; }
 
 #controlBar { position: absolute; bottom: 0px; left: 0px; right: 0px; z-index: 100;
     background: repeat-x bottom left url({$img_back}); height: 40px; width: 100%; padding-top: 10px;}
-#controlBar li { float: left; padding: 0 7%; height: }
+#controlBar li { float: left; padding: 0 7%; }
 #controlBar li a { display: block; opacity: 0.50; color: #fff; text-decoration: none; font-size: 2em;
     line-height: 20px; width: 50px; text-align: center; }
-#controlBar li a:hover { opacity: 1.0; }
+#controlBar li a:hover { opacity: 1.0; text-shadow: 0px 0px 5px #000; }
 #controlBar li.back a { font-size: 2em; font-weight: bold; }
 #controlBar li.next a, #controlBar li.prev a { font-size: 4em; }
 #controlBar li.play a { font-size: 3em; }
@@ -1145,6 +1186,17 @@ elseif (isset($_GET['slideshow']))
     $selected_dir = $_GET['slideshow'];
     $title = __('Slideshow');
 }
+elseif (!empty($_GET['embed']) && preg_match('!^(.*)(?:/?([^/]+)[_.](jpe?g))?$!Ui', $_GET['embed'], $match))
+{
+    $mode = 'embed';
+    $selected_dir = $match[1];
+    $title = __('Slideshow');
+
+    if (!empty($match[2]))
+    {
+        $selected_file = $match[2] . '.' . $match[3];
+    }
+}
 else
 {
     $mode = 'dir';
@@ -1177,6 +1229,8 @@ else
 
 if ($mode == 'slideshow')
     $css = SELF_URL . '?slideshow.css';
+elseif ($mode == 'embed')
+    $css = SELF_URL . '?embed.css';
 elseif (file_exists(BASE_DIR . '/user_style.css'))
     $css = BASE_URL . 'user_style.css';
 else
@@ -1190,7 +1244,7 @@ $menu = '<h5><a class="home" href="'.SELF_URL.'">'.__('My Pictures').'</a>
 
 header('Content-Type: text/html; charset=UTF-8');
 
-if ($mode != 'slideshow' && file_exists(BASE_DIR . '/user_header.php'))
+if ($mode != 'slideshow' && $mode != 'embed' && file_exists(BASE_DIR . '/user_header.php'))
     require BASE_DIR . '/user_header.php';
 else
 {
@@ -1474,7 +1528,16 @@ elseif ($mode == 'pic')
     $date = __($date, $pic['time']);
     echo '
         <dt class="date">'.__('Date:').'</dt>
-        <dd class="date">'.$date.'</dd>
+        <dd class="date">'.$date.'</dd>';
+
+    if (ALLOW_EMBED)
+    {
+        echo '
+        <dt class="embed">'.__('Embed:').'</dt>
+        <dd class="embed"><input type="text" onclick="this.select();" value="'.htmlspecialchars(embed_tag($pic)).'" /></dd>';
+    }
+
+    echo '
     </dl>';
 
     list($prev, $next) = $f->getPrevAndNext($selected_dir, $selected_file);
@@ -1666,6 +1729,95 @@ elseif ($mode == 'slideshow')
         </ul>
         ';
     }
+}
+elseif ($mode == 'embed')
+{
+    $list = $f->getDirectory($selected_dir, true);
+
+    if ($list === false || empty($list[1]))
+    {
+        echo '<p class="info">'.__('No picture found.').'</p>';
+        exit;
+    }
+
+    $list = $list[1];
+
+    if (!empty($selected_file))
+    {
+        $current_file = $selected_file;
+    }
+    else
+    {
+        $current = current($list);
+        $current_file = $current['filename'];
+    }
+
+    $pic = $f->getInfos($current_file, $selected_dir);
+
+    if (empty($pic))
+    {
+        die(__('No picture found.'));
+    }
+
+    $wh = '';
+    list($nw, $nh) = $f->getNewSize($pic['width'], $pic['height'], 600);
+
+    if (file_exists($f->getSmallPath($pic['hash'])))
+        $small_url = small_url($pic);
+    else
+    {
+        $small_url = image_url($pic);
+        $wh = 'width="'.$nw.'" height="'.$nh.'"';
+    }
+
+    if ($nh > 400 && $nh > $nw)
+    {
+        list($nw, $nh) = $f->getNewSize($pic['width'], $pic['height'], 400);
+        $wh = 'width="'.$nw.'" height="'.$nh.'"';
+    }
+
+    echo '
+    <script type="text/javascript">
+    function changePic()
+    {
+        document.body.className = "loading";
+    }
+    </script>
+    <p class="pic">
+        <img src="'.$small_url.'" alt="'.$pic['filename'].'" '.$wh.' />
+    </p>';
+
+    if (!empty($pic['comment']))
+    {
+        echo '<p class="comment">'.$f->formatText($pic['comment']).'</p>';
+    }
+
+    list($prev, $next) = $f->getPrevAndNext($selected_dir, $current_file);
+
+    if (!$next)
+        $next = current($list);
+    if (!$prev)
+        $prev = end($list);
+
+    $nb_total = count($list);
+    $nb_current = 1;
+
+    foreach ($list as &$lpic)
+    {
+        if ($lpic['id'] == $pic['id'])
+            break;
+
+        $nb_current++;
+    }
+
+    echo '
+    <ul id="controlBar">
+        <li class="prev"><a href="'.embed_url($prev).'" onclick="changePic();" title="'.__('Previous').'">&larr;</a></li>
+        <li class="back"><a href="'.SELF_URL.'?'.$selected_dir.'" onclick="window.open(this.href); return false;">'.GALLERY_TITLE.'</a></li>
+        <li class="current">'.$nb_current.' / '.$nb_total.'</li>
+        <li class="next"><a href="'.embed_url($next).'" onclick="changePic();" title="'.__('Next').'">&rarr;</a></li>
+    </ul>
+    ';
 }
 else
 {
