@@ -44,7 +44,7 @@ class fotooManager
         $dir = CACHE_DIR . '/' . $hash[0];
 
         if (!file_exists($dir))
-            mkdir($dir, 0700);
+            mkdir($dir, 0777);
 
         return $dir . '/' . $hash . '_thumb.jpg';
     }
@@ -54,7 +54,7 @@ class fotooManager
         $dir = CACHE_DIR . '/' . $hash[0];
 
         if (!file_exists($dir))
-            mkdir($dir, 0700);
+            mkdir($dir, 0777);
 
         return $dir . '/' . $hash . '_small.jpg';
     }
@@ -74,7 +74,7 @@ class fotooManager
 
         if (!file_exists(CACHE_DIR))
         {
-            if (!mkdir(CACHE_DIR, 0700))
+            if (!mkdir(CACHE_DIR, 0777))
             {
                 echo '<hr />';
                 echo 'Please create the directory '.CACHE_DIR.' and make it writable by this script.';
