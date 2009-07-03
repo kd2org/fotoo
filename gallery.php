@@ -1052,7 +1052,7 @@ ul.dirs li a:hover { background-color: #ffc; }
 
 dl.pic { width: 60%; float: left; text-align: center; }
 dl.pic dd.orig { margin: 0.5em 0; }
-dl.metas { float: right; width: 35%; border: 1px solid #ccc; background: #efe; padding: 0.5em; margin-bottom: 1em; }
+dl.metas, dl.details { float: right; width: 35%; border: 1px solid #ccc; background: #efe; padding: 0.5em; margin-bottom: 1em; }
 dl.metas dt { font-weight: bold; padding-left: 1.7em; background: no-repeat 0.1em 0.1em; }
 dl.metas dt.tags { background-image: url({$img_tag}); }
 dl.metas dt.date { background-image: url({$img_date}); }
@@ -1060,7 +1060,7 @@ dl.metas dt.comment { background-image: url({$img_info}); }
 dl.metas dt.embed { background-image: url({$img_forward}); }
 dl.metas dd.embed input { padding: 0.2em; width: 97%; }
 dl.metas dd { margin: 0.2em 0 1em; }
-dl.details { float: right; clear: right; width: 35%; border: 1px solid #ccc; background: #efe; padding: 0.5em; font-size: 0.9em; margin-bottom: 1em; }
+dl.details { font-size: 0.9em; }
 dl.details dt { width: 40%; float: left; text-align: right; margin-right: 0.5em; clear: left;}
 dl.details dd { width: 55%; float: left; }
 ul.goPrevNext { float: right; width: 35%; clear: right; }
