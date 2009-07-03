@@ -19,19 +19,19 @@
 */
 
 // This check is useless, if you have PHP < 5 you will get a parse error
-if (phpversion() < 5)
+if (!version_compare(phpversion(), '5.2', '>='))
 {
-    die("Argh you don't have PHP 5 ! Please install it right now !");
+    die("You need at least PHP 5.2 to use this application.");
 }
 
 if (!class_exists('SQLiteDatabase'))
 {
-    die("You don't have SQLite native extension, please install it.");
+    die("You need PHP SQLite extension to use this application.");
 }
 
 if (strpos($_SERVER['HTTP_HOST'], '.free.fr'))
 {
-    die("Free.fr n'est pas compatible avec Fotoo Gallery (bug dans SQLite)");
+    die("Free.fr n'est pas compatible avec Fotoo Gallery (bug dans SQLite).");
 }
 
 class fotooManager
@@ -107,11 +107,13 @@ class fotooManager
             path VARCHAR(255) NOT NULL,
             width SMALLINT UNSIGNED NOT NULL,
             height SMALLINT UNSIGNED NOT NULL,
+            size INT UNSIGNED NOT NULL,
             year SMALLINT UNSIGNED NOT NULL,
             month TINYINT UNSIGNED NOT NULL,
             day TINYINT UNSIGNED NOT NULL,
             time INTEGER UNSIGNED NOT NULL,
             comment VARCHAR(255) NOT NULL,
+            details TEXT NOT NULL,
             hash VARCHAR(50) NOT NULL
         );
 
@@ -124,35 +126,8 @@ class fotooManager
             name_id VARCHAR(255) NOT NULL,
             photo INTEGER UNSIGNED,
             PRIMARY KEY (name_id, photo)
-        );');
-    }
-
-    private function upgradeDB($upgrade)
-    {
-        if ($upgrade == 'TAGS_ID')
-        {
-            $res = $this->db->arrayQuery('SELECT name, photo FROM tags;');
-
-            $this->db->queryExec('
-            DROP TABLE tags;
-            CREATE TABLE tags (
-                name VARCHAR(255) NOT NULL,
-                name_id VARCHAR(255) NOT NULL,
-                photo INTEGER UNSIGNED,
-                PRIMARY KEY (name_id, photo)
-            );');
-
-
-            foreach ($res as $row)
-            {
-                $name_id = $this->getTagId($row['name']);
-                $this->db->unbufferedQuery("INSERT INTO tags (name, name_id, photo)
-                    VALUES ('".sqlite_escape_string($row['name'])."',
-                        '".sqlite_escape_string($name_id)."', '".(int)$row['photo']."');");
-            }
-        }
-
-        die('<p style="color: red; background: white; padding: 5px;">Upgrade to new version has been done with success. Reload the page.</p>');
+        );
+        ');
     }
 
     // Returns informations on a photo
@@ -190,11 +165,6 @@ class fotooManager
         $tags = @$this->db->arrayQuery('SELECT name, name_id FROM tags
             WHERE photo="'.(int)$pic['id'].'";', SQLITE_ASSOC);
 
-        if ($this->db->lastError() && ($error = error_get_last()) && preg_match('!no such column: name_id!', $error['message']))
-        {
-            $this->upgradeDB('TAGS_ID');
-        }
-
         $pic['tags'] = array();
         foreach ($tags as $row)
         {
@@ -202,7 +172,7 @@ class fotooManager
         }
 
         $small_path = $this->getSmallPath($hash);
-        if (GEN_SMALL == 2 && !$from_list && !file_exists($small_path))
+        if (GEN_SMALL == 2 && !$from_list && !file_exists($small_path) && $pic['width'] <= MAX_IMAGE_SIZE && $pic['height'] <= MAX_IMAGE_SIZE)
         {
             $this->resizeImage($file, $small_path, $pic['width'], $pic['height'], 600);
         }
@@ -288,7 +258,9 @@ class fotooManager
         if (!$file_time)
             return false;
 
-        $hash = $this->getHash($filename, $path, filesize($file), $file_time);
+        $file_size = filesize($file);
+
+        $hash = $this->getHash($filename, $path, $file_size, $file_time);
 
         $size = getimagesize($file, $infos);
 
@@ -297,6 +269,7 @@ class fotooManager
         $comment = '';
         $tags = array();
         $date = false;
+        $details = array();
 
         // IPTC contains tags
         if (!empty($infos['APP13']))
@@ -316,8 +289,8 @@ class fotooManager
 
         unset($infos, $size);
 
-        // EXIF contains date, comment and thumbnail
-        $exif = exif_read_data($file, 0, true, true);
+        // EXIF contains date, comment and thumbnail and other details
+        $exif = @exif_read_data($file, 0, true, true);
         if (!empty($exif))
         {
             if (!empty($exif['IFD0']['DateTimeOriginal']))
@@ -337,6 +310,69 @@ class fotooManager
             {
                 $thumb = $exif['THUMBNAIL']['THUMBNAIL'];
             }
+
+            if (!empty($exif['IFD0']['Make']))
+            {
+                $details['maker'] = trim($exif['IFD0']['Make']);
+            }
+
+            if (!empty($exif['IFD0']['Model']))
+            {
+                if (!empty($details['maker']))
+                {
+                    $exif['IFD0']['Model'] = str_replace($details['maker'], '', $exif['IFD0']['Model']);
+                }
+
+                $details['model'] = trim($exif['IFD0']['Model']);
+            }
+
+            if (!empty($exif['EXIF']['ExposureTime']))
+            {
+                $details['exposure'] = $exif['EXIF']['ExposureTime'];
+
+                // To display a human readable number
+                if (preg_match('!^([0-9.]+)/([0-9.]+)$!', $details['exposure'], $match)
+                    && (float)$match[1] > 0 && (float)$match[2] > 0)
+                {
+                    $result = round((float)$match[1] / (float)$match[2], 3);
+                    $details['exposure'] = $result;
+                }
+            }
+
+            if (!empty($exif['EXIF']['FNumber']))
+            {
+                $details['fnumber'] = $exif['EXIF']['FNumber'];
+
+                if (preg_match('!^([0-9.]+)/([0-9.]+)$!', $details['fnumber'], $match))
+                {
+                    $details['fnumber'] = round($match[1] / $match[2], 1);
+                }
+            }
+
+            if (!empty($exif['EXIF']['ISOSpeedRatings']))
+            {
+                $details['iso'] = $exif['EXIF']['ISOSpeedRatings'];
+            }
+
+            if (!empty($exif['EXIF']['Flash']))
+            {
+                $details['flash'] = ($exif['EXIF']['Flash'] & 0x01) ? true : false;
+            }
+
+            if (!empty($exif['EXIF']['ExifImageWidth']) && !empty($exif['EXIF']['ExifImageLength']))
+            {
+                $details['resolution'] = (int)$exif['EXIF']['ExifImageWidth'] . ' x ' . $exif['EXIF']['ExifImageLength'];
+            }
+
+            if (!empty($exif['EXIF']['FocalLength']))
+            {
+                $details['focal'] = $exif['EXIF']['FocalLength'];
+
+                if (preg_match('!^([0-9.]+)/([0-9.]+)$!', $details['focal'], $match))
+                {
+                    $details['focal'] = round($match[1] / $match[2], 1);
+                }
+            }
         }
 
         unset($exif);
@@ -344,24 +380,32 @@ class fotooManager
         if (!$date)
             $date = $file_time;
 
+        $can_resize = ($width <= MAX_IMAGE_SIZE && $height <= MAX_IMAGE_SIZE);
+
         if (isset($thumb))
         {
             file_put_contents($this->getThumbPath($hash), $thumb);
         }
-        else
+        elseif ($can_resize)
         {
             $this->resizeImage($file, $this->getThumbPath($hash), $width, $height, 160);
         }
 
-        if (GEN_SMALL == 1)
+        if (GEN_SMALL == 1 && $can_resize)
             $this->resizeImage($file, $this->getSmallPath($hash), $width, $height, 600);
 
+        if (!empty($details))
+            $details = json_encode($details);
+        else
+            $details = '';
+
         @$this->db->unbufferedQuery("INSERT INTO photos
-            (id, filename, path, width, height, year, month, day, time, comment, hash)
+            (id, filename, path, width, height, size, year, month, day, time, comment, details, hash)
             VALUES (NULL, '".sqlite_escape_string($filename)."', '".sqlite_escape_string($path)."',
-            '".(int)$width."', '".(int)$height."', '".date('Y', $date)."',
+            '".(int)$width."', '".(int)$height."', '".(int)$file_size."', '".date('Y', $date)."',
             '".date('m', $date)."', '".date('d', $date)."', '".(int)$date."',
-            '".sqlite_escape_string($comment)."', '".sqlite_escape_string($hash)."');");
+            '".sqlite_escape_string($comment)."', '".sqlite_escape_string($details)."',
+            '".sqlite_escape_string($hash)."');");
 
         $id = $this->db->lastInsertRowid();
 
@@ -383,6 +427,7 @@ class fotooManager
             'height'=>  $height,
             'time'  =>  $date,
             'comment'=> $comment,
+            'details'=> $details,
             'hash'  =>  $hash,
             'year'  =>  date('Y', $date),
             'month' =>  date('m', $date),
@@ -612,6 +657,43 @@ class fotooManager
         return $text;
     }
 
+    public function formatDetails($details)
+    {
+        if (empty($details))
+            return '';
+
+        if (!is_array($details))
+            $details = json_decode($details, true);
+
+        $out = array();
+
+        if (isset($details['maker']))
+            $out[__('Camera maker:')] = $details['maker'];
+
+        if (isset($details['model']))
+            $out[__('Camera model:')] = $details['model'];
+
+        if (isset($details['exposure']))
+            $out[__('Exposure:')] = __('%EXPOSURE seconds', 'REPLACE', array('%EXPOSURE' => $details['exposure']));
+
+        if (isset($details['fnumber']))
+            $out[__('Aperture:')] = 'f' . $details['fnumber'];
+
+        if (isset($details['iso']))
+            $out[__('ISO speed:')] = $details['iso'];
+
+        if (isset($details['flash']))
+            $out[__('Flash:')] = $details['flash'] ? __('On') : __('Off');
+
+        if (isset($details['focal']))
+            $out[__('Focal length:')] = $details['focal'] . ' mm';
+
+        if (isset($details['resolution']))
+            $out[__('Original resolution:')] = $details['resolution'];
+
+        return $out;
+    }
+
     /*
      * Resize an image using imlib, imagick or GD, if one fails it tries the next
      */
@@ -756,9 +838,11 @@ if (file_exists(dirname(__FILE__) . '/user_config.php'))
 
 if (!function_exists('__'))
 {
-    function __($str, $time=false) {
-        if ($time)
+    function __($str, $mode=false, $datas=false) {
+        if ($mode == 'TIME')
             return strftime($str, $time);
+        elseif ($mode == 'REPLACE')
+            return strtr($str, $datas);
         else
             return $str;
     }
@@ -769,6 +853,7 @@ if (!defined('CACHE_DIR'))  define('CACHE_DIR', BASE_DIR . '/cache');
 if (!defined('BASE_URL'))   define('BASE_URL', 'http://'.$_SERVER['HTTP_HOST'].dirname($_SERVER['SCRIPT_NAME']).'/');
 if (!defined('SELF_URL'))   define('SELF_URL', BASE_URL . (basename($_SERVER['SCRIPT_NAME']) == 'index.php' ? '' : basename($_SERVER['SCRIPT_NAME'])));
 if (!defined('GEN_SMALL'))  define('GEN_SMALL', 0);
+if (!defined('MAX_IMAGE_SIZE')) define('MAX_IMAGE_SIZE', 2048);
 if (!defined('GALLERY_TITLE'))  define('GALLERY_TITLE', __('My pictures'));
 if (!defined('ALLOW_EMBED'))    define('ALLOW_EMBED', true);
 
@@ -970,9 +1055,9 @@ ul.dirs li { float: left; width: 18%; margin: 0.5em; }
 ul.dirs li a { display: block; border: 2px solid #cc6; padding: 0.5em 0.5em 0.5em 2em; background: no-repeat 0.5em 0.5em url({$img_dir}); }
 ul.dirs li a:hover { background-color: #ffc; }
 
-dl.pic { width: 600px; float: left; text-align: center; }
+dl.pic { width: 60%; float: left; text-align: center; }
 dl.pic dd.orig { margin: 0.5em 0; }
-dl.metas { margin-left: 620px; border: 1px solid #ccc; background: #efe; padding: 0.5em; }
+dl.metas { float: right; width: 35%; border: 1px solid #ccc; background: #efe; padding: 0.5em; margin-bottom: 1em; }
 dl.metas dt { font-weight: bold; padding-left: 1.7em; background: no-repeat 0.1em 0.1em; }
 dl.metas dt.tags { background-image: url({$img_tag}); }
 dl.metas dt.date { background-image: url({$img_date}); }
@@ -980,9 +1065,12 @@ dl.metas dt.comment { background-image: url({$img_info}); }
 dl.metas dt.embed { background-image: url({$img_forward}); }
 dl.metas dd.embed input { padding: 0.2em; width: 97%; }
 dl.metas dd { margin: 0.2em 0 1em; }
-ul.goPrevNext { margin-left: 620px; margin-top: 1em; }
+dl.details { float: right; clear: right; width: 35%; border: 1px solid #ccc; background: #efe; padding: 0.5em; font-size: 0.9em; margin-bottom: 1em; }
+dl.details dt { width: 40%; float: left; text-align: right; margin-right: 0.5em; clear: left;}
+dl.details dd { width: 55%; float: left; }
+ul.goPrevNext { float: right; width: 35%; clear: right; }
 ul.goPrevNext li { float: left; position: relative; width: 50%; text-align: center; min-height: 1px; }
-ul.goPrevNext li a { display: block; width: 100%; color: #000; text-decoration: none; opacity: 0.50; }
+ul.goPrevNext li a { display: block; width: 100%; color: #000; text-decoration: none; opacity: 0.50; overflow: hidden; }
 ul.goPrevNext li span { display: block; width: 100%; font-size: 50px; line-height: 40px; }
 ul.goPrevNext li a:hover { opacity: 1.0; }
 
@@ -1163,11 +1251,11 @@ if (isset($_GET['date']))
         $day = $date[2];
 
     if ($day)
-        $title = __('Pictures for %A %d %B %Y', strtotime($_GET['date']));
+        $title = __('Pictures for %A %d %B %Y', 'TIME', strtotime($_GET['date']));
     elseif ($month)
-        $title = __('Pictures for %B %Y', strtotime($_GET['date'].'/01'));
+        $title = __('Pictures for %B %Y', 'TIME', strtotime($_GET['date'].'/01'));
     elseif ($year)
-        $title = str_replace('%Y', $year, __('Pictures for %Y'));
+        $title = __('Pictures for %Y', 'REPLACE', array('%Y' => $year));
     else
         $title = __('Pictures by date');
 
@@ -1182,7 +1270,7 @@ elseif (!empty($_GET['tag']))
 {
     $mode = 'tag';
     $tag = $_GET['tag'];
-    $title = sprintf(__('Pictures in tag %s'), htmlspecialchars($tag));
+    $title = __('Pictures in tag %TAG', 'REPLACE', array('%TAG' => htmlspecialchars($tag)));
 }
 elseif (isset($_GET['slideshow']))
 {
@@ -1276,9 +1364,9 @@ if ($mode == 'date')
     if ($year)
         echo '<a href="'.SELF_URL.'?date='.$year.'">'.$year.'</a> ';
     if ($month)
-        echo '<a href="'.SELF_URL.'?date='.$year.'/'.$month.'">'.__('%B', strtotime($year.'-'.$month.'-01')).'</a> ';
+        echo '<a href="'.SELF_URL.'?date='.$year.'/'.$month.'">'.__('%B', 'TIME', strtotime($year.'-'.$month.'-01')).'</a> ';
     if ($day)
-        echo '<a href="'.SELF_URL.'?date='.$year.'/'.$month.'/'.$day.'">'.__('%A %d', strtotime($year.'-'.$month.'-'.$day)).'</a> ';
+        echo '<a href="'.SELF_URL.'?date='.$year.'/'.$month.'/'.$day.'">'.__('%A %d', 'TIME', strtotime($year.'-'.$month.'-'.$day)).'</a> ';
 
     echo '
         </h4>
@@ -1325,7 +1413,7 @@ if ($mode == 'date')
                     echo '<h2><a href="'.SELF_URL.'?date='.$pic['year'].'">'.$pic['year'].'</a></h2>';
 
                     if (isset($pic['more']))
-                        echo '<p class="more"><a href="'.SELF_URL.'?date='.$pic['year'].'">'.sprintf(__("(%s more pictures)"), $pic['more']).'</a></p>';
+                        echo '<p class="more"><a href="'.SELF_URL.'?date='.$pic['year'].'">'.__("(%NB more pictures)", 'REPLACE', array('%NB' => $pic['more'])).'</a></p>';
 
                     echo '<ul class="pics">';
                 }
@@ -1344,10 +1432,10 @@ if ($mode == 'date')
 
                 echo '
                 <li class="'.($month ? 'day' : 'month').'">
-                    <h3><a href="'.$url.'">'.($month ? __('%A %d', $pic['time']) : __('%B', $pic['time'])).'</a></h3>';
+                    <h3><a href="'.$url.'">'.($month ? __('%A %d', 'TIME', $pic['time']) : __('%B', 'TIME', $pic['time'])).'</a></h3>';
 
                 if (isset($pic['more']))
-                    echo '<p class="more"><a href="'.$url.'">'.sprintf(__("(%s more pictures)"), $pic['more']).'</a></p>';
+                    echo '<p class="more"><a href="'.$url.'">'.__("(%NB more pictures)", 'REPLACE', array('%NB' => $pic['more'])).'</a></p>';
 
                 echo '
                     <ul class="pics">';
@@ -1414,7 +1502,7 @@ elseif ($mode == 'tag')
         if ($spread == 0) $spread = 1;
         $step = 100 / $spread;
 
-        echo '<p class="related_tags">'.sprintf(__("Other tags related to '%s':"), $tag).' ';
+        echo '<p class="related_tags">'.__("Other tags related to '%TAG':", 'REPLACE', array('%TAG' => $tag)).' ';
         foreach ($tags as $name=>$nb)
         {
             $size = 100 + round(($nb - $min) * $step);
@@ -1483,20 +1571,31 @@ elseif ($mode == 'pic')
 
     if (file_exists($f->getSmallPath($pic['hash'])))
         $small_url = small_url($pic);
-    else
+    elseif ($pic['width'] <= MAX_IMAGE_SIZE && $pic['height'] <= MAX_IMAGE_SIZE)
     {
         $small_url = $orig_url;
         list($nw, $nh) = $f->getNewSize($pic['width'], $pic['height'], 600);
         $wh = 'width="'.$nw.'" height="'.$nh.'"';
     }
+    else
+    {
+        $small_url = false;
+    }
 
     echo '
     <dl class="pic">
-        <dt class="small">
-            <a href="'.$orig_url.'"><img src="'.$small_url.'" alt="'.$pic['filename'].'" '.$wh.' /></a>
+        <dt class="small">';
+
+        if ($small_url)
+            echo '<a href="'.$orig_url.'"><img src="'.$small_url.'" alt="'.$pic['filename'].'" '.$wh.' /></a>';
+        else
+            echo __("This picture is too big (%W x %H) to be displayed in this page.", 'REPLACE', array('%W' => $pic['width'], '%H' => $pic['height']));
+
+        echo '
         </dt>
         <dd class="orig">
-            <a href="'.$orig_url.'">'.sprintf(__('Download image at original size (%s x %s)'), $pic['width'], $pic['height']).'</a>
+            <a href="'.$orig_url.'">'.__('Download image at original size (%W x %H) - %SIZE MB', 'REPLACE',
+            array('%W' => $pic['width'], '%H' => $pic['height'], '%SIZE' => round($pic['size'] / 1024 / 1024, 1))).'</a>
         </dd>
     </dl>
     ';
@@ -1529,7 +1628,7 @@ elseif ($mode == 'pic')
         '%2' => SELF_URL . '?date='.$pic['year'].'/'.$pic['month'],
         '%3' => SELF_URL . '?date='.$pic['year'],
     ));
-    $date = __($date, $pic['time']);
+    $date = __($date, 'TIME', $pic['time']);
     echo '
         <dt class="date">'.__('Date:').'</dt>
         <dd class="date">'.$date.'</dd>';
@@ -1544,19 +1643,37 @@ elseif ($mode == 'pic')
     echo '
     </dl>';
 
+    if (!empty($pic['details']))
+    {
+        $details = $f->formatDetails($pic['details']);
+
+        echo '
+        <dl class="details">';
+
+        foreach ($details as $name=>$value)
+        {
+            echo '
+            <dt>'.$name.'</dt>
+            <dd>'.$value.'</dd>';
+        }
+
+        echo '
+        </dl>';
+    }
+
     list($prev, $next) = $f->getPrevAndNext($selected_dir, $selected_file);
 
     echo '
     <ul class="goPrevNext">
         <li class="goPrev">' .
         ($prev ?
-            '<a href="' . img_page_url($prev) . '" title="' . __('Previous') . '"><img src="' .
-            thumb_url($prev) . '" alt="' . __('Previous') . '" /><span>&larr;</span></a>' : '') .
+            '<a href="' . img_page_url($prev) . '" title="' . __('Previous') . '"><span>&larr;</span><img src="' .
+            thumb_url($prev) . '" alt="' . __('Previous') . '" /></a>' : '') .
         '</li>
         <li class="goNext">' .
         ($next ?
-            '<a href="' . img_page_url($next) . '" title="' . __('Next') . '"><img src="' .
-            thumb_url($next) . '" alt="' . __('Next') . '" /><span>&rarr;</span></a>' : '') .
+            '<a href="' . img_page_url($next) . '" title="' . __('Next') . '"><span>&rarr;</span><img src="' .
+            thumb_url($next) . '" alt="' . __('Next') . '" /></a>' : '') .
         '</li>
     </ul>';
 }
@@ -1729,7 +1846,7 @@ elseif ($mode == 'slideshow')
             <li class="pause"><a href="#" onclick="playPause(); return false;" title="'.__('Pause').'">&#9612;&#9612;</a></li>
             <li class="play"><a href="#" onclick="playPause(); return false;" title="'.__('Restart').'">&#9654;</a></li>
             <li class="next"><a href="#" onclick="goNext(); return false;" title="'.__('Next').'">&rarr;</a></li>
-            <li class="back"><a href="'.SELF_URL.'?'.$selected_dir.'">'.__('Retour').'</a></li>
+            <li class="back"><a href="'.SELF_URL.'?'.$selected_dir.'">'.__('Back').'</a></li>
         </ul>
         ';
     }

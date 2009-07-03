@@ -50,8 +50,12 @@ define('ALLOW_EMBED', true);
 // Generate all small images in directory update process (slow)
 //define('GEN_SMALL', 1);
 
-// Generate small image when an image page is viewed (less slow)
-//define('GEN_SMALL', 2);
+// Generate small image when an image is viewed (less slow)
+define('GEN_SMALL', 2);
+
+// If an image width or height is superior to this number, the gallery
+// will not try to resize it
+define('MAX_IMAGE_SIZE', 2048);
 
 // Shortcut tags in album and pictures comments
 // eg. if you type wp:Belgium in your comment tag, it will make a link to wikipedia
@@ -73,8 +77,8 @@ $french_strings = array(
         =>  'Photos par date',
     'Pictures by tag'
         =>  'Photos par mot-cl&eacute;',
-    'Pictures in tag %s'
-        =>  'Photos pour le mot-cl&eacute; %s',
+    'Pictures in tag %TAG'
+        =>  'Photos pour le mot-cl&eacute; %TAG',
     'My Pictures'
         =>  'Mes photos',
     'By date'
@@ -85,14 +89,14 @@ $french_strings = array(
         =>  '%B',
     '%A %d'
         =>  '%A %d',
-    '(%s more pictures)'
-        =>  '(%s photos de plus)',
+    '(%NB more pictures)'
+        =>  '(%NB photos de plus)',
     'Tags'
         =>  'Mots-cl&eacute;s',
-    "Other tags related to '%s':"
-        =>  "Autres mots-cl&eacute;s en rapport avec '%s' :",
-    'Download image at original size (%s x %s)'
-        =>  "T&eacute;l&eacute;charger l'image au format original (%s x %s)",
+    "Other tags related to '%TAG':"
+        =>  "Autres mots-cl&eacute;s en rapport avec '%TAG' :",
+    'Download image at original size (%W x %H) - %SIZE MB'
+        =>  "T&eacute;l&eacute;charger l'image au format original (%W x %H) - %SIZE Mo",
     'Comment:'
         =>  'Commentaire :',
     'Tags:'
@@ -128,6 +132,30 @@ $french_strings = array(
         =>  'Mettre en pause',
     'Restart'
         =>  'Reprendre',
+    'Photo details'
+        =>  'D&eacute;tails de la photo',
+    'Camera maker:'
+        =>  'Fabricant de l\'appareil :',
+    'Camera model:'
+        =>  'Mod&egrave;le de l\'appareil :',
+    'Exposure:'
+        =>  'Exposition :',
+    'Aperture:'
+        =>  'Ouverture :',
+    'ISO speed:'
+        =>  'Sensibilit&eacute; ISO :',
+    'Flash:'
+        =>  'Flash :',
+    'On'
+        =>  'Activ&eacute;',
+    'Off'
+        =>  'D&eacute;sactiv&eacute;',
+    'Focal length:'
+        =>  'Longueur focale :',
+    'Original resolution:'
+        =>  'R&eacute;solution originale :',
+    '%EXPOSURE seconds'
+        =>  '%EXPOSURE secondes',
 );
 
 // Days of the week translations
@@ -157,7 +185,7 @@ $french_months = array(
     'December'  =>  'd&eacute;cembre',
 );
 
-function __($str, $time=false)
+function __($str, $mode=false, $datas=false)
 {
     global $french_strings, $french_days, $french_months;
 
@@ -166,11 +194,21 @@ function __($str, $time=false)
     else
         $tr = $str;
 
-    if ($time)
+    if ($mode == 'TIME')
     {
-        $tr = strftime($tr, $time);
+        $tr = strftime($tr, $datas);
         $tr = strtr($tr, $french_days);
         $tr = strtr($tr, $french_months);
+    }
+    elseif ($mode == 'REPLACE')
+    {
+        foreach ($datas as $key => $value)
+        {
+            if (is_float($value))
+                $value = str_replace('.', ',', (string)$value);
+
+            $tr = str_replace($key, $value, $tr);
+        }
     }
 
     return $tr;
