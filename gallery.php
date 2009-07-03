@@ -1561,8 +1561,8 @@ elseif ($mode == 'pic')
         echo '
         </dt>
         <dd class="orig">
-            <a href="'.$orig_url.'">'.__('Download image at original size (%W x %H) - %SIZE MB', 'REPLACE',
-            array('%W' => $pic['width'], '%H' => $pic['height'], '%SIZE' => round($pic['size'] / 1024 / 1024, 1))).'</a>
+            <a href="'.$orig_url.'">'.__('Download image at original size (%W x %H) - %SIZE KB', 'REPLACE',
+            array('%W' => $pic['width'], '%H' => $pic['height'], '%SIZE' => round($pic['size'] / 1000))).'</a>
         </dd>
     </dl>
     ';
