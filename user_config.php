@@ -132,6 +132,8 @@ $french_strings = array(
         =>  'Mettre en pause',
     'Restart'
         =>  'Reprendre',
+    'Back'
+        =>  'Retour',
     'Photo details'
         =>  'D&eacute;tails de la photo',
     'Camera maker:'

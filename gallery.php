@@ -94,8 +94,11 @@ class fotooManager
         $this->db = new SQLiteDatabase(CACHE_DIR . '/photos.db', 0600);
 
         if ($init)
+        {
+            header('Location: '.SELF_URL.'?index_all');
             $this->initDB();
-
+            exit;
+        }
     }
 
     private function initDB()
@@ -1795,6 +1798,10 @@ elseif ($mode == 'slideshow' || $mode == 'embed')
             if ($mode == 'embed' && file_exists($f->getSmallPath($pic['hash'])))
             {
                 $path = small_url($pic);
+            }
+            elseif ($pic['width'] > MAX_IMAGE_SIZE || $pic['height'] > MAX_IMAGE_SIZE)
+            {
+                continue;
             }
 
             $pics.= '{
