@@ -808,17 +808,9 @@ function image_url($pic)
     return BASE_URL . (empty($pic['path']) ? '' : $pic['path'].'/') . $pic['filename'];
 }
 
-function embed_url($pic)
-{
-    if (is_string($pic))
-        return SELF_URL . '?embed=' . $pic;
-    else
-        return SELF_URL . '?embed=' . (empty($pic['path']) ? '' : $pic['path'].'/') . $pic['filename'];
-}
-
 function embed_tag($pic)
 {
-    $url = embed_url($pic);
+    $url = SELF_URL . '?embed=' . (empty($pic['path']) ? '' : $pic['path'].'/') . '#' . $pic['filename'];
     $html = '<object type="text/html" width="600" height="450" data="'.$url.'">'
         .   '<iframe src="'.$url.'" width="600" height="450" frameborder="0" scrolling="no"></iframe>'
         .   '</object>';
@@ -1014,7 +1006,7 @@ if (isset($_GET['feed']))
     exit;
 }
 
-if (isset($_GET['style_css']) || isset($_GET['slideshow_css']) || isset($_GET['embed_css']))
+if (isset($_GET['style_css']) || isset($_GET['slideshow_css']))
 {
     header('Content-Type: text/css');
 
@@ -1091,35 +1083,11 @@ a:visited { color: black; }
 a:hover { color: darkred; }
 EOF_STYLE_CSS;
     }
-    elseif (isset($_GET['embed_css']))
-    {
-        echo <<<EOF_EMBED_CSS
-* { margin: 0; padding: 0; }
-body { background: #000; font-family: Sans-serif; position: absolute; top: 0; left: 0; bottom: 0; right: 0;
-    font-size: 12px; overflow: hidden; text-align: center; }
-ul { list-style-type: none; }
-body.loading { cursor: wait; }
-
-div.comment { position: absolute; top: 0; left: 0; right: 0; padding: 0.5em; background: url({$img_bg}); display: none; color: #fff; }
-body.hover div.comment { display: block; }
-
-#controlBar { position: absolute; bottom: 0px; left: 0px; right: 0px; z-index: 100;
-    background: repeat-x bottom left url({$img_back}); height: 30px; width: 100%; padding-top: 20px;}
-#controlBar li { float: left; padding: 0 3%; }
-#controlBar li a { display: block; opacity: 0.50; color: #fff; text-decoration: none; font-size: 2em;
-    line-height: 20px; width: 50px; text-align: center; }
-#controlBar li a:hover { opacity: 1.0; text-shadow: 0px 0px 5px #000; }
-#controlBar li.back a { font-size: 1.2em; font-weight: bold; width: 280px; }
-#controlBar li.next a, #controlBar li.prev a { font-size: 4em; }
-
-#controlBar li.current { color: #fff; font-size: 1.5em; line-height: 20px; opacity: 0.75; width: 70px; }
-EOF_EMBED_CSS;
-    }
     else
     {
         echo <<<EOF_SLIDESHOW_CSS
 * { margin: 0; padding: 0; }
-body { background: #000; font-family: Sans-serif; position: absolute; top: 0; left: 0; bottom: 0; right: 0; font-size: 12px; }
+body { background: #000; font-family: Sans-serif; position: absolute; top: 0; left: 0; bottom: 0; right: 0; font-size: 12px; overflow: hidden; }
 ul { list-style-type: none; }
 body.loading { cursor: wait; }
 
@@ -1127,21 +1095,24 @@ p.info { color: #fff; padding: 1em; }
 
 #slideshow img { position: absolute; top: 0; left: 0; }
 
-#controlBar { position: absolute; bottom: 0px; left: 0px; right: 0px; z-index: 100;
+ul { position: absolute; bottom: 0px; left: 0px; right: 0px; z-index: 100;
     background: repeat-x bottom left url({$img_back}); height: 40px; width: 100%; padding-top: 10px;}
-#controlBar li { float: left; padding: 0 7%; }
-#controlBar li a { display: block; opacity: 0.50; color: #fff; text-decoration: none; font-size: 2em;
+li { float: left; padding: 0 10%; }
+li a { display: block; opacity: 0.50; color: #fff; text-decoration: none; font-size: 2em;
     line-height: 20px; width: 50px; text-align: center; }
-#controlBar li a:hover { opacity: 1.0; text-shadow: 0px 0px 5px #000; }
-#controlBar li.back a { font-size: 2em; font-weight: bold; }
-#controlBar li.next a, #controlBar li.prev a { font-size: 4em; }
-#controlBar li.play a { font-size: 3em; }
+li a:hover { opacity: 1.0; text-shadow: 0px 0px 5px #000; }
+li.back a { font-size: 2em; font-weight: bold; }
+li.next a, #controlBar li.prev a { font-size: 4em; }
+li.play a { font-size: 3em; }
 
-#controlBar.playing li.play { display: none; }
-#controlBar.pause li.pause { display: none; }
+.playing li.play { display: none; }
+.pause li.pause { display: none; }
 
-#controlBar li.loading { color: #fff; font-size: 4em; line-height: 20px; visibility: hidden; }
-body.loading #controlBar li.loading  { visibility: visible; }
+ul.embed { height: 30px; padding-top: 20px; }
+ul.embed li { padding: 0 3%; }
+ul.embed li.current { color: #fff; font-size: 1.5em; line-height: 20px; opacity: 0.75; width: 70px; }
+ul.embed li.back a { font-size: 1.2em; width: 280px; }
+b { font-weight: normal; }
 
 EOF_SLIDESHOW_CSS;
     }
@@ -1278,16 +1249,11 @@ elseif (isset($_GET['slideshow']))
     $selected_dir = $_GET['slideshow'];
     $title = __('Slideshow');
 }
-elseif (!empty($_GET['embed']) && preg_match('!^(.*)(?:/?([^/]+)[_.](jpe?g))?$!Ui', $_GET['embed'], $match))
+elseif (isset($_GET['embed']))
 {
     $mode = 'embed';
-    $selected_dir = $match[1];
+    $selected_dir = $_GET['embed'];
     $title = __('Slideshow');
-
-    if (!empty($match[2]))
-    {
-        $selected_file = $match[2] . '.' . $match[3];
-    }
 }
 else
 {
@@ -1319,10 +1285,8 @@ else
     }
 }
 
-if ($mode == 'slideshow')
+if ($mode == 'slideshow' || $mode == 'embed')
     $css = SELF_URL . '?slideshow.css';
-elseif ($mode == 'embed')
-    $css = SELF_URL . '?embed.css';
 elseif (file_exists(BASE_DIR . '/user_style.css'))
     $css = BASE_URL . 'user_style.css';
 else
@@ -1677,7 +1641,7 @@ elseif ($mode == 'pic')
         '</li>
     </ul>';
 }
-elseif ($mode == 'slideshow')
+elseif ($mode == 'slideshow' || $mode == 'embed')
 {
     $list = $f->getDirectory($selected_dir, true);
 
@@ -1691,9 +1655,6 @@ elseif ($mode == 'slideshow')
         var playing = false;
         var current = 0;
 
-        if (window.location.hash)
-            current = parseInt(window.location.hash.substr(1));
-
         var max_width = 0;
         var max_height = 0;
 
@@ -1704,16 +1665,17 @@ elseif ($mode == 'slideshow')
             document.getElementById("picture_"+previous).style.display = "none";
         }
 
-        function loadPicture(nb, previous) {
-            var pic_id = "picture_"+nb;
-            document.body.className = "loading"
+        function loadPicture(id, previous) {
+            var pic = pictures[id];
+            var pic_id = "picture_"+id;
+            document.body.className = "loading";
 
             if (slideEvent)
                 window.clearTimeout(slideEvent);
 
             if (!document.getElementById(pic_id)) {
-                var width = parseInt(pictures[nb][2]);
-                var height = parseInt(pictures[nb][3]);
+                var width = pic.width;
+                var height = pic.height;
                 var ratio = false;
 
                 if(width > max_width) {
@@ -1737,7 +1699,8 @@ elseif ($mode == 'slideshow')
                 img.id = pic_id;
                 img.style.display = "block";
                 img.style.margin = Math.round((max_height - height) / 2) + "px 0px 0px " + Math.round((max_width - width) / 2) + "px";
-                img.src = pictures[current][0];
+                img.src = pic.src;
+                img.onclick = goNext;
 
                 if (typeof(previous) != "undefined") {
                     img.width = "1";
@@ -1751,6 +1714,8 @@ elseif ($mode == 'slideshow')
                 document.getElementById("slideshow").appendChild(img);
 
                 document.getElementById(pic_id).onload = function() {
+                    document.body.className = "";
+
                     if (playing)
                         slideEvent = window.setTimeout(goNext, time_slide * 1000);
 
@@ -1760,10 +1725,14 @@ elseif ($mode == 'slideshow')
                     if (typeof(previous) != "undefined")
                         hidePrevious(previous);
 
-                    document.body.className = "";
+
+                    if (document.getElementById("current_nb"))
+                        document.getElementById("current_nb").innerHTML = parseInt(current) + 1;
                 }
             }
             else {
+                document.body.className = "";
+
                 document.getElementById(pic_id).style.display = "block";
 
                 if (playing)
@@ -1772,10 +1741,11 @@ elseif ($mode == 'slideshow')
                 if (typeof(previous) != "undefined")
                     hidePrevious(previous);
 
-                document.body.className = "";
+                if (document.getElementById("current_nb"))
+                    document.getElementById("current_nb").innerHTML = parseInt(current) + 1;
             }
 
-            window.location.href = "#" + nb;
+            window.location.href = "#" + pic.filename;
         }
 
         function playPause() {
@@ -1814,133 +1784,93 @@ elseif ($mode == 'slideshow')
             loadPicture(current, previous);
         }
 
-        window.onload = playPause;
-        window.onresize = function() {
-            window.clearTimeout(slideEvent);
-            window.setTimeout("window.location.reload();", 10);
-        }
+        var pictures = new Array(';
 
-        var pictures = new Array();
-        ';
+        $pics = '';
 
         foreach ($list[1] as &$pic)
         {
             $path = BASE_URL . (empty($pic['path']) ? '' : $pic['path'].'/') . $pic['filename'];
-            echo '
-            pictures.push(new Array("'.htmlspecialchars($path).'", "'
-                . htmlspecialchars($pic['comment']).'", '.$pic['width'].', '.$pic['height'].'));';
+
+            if ($mode == 'embed' && file_exists($f->getSmallPath($pic['hash'])))
+            {
+                $path = small_url($pic);
+            }
+
+            $pics.= '{
+                    filename: "' . htmlspecialchars($pic['filename']) . '",
+                    src: "'.htmlspecialchars($path).'",
+                    comment: "' . htmlspecialchars($pic['comment']).'",
+                    width: '.$pic['width'].',
+                    height: '.$pic['height']."},";
         }
 
-        reset($list[1]);
-        $pic = current($list[1]);
-        $path = BASE_URL . (empty($pic['path']) ? '' : $pic['path'].'/') . $pic['filename'];
+        echo substr($pics, 0, -1);
+        unset($pics, $i, $path);
+
+        echo ');
+
+        if (window.location.hash)
+        {
+            var load_pic = window.location.hash.substr(1);
+            for (i in pictures)
+            {
+                if (pictures[i].filename == load_pic)
+                {
+                    current = i;
+                    break;
+                }
+            }
+        };
+
+        window.onload = function() {
+            playPause();
+        };
+        window.onresize = function() {
+            window.clearTimeout(slideEvent);
+            window.setTimeout("window.location.reload();", 10);
+        };';
+
+        if ($mode == 'embed')
+        {
+            echo '
+            max_width = 600;
+            max_height = 450;
+
+            window.onload = function()
+            {
+                loadPicture(current);
+            };
+            ';
+        }
 
         echo '
         </script>
         <div id="slideshow">
-        </div>
+        </div>';
 
-        <ul id="controlBar" class="playing">
-            <li class="loading">&#8986;</li>
-            <li class="prev"><a href="#" onclick="goPrev(); return false;" title="'.__('Previous').'">&larr;</a></li>
-            <li class="pause"><a href="#" onclick="playPause(); return false;" title="'.__('Pause').'">&#9612;&#9612;</a></li>
-            <li class="play"><a href="#" onclick="playPause(); return false;" title="'.__('Restart').'">&#9654;</a></li>
-            <li class="next"><a href="#" onclick="goNext(); return false;" title="'.__('Next').'">&rarr;</a></li>
-            <li class="back"><a href="'.SELF_URL.'?'.$selected_dir.'">'.__('Back').'</a></li>
-        </ul>
-        ';
+        if ($mode == 'slideshow')
+        {
+            echo '
+            <ul id="controlBar" class="playing">
+                <li class="prev"><a href="#" onclick="goPrev(); return false;" title="'.__('Previous').'">&larr;</a></li>
+                <li class="pause"><a href="#" onclick="playPause(); return false;" title="'.__('Pause').'">&#9612;&#9612;</a></li>
+                <li class="play"><a href="#" onclick="playPause(); return false;" title="'.__('Restart').'">&#9654;</a></li>
+                <li class="next"><a href="#" onclick="goNext(); return false;" title="'.__('Next').'">&rarr;</a></li>
+                <li class="back"><a href="'.SELF_URL.'?'.$selected_dir.'">'.__('Back').'</a></li>
+            </ul>';
+        }
+        else
+        {
+            echo '
+            <ul id="controlBar" class="embed">
+                <li class="prev"><a href="#" onclick="goPrev(); return false;" title="'.__('Previous').'">&larr;</a></li>
+                <li class="back"><a href="'.SELF_URL.'?'.$selected_dir.'" onclick="window.open(this.href); return false;">'.GALLERY_TITLE.'</a></li>
+                <li class="current"><b id="current_nb">0</b> / '.count($list[1]).'</li>
+                <li class="next"><a href="#" onclick="goNext(); return false;" title="'.__('Next').'">&rarr;</a></li>
+            </ul>';
+        }
     }
-}
-elseif ($mode == 'embed')
-{
-    $list = $f->getDirectory($selected_dir, true);
-
-    if ($list === false || empty($list[1]))
-    {
-        echo '<p class="info">'.__('No picture found.').'</p>';
-        exit;
-    }
-
-    $list = $list[1];
-
-    if (!empty($selected_file))
-    {
-        $current_file = $selected_file;
-    }
-    else
-    {
-        $current = current($list);
-        $current_file = $current['filename'];
-    }
-
-    $pic = $f->getInfos($current_file, $selected_dir);
-
-    if (empty($pic))
-    {
-        die(__('No picture found.'));
-    }
-
-    $wh = '';
-    list($nw, $nh) = $f->getNewSize($pic['width'], $pic['height'], 600);
-
-    if (file_exists($f->getSmallPath($pic['hash'])))
-        $small_url = small_url($pic);
-    else
-    {
-        $small_url = image_url($pic);
-        $wh = 'width="'.$nw.'" height="'.$nh.'"';
-    }
-
-    if ($nh > 450 && $nh > $nw)
-    {
-        list($nw, $nh) = $f->getNewSize($pic['width'], $pic['height'], 450);
-        $wh = 'width="'.$nw.'" height="'.$nh.'"';
-    }
-
-    echo '
-    <p class="pic">
-        <img src="'.$small_url.'" alt="'.$pic['filename'].'" '.$wh.' id="picture" />
-    </p>
-    <script type="text/javascript">
-    function changePic()
-    {
-        document.body.className = "loading";
-    }
-    window.onmouseover = function () { document.body.className = "hover"; }
-    window.onmouseout = function () { document.body.className = ""; }
-    </script>';
-
-    if (!empty($pic['comment']))
-    {
-        echo '<div class="comment"><p>'.$f->formatText($pic['comment']).'</p></div>';
-    }
-
-    list($prev, $next) = $f->getPrevAndNext($selected_dir, $current_file);
-
-    if (!$next)
-        $next = current($list);
-    if (!$prev)
-        $prev = end($list);
-
-    $nb_total = count($list);
-    $nb_current = 1;
-
-    foreach ($list as &$lpic)
-    {
-        if ($lpic['id'] == $pic['id'])
-            break;
-
-        $nb_current++;
-    }
-
-    echo '
-    <ul id="controlBar">
-        <li class="prev"><a href="'.embed_url($prev).'" onclick="changePic();" title="'.__('Previous').'">&larr;</a></li>
-        <li class="back"><a href="'.SELF_URL.'?'.$selected_dir.'" onclick="window.open(this.href); return false;">'.GALLERY_TITLE.'</a></li>
-        <li class="current">'.$nb_current.' / '.$nb_total.'</li>
-        <li class="next"><a href="'.embed_url($next).'" onclick="changePic();" title="'.__('Next').'">&rarr;</a></li>
-    </ul>
-    ';
 }
 else
 {
