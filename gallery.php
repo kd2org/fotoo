@@ -1,6 +1,6 @@
 <?php
 /*
-    Fotoo Gallery v2
+    Fotoo Gallery v2.0.r824
     Copyright 2004-2008 BohwaZ - http://dev.kd2.org/
     Licensed under the GNU AGPLv3
 
