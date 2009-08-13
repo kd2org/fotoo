@@ -5,7 +5,7 @@ body { font-family: Sans-serif;
 	color: #fff; padding: 1em; }
 h1 { font-size: 2em; margin-top: 0.2em; height: 1.5em; text-shadow: 2px 2px 2px #000; }
 hr { visibility: hidden; clear: both; }
-#mywebsite a { display: block; text-indent: -70em; overflow: hidden; width: 230px; height: 35px; }
+#mywebsite a { display: block; font-size: 1.5em; }
 a img { border: none; }
 
 #header { height: 1.4em; margin-bottom: 5em; }

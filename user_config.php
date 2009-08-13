@@ -1,7 +1,7 @@
 <?php
 /*
-    Fotoo Gallery v2
-    Copyright 2004-2008 BohwaZ - http://dev.kd2.org/
+    Fotoo Gallery v2.1.0
+    Copyright 2004-2009 BohwaZ - http://dev.kd2.org/
     Licensed under the GNU AGPLv3
 
     This software is free software: you can redistribute it and/or modify

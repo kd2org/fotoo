@@ -1,7 +1,7 @@
 <?php
 /*
-    Fotoo Gallery v2.0.r824
-    Copyright 2004-2008 BohwaZ - http://dev.kd2.org/
+    Fotoo Gallery v2.1.0
+    Copyright 2004-2009 BohwaZ - http://dev.kd2.org/
     Licensed under the GNU AGPLv3
 
     This software is free software: you can redistribute it and/or modify
@@ -442,9 +442,6 @@ class fotooManager
     static public function getValidDirectory($path)
     {
         $path = preg_replace('!(^/+|/+$)!', '', $path);
-
-        if (!preg_match('!^[a-z0-9A-Z_.-]+$!', $path))
-            return false;
 
         if (preg_match('![.]{2,}!', $path))
             return false;
