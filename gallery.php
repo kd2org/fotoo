@@ -439,10 +439,26 @@ class fotooManager
         );
     }
 
+    static public function getValidDirectory($path)
+    {
+        $path = preg_replace('!(^/+|/+$)!', '', $path);
+
+        if (!preg_match('!^[a-z0-9A-Z_.-]+$!', $path))
+            return false;
+
+        if (preg_match('![.]{2,}!', $path))
+            return false;
+
+        return $path;
+    }
+
     // Returns directories and pictures inside a directory
     public function getDirectory($path='')
     {
-        $path = preg_replace('!(^/+|/+$)!', '', $path);
+        $path = self::getValidDirectory($path);
+
+        if ($path)
+            return false;
 
         if ($path == '.' || empty($path))
             $dir_path = BASE_DIR . '/';
@@ -1249,13 +1265,13 @@ elseif (!empty($_GET['tag']))
 elseif (isset($_GET['slideshow']))
 {
     $mode = 'slideshow';
-    $selected_dir = $_GET['slideshow'];
+    $selected_dir = fotooManager::getValidDirectory($_GET['slideshow']);
     $title = __('Slideshow');
 }
 elseif (isset($_GET['embed']))
 {
     $mode = 'embed';
-    $selected_dir = $_GET['embed'];
+    $selected_dir = fotooManager::getValidDirectory($_GET['embed']);
     $title = __('Slideshow');
 }
 else
@@ -1272,14 +1288,17 @@ else
 
     if (!empty($_SERVER['QUERY_STRING']) && preg_match('!^(.*)(?:/?([^/]+)[_.](jpe?g))?$!Ui', urldecode($_SERVER['QUERY_STRING']), $match))
     {
-        $selected_dir = $match[1];
-        $title = strtr(htmlspecialchars($match[1]), array('/' => ' / ', '_' => ' '));
-
-        if (!empty($match[2]))
+        $selected_dir = fotooManager::getValidDirectory($match[1]);
+        if ($selected_dir !== false)
         {
-            $selected_file = $match[2] . '.' . $match[3];
-            $mode = 'pic';
-            $title = strtr(htmlspecialchars($match[2]), array('_' => ' ', '-' => ' - '));
+            $title = strtr(htmlspecialchars($match[1]), array('/' => ' / ', '_' => ' '));
+
+            if (!empty($match[2]))
+            {
+                $selected_file = $match[2] . '.' . $match[3];
+                $mode = 'pic';
+                $title = strtr(htmlspecialchars($match[2]), array('_' => ' ', '-' => ' - '));
+            }
         }
     }
     else
@@ -1527,7 +1546,7 @@ elseif ($mode == 'pic')
             if ($current) $current .= '/';
             $current .= $d;
 
-            echo '  <a href="'.SELF_URL.'?'.$current.'">'.strtr($d, '_-', '  ')."</a>\n";
+            echo '  <a href="'.SELF_URL.'?'.htmlspecialchars($current).'">'.htmlspecialchars(strtr($d, '_-', '  '))."</a>\n";
         }
     }
 
@@ -1554,7 +1573,7 @@ elseif ($mode == 'pic')
         <dt class="small">';
 
         if ($small_url)
-            echo '<a href="'.$orig_url.'"><img src="'.$small_url.'" alt="'.$pic['filename'].'" '.$wh.' /></a>';
+            echo '<a href="'.$orig_url.'"><img src="'.$small_url.'" alt="'.htmlspecialchars($pic['filename']).'" '.$wh.' /></a>';
         else
             echo __("This picture is too big (%W x %H) to be displayed in this page.", 'REPLACE', array('%W' => $pic['width'], '%H' => $pic['height']));
 
@@ -1864,7 +1883,7 @@ elseif ($mode == 'slideshow' || $mode == 'embed')
                 <li class="pause"><a href="#" onclick="playPause(); return false;" title="'.__('Pause').'">&#9612;&#9612;</a></li>
                 <li class="play"><a href="#" onclick="playPause(); return false;" title="'.__('Restart').'">&#9654;</a></li>
                 <li class="next"><a href="#" onclick="goNext(); return false;" title="'.__('Next').'">&rarr;</a></li>
-                <li class="back"><a href="'.SELF_URL.'?'.$selected_dir.'">'.__('Back').'</a></li>
+                <li class="back"><a href="'.SELF_URL.'?'.htmlspecialchars($selected_dir).'">'.__('Back').'</a></li>
             </ul>';
         }
         else
@@ -1872,7 +1891,7 @@ elseif ($mode == 'slideshow' || $mode == 'embed')
             echo '
             <ul id="controlBar" class="embed">
                 <li class="prev"><a href="#" onclick="goPrev(); return false;" title="'.__('Previous').'">&larr;</a></li>
-                <li class="back"><a href="'.SELF_URL.'?'.$selected_dir.'" onclick="window.open(this.href); return false;">'.GALLERY_TITLE.'</a></li>
+                <li class="back"><a href="'.SELF_URL.'?'.htmlspecialchars($selected_dir).'" onclick="window.open(this.href); return false;">'.htmlspecialchars(GALLERY_TITLE).'</a></li>
                 <li class="current"><b id="current_nb">0</b> / '.count($list[1]).'</li>
                 <li class="next"><a href="#" onclick="goNext(); return false;" title="'.__('Next').'">&rarr;</a></li>
             </ul>';
@@ -1900,12 +1919,12 @@ else
             if ($current) $current .= '/';
             $current .= $d;
 
-            echo '  <a href="'.SELF_URL.'?'.$current.'">'.strtr($d, '_-', '  ')."</a>\n";
+            echo '  <a href="'.SELF_URL.'?'.htmlspecialchars($current).'">'.htmlspecialchars(strtr($d, '_-', '  '))."</a>\n";
         }
     }
 
     if (!empty($list[1]))
-        echo '  <script type="text/javascript"> document.write("<small><a class=\\"slideshow\\" href=\\"'.SELF_URL.'?slideshow='.$selected_dir.'\\">'.__('Slideshow').'</a></small>"); </script>';
+        echo '  <script type="text/javascript"> document.write("<small><a class=\\"slideshow\\" href=\\"'.SELF_URL.'?slideshow='.htmlspecialchars($selected_dir).'\\">'.__('Slideshow').'</a></small>"); </script>';
 
     echo "</h4>
     </div>\n";
@@ -1929,7 +1948,7 @@ else
         foreach ($dirs as $dir)
         {
             echo '  <li><a href="'.SELF_URL.'?'
-                .(!empty($selected_dir) ? $selected_dir.'/'.$dir : $dir)
+                .(!empty($selected_dir) ? htmlspecialchars($selected_dir.'/'.$dir) : htmlspecialchars($dir))
                 .'">'.htmlspecialchars(strtr($dir, '_', ' '))."</a></li>\n";
         }
         echo "</ul>\n";
