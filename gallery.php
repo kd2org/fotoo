@@ -633,6 +633,17 @@ class fotooManager
         return $tags;
     }
 
+    public function getTagNameFromId($tag)
+    {
+        $res = $this->db->arrayQuery('SELECT name FROM tags
+            WHERE name_id = \''.sqlite_escape_string($tag).'\' LIMIT 1;', SQLITE_ASSOC);
+
+        if (!empty($res[0]))
+            return $res[0]['name'];
+        else
+            return false;
+    }
+
     private function intelligent_utf8_encode($str)
     {
         if (preg_match('%^(?:
@@ -1223,6 +1234,13 @@ if (isset($_GET['index_all']))
     exit;
 }
 
+// For cache force url
+if (!empty($_GET['r']))
+{
+    unset($_GET['r']);
+    $_SERVER['QUERY_STRING'] = '';
+}
+
 // Get which display mode is asked
 if (isset($_GET['date']))
 {
@@ -1256,7 +1274,7 @@ elseif (isset($_GET['tags']))
 elseif (!empty($_GET['tag']))
 {
     $mode = 'tag';
-    $tag = $_GET['tag'];
+    $tag = $f->getTagNameFromId($_GET['tag']);
     $title = __('Pictures in tag %TAG', 'REPLACE', array('%TAG' => htmlspecialchars($tag)));
 }
 elseif (isset($_GET['slideshow']))
@@ -1458,7 +1476,7 @@ elseif ($mode == 'tags')
         foreach ($tags as $tag=>$nb)
         {
             $size = 100 + round(($nb - $min) * $step);
-            echo '<a href="'.SELF_URL.'?tag='.urlencode($tag).'" style="font-size: '.$size.'%;">'
+            echo '<a href="'.SELF_URL.'?tag='.urlencode($f->getTagId($tag)).'" style="font-size: '.$size.'%;">'
                 .htmlspecialchars($tag).'</a> <small>('.$nb.')</small> ';
         }
 
@@ -1471,7 +1489,7 @@ elseif ($mode == 'tag')
     echo '<div id="header">
         '.$menu.'
         <h4><strong><a href="'.SELF_URL.'?tags">'.__('Tags').'</a></strong>
-            <a href="'.SELF_URL.'?tag='.urlencode($tag).'">'.htmlspecialchars($tag).'</a>
+            <a href="'.SELF_URL.'?tag='.urlencode($f->getTagId($tag)).'">'.htmlspecialchars($tag).'</a>
         </h4>
     </div>';
 
@@ -1489,7 +1507,7 @@ elseif ($mode == 'tag')
         foreach ($tags as $name=>$nb)
         {
             $size = 100 + round(($nb - $min) * $step);
-            echo '<a href="'.SELF_URL.'?tag='.urlencode($name).'" style="font-size: '.$size.'%;">'.htmlspecialchars($name).'</a> ';
+            echo '<a href="'.SELF_URL.'?tag='.urlencode($f->getTagId($name)).'" style="font-size: '.$size.'%;">'.htmlspecialchars($name).'</a> ';
             echo '<small>('.$nb.')</small> ';
         }
         echo '</p>';
