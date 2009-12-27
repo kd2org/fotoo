@@ -28,7 +28,7 @@
         * (optional) PHP Imagick or PHP Imlib extension (it will make thumbnail generation faster)
         * GD (if Imagick and Imlib are not installed), used for thumbnail generation when there is no
           Exif thumbnail available
-       
+
         Note: this application will throw an error on Free.fr hosting service because their SQLite
         version is broken (see http://www.aduf.org/viewtopic.php?t=170585 for details).
 
@@ -38,10 +38,19 @@
         Just copy the file 'gallery.php' to 'index.php' at the root of your pictures directory.
 
         Make sure the script can write to the pictures cache directory ([root of gallery]/cache).
-        
+
+    TAGGING, COMMENTING AND ORGANIZING YOUR PICTURES
+    ------------------------------------------------
+
+        Fotoo Gallery, as its name stand it, is just a gallery, aimed to photo galleries.
+        It's using datas embedded in pictures (EXIF comments and IPTC tags) to generate its database.
+        If you want to comment, tag and organize your pictures in albums/directories, you will
+        have to use a software that stores comments and tags in the files, like jBrout for example,
+        which is a very good software.
+
     TAGS IN COMMENTS
     ----------------
-    
+
         Try tag:My_tag in an image comments, it will link to the "My_tag" pictures list.
         You can add your own tags, take a look at the example user_config.php
 
@@ -57,10 +66,24 @@
 
         (yeah it will be a bit slow with big pictures)
 
+    MAXIMUM IMAGE SIZE
+    ------------------
+
+        A good thing would be to resize your pictures before uploading them,
+        there is a parameter MAX_IMAGE_SIZE in user_config.php that defaults to 2048.
+        If a picture is larger than this number, the gallery won't try to resize it,
+        either to a small one or to a thumbnail. This is to avoid high server load.
+
+        You can resize all pictures from a directory to a maximum width and height with
+        this shell line:
+
+        $ find . -name '*.jpg' -exec echo "{}" \; \
+            -exec convert \-size 2048x2048 \-resize 2048x2048 {} {} \;
+
     CHANGING DATES
-    -------------
-    
+    --------------
+
         If your pictures dates are messed up but you have named your images like '2000-Me_on_beach.jpg'
         you can try some shell line like this one :
-        
+
         for i in 20??-*.jpg; do DATE=`echo $i | sed -r 's/([0-9])-.*/\1/'`; touch -d "${DATE}-01-01 01:01:01" $i; done;
