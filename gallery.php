@@ -450,7 +450,7 @@ class fotooManager
     }
 
     // Returns directories and pictures inside a directory
-    public function getDirectory($path='')
+    public function getDirectory($path='', $dont_check = false)
     {
         $path = self::getValidDirectory($path);
 
@@ -481,6 +481,12 @@ class fotooManager
                 $dirs[] = $file;
             }
             elseif (!preg_match('!\.jpe?g$!i', $file))
+            {
+                continue;
+            }
+            // Don't detect updates when directory has already been updated
+            // (used in 'index_all' process only, to avoid server load)
+            elseif ($dont_check)
             {
                 continue;
             }
@@ -1161,12 +1167,27 @@ if (!empty($_GET['updateFile']) && isset($_GET['updateDir']))
 
 if (isset($_GET['index_all']))
 {
+    if (!isset($_SESSION))
+    {
+        session_start();
+
+        if (!isset($_SESSION['processed']))
+            $_SESSION['processed'] = array();
+    }
+
     function update_dir($dir)
     {
         global $f;
 
+        if (in_array($dir, $_SESSION['processed']))
+            $dont_check = true;
+        else
+            $dont_check = false;
+
         $pics = $dirs = $update = $desc = false;
-        $list = $f->getDirectory($dir, true);
+        $list = $f->getDirectory($dir, $dont_check);
+
+        $_SESSION['processed'][] = $dir;
 
         if (empty($list))
             return false;
