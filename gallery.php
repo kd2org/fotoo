@@ -454,7 +454,7 @@ class fotooManager
     {
         $path = self::getValidDirectory($path);
 
-        if ($path)
+        if ($path === false)
             return false;
 
         if ($path == '.' || empty($path))
