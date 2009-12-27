@@ -1701,7 +1701,7 @@ elseif ($mode == 'pic')
 }
 elseif ($mode == 'slideshow' || $mode == 'embed')
 {
-    $list = $f->getDirectory($selected_dir, true);
+    $list = $f->getDirectory($selected_dir);
 
     if ($list === false || empty($list[1]))
         echo '<p class="info">'.__('No picture found.').'</p>';
@@ -1937,7 +1937,7 @@ elseif ($mode == 'slideshow' || $mode == 'embed')
 else
 {
     $pics = $dirs = $update = $desc = false;
-    $list = $f->getDirectory($selected_dir, true);
+    $list = $f->getDirectory($selected_dir);
 
     echo "<h1>".$title."</h1>\n";
 
