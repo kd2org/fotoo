@@ -650,18 +650,32 @@ class fotooManager
             return false;
     }
 
+    private function seems_utf8($str)
+    {
+        $length = strlen($str);
+        for ($i=0; $i < $length; $i++)
+        {
+            $c = ord($str[$i]);
+            if ($c < 0x80) $n = 0; # 0bbbbbbb
+            elseif (($c & 0xE0) == 0xC0) $n=1; # 110bbbbb
+            elseif (($c & 0xF0) == 0xE0) $n=2; # 1110bbbb
+            elseif (($c & 0xF8) == 0xF0) $n=3; # 11110bbb
+            elseif (($c & 0xFC) == 0xF8) $n=4; # 111110bb
+            elseif (($c & 0xFE) == 0xFC) $n=5; # 1111110b
+            else return false; # Does not match any model
+
+            for ($j=0; $j<$n; $j++)
+            {
+                if ((++$i == $length) || ((ord($str[$i]) & 0xC0) != 0x80))
+                    return false;
+            }
+        }
+        return true;
+    }
+
     private function intelligent_utf8_encode($str)
     {
-        if (preg_match('%^(?:
-             [\x09\x0A\x0D\x20-\x7E]            # ASCII
-           | [\xC2-\xDF][\x80-\xBF]            # non-overlong 2-byte
-           |  \xE0[\xA0-\xBF][\x80-\xBF]        # excluding overlongs
-           | [\xE1-\xEC\xEE\xEF][\x80-\xBF]{2}  # straight 3-byte
-           |  \xED[\x80-\x9F][\x80-\xBF]        # excluding surrogates
-           |  \xF0[\x90-\xBF][\x80-\xBF]{2}    # planes 1-3
-           | [\xF1-\xF3][\x80-\xBF]{3}          # planes 4-15
-           |  \xF4[\x80-\x8F][\x80-\xBF]{2}    # plane 16
-            )*$%xs', $str))
+        if ($this->seems_utf8($str))
             return $str;
         else
             return utf8_encode($str);
@@ -670,7 +684,7 @@ class fotooManager
     public function formatText($text)
     {
         $text = $this->intelligent_utf8_encode($text);
-        $text = htmlspecialchars($text);
+        $text = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
 
         // Allow simple, correctly closed, html tags (<strong>, <em>, <code>...)
         $text = preg_replace('!&lt;([a-z]+)&gt;(.*)&lt;/\\1&gt;!isU', '<\\1>\\2</\\1>', $text);
@@ -2021,7 +2035,6 @@ else
         echo "</script>\n"
             .'<script type="text/javascript" src="'.SELF_URL.'?update.js"></script>';
     }
-
 }
 
 if (file_exists(BASE_DIR . '/user_footer.php'))
