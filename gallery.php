@@ -61,9 +61,9 @@ class fotooManager
 
     public function getTagId($name)
     {
-        $name = htmlentities($name);
+        $name = htmlentities($name, ENT_QUOTES, 'UTF-8');
         $name = preg_replace('!&([aeiouyAEIOUYNcC]|ae)(?:circ|grave|acute|circ|tilde|uml|ring|slash|cedil|lig);!', '\\1', $name);
-        $name = html_entity_decode($name);
+        $name = html_entity_decode($name, ENT_QUOTES, 'UTF-8');
         $name = strtolower($name);
         return $name;
     }
