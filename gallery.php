@@ -1199,9 +1199,19 @@ if (isset($_GET['index_all']))
 
     if ($_GET['index_all'] != 'done')
     {
+        define('TIMER_START', time());
+
         function update_dir($dir)
         {
             global $f;
+
+            // Let's start again if timer seems too late, because processing a lot of
+            // directories could be very slow
+            if ((time() - TIMER_START) > (ini_get('max_execution_time') - 5))
+            {
+                header('Location: '.SELF_URL.'?index_all='.time());
+                exit;
+            }
 
             if (in_array($dir, $_SESSION['processed']))
                 $dont_check = true;
