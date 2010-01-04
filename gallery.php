@@ -1187,45 +1187,66 @@ if (isset($_GET['index_all']))
 
         if (!isset($_SESSION['processed']))
             $_SESSION['processed'] = array();
+
+        if ($_GET['index_all'] == 'done')
+        {
+            $_SESSION = array();
+            session_destroy();
+            session_write_close();
+            setcookie(session_name(), '', time() - 3600);
+        }
     }
 
-    function update_dir($dir)
+    if ($_GET['index_all'] != 'done')
     {
-        global $f;
+        function update_dir($dir)
+        {
+            global $f;
 
-        if (in_array($dir, $_SESSION['processed']))
-            $dont_check = true;
-        else
-            $dont_check = false;
+            if (in_array($dir, $_SESSION['processed']))
+                $dont_check = true;
+            else
+                $dont_check = false;
 
-        $pics = $dirs = $update = $desc = false;
-        $list = $f->getDirectory($dir, $dont_check);
+            $pics = $dirs = $update = $desc = false;
+            $list = $f->getDirectory($dir, $dont_check);
 
-        $_SESSION['processed'][] = $dir;
+            $_SESSION['processed'][] = $dir;
 
-        if (empty($list))
+            if (empty($list))
+                return false;
+            else
+                list($dirs, $pics, $update, $desc) = $list;
+
+            if (!empty($update))
+            {
+                return array($dir, $update);
+            }
+
+            foreach ($dirs as $subdir)
+            {
+                $subdir = (!empty($dir) ? $dir . '/' : '') . $subdir;
+                $res = update_dir($subdir);
+
+                if ($res)
+                    return $res;
+            }
+
             return false;
-        else
-            list($dirs, $pics, $update, $desc) = $list;
-
-        if (!empty($update))
-        {
-            return array($dir, $update);
         }
 
-        foreach ($dirs as $subdir)
+        $res = update_dir('');
+
+        if (!$res)
         {
-            $subdir = (!empty($dir) ? $dir . '/' : '') . $subdir;
-            $res = update_dir($subdir);
-
-            if ($res)
-                return $res;
+            header('Location: '.SELF_URL.'?index_all=done');
+            exit;
         }
-
-        return false;
     }
-
-    $res = update_dir('');
+    else
+    {
+        $res = false;
+    }
 
     echo '<html><body>';
 
@@ -1258,7 +1279,7 @@ if (isset($_GET['index_all']))
     }
     else
     {
-        echo '<a href="'.SELF_URL.'">'.__('Update done.').'</a>';
+        echo '<a href="'.SELF_URL.'?r='.time().'">'.__('Update done.').'</a>';
     }
 
     echo '
