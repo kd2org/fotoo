@@ -1207,7 +1207,7 @@ if (isset($_GET['index_all']))
 
             // Let's start again if timer seems too late, because processing a lot of
             // directories could be very slow
-            if ((time() - TIMER_START) > (ini_get('max_execution_time') - 5))
+            if ((time() - TIMER_START) >= (ini_get('max_execution_time') - 5))
             {
                 header('Location: '.SELF_URL.'?index_all='.time());
                 exit;
