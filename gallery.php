@@ -1,6 +1,6 @@
 <?php
 /*
-    Fotoo Gallery v2.1.0
+    Fotoo Gallery v2.2.0
     Copyright 2004-2009 BohwaZ - http://dev.kd2.org/
     Licensed under the GNU AGPLv3
 
@@ -855,9 +855,13 @@ function image_url($pic)
     return BASE_URL . (empty($pic['path']) ? '' : $pic['path'].'/') . $pic['filename'];
 }
 
-function embed_tag($pic)
+function embed_html($data)
 {
-    $url = SELF_URL . '?embed=' . (empty($pic['path']) ? '' : $pic['path'].'/') . '#' . $pic['filename'];
+    if (is_array($data))
+        $url = SELF_URL . '?embed=' . (empty($pic['path']) ? '' : $pic['path'].'/') . '#' . $pic['filename'];
+    else
+        $url = SELF_URL . '?embed&tag=' . urlencode($data);
+
     $html = '<object type="text/html" width="600" height="450" data="'.$url.'">'
         .   '<iframe src="'.$url.'" width="600" height="450" frameborder="0" scrolling="no"></iframe>'
         .   '</object>';
@@ -1337,23 +1341,31 @@ elseif (isset($_GET['tags']))
     $title = __('Pictures by tag');
     $mode = 'tags';
 }
+elseif (isset($_GET['slideshow']))
+{
+    $mode = 'slideshow';
+    $title = __('Slideshow');
+
+    if (!empty($_GET['tag']))
+        $selected_tag = $f->getTagId($_GET['tag']);
+    else
+        $selected_dir = fotooManager::getValidDirectory($_GET['slideshow']);
+}
+elseif (isset($_GET['embed']))
+{
+    $mode = 'embed';
+    $title = __('Slideshow');
+
+    if (!empty($_GET['tag']))
+        $selected_tag = $f->getTagId($_GET['tag']);
+    else
+        $selected_dir = fotooManager::getValidDirectory($_GET['embed']);
+}
 elseif (!empty($_GET['tag']))
 {
     $mode = 'tag';
     $tag = $f->getTagNameFromId($_GET['tag']);
     $title = __('Pictures in tag %TAG', 'REPLACE', array('%TAG' => htmlspecialchars($tag)));
-}
-elseif (isset($_GET['slideshow']))
-{
-    $mode = 'slideshow';
-    $selected_dir = fotooManager::getValidDirectory($_GET['slideshow']);
-    $title = __('Slideshow');
-}
-elseif (isset($_GET['embed']))
-{
-    $mode = 'embed';
-    $selected_dir = fotooManager::getValidDirectory($_GET['embed']);
-    $title = __('Slideshow');
 }
 else
 {
@@ -1551,11 +1563,18 @@ elseif ($mode == 'tags')
 }
 elseif ($mode == 'tag')
 {
+    $pics = $f->getByTag($tag);
+
     echo '<h1>'.$title.'</h1>';
     echo '<div id="header">
         '.$menu.'
         <h4><strong><a href="'.SELF_URL.'?tags">'.__('Tags').'</a></strong>
-            <a href="'.SELF_URL.'?tag='.urlencode($f->getTagId($tag)).'">'.htmlspecialchars($tag).'</a>
+            <a href="'.SELF_URL.'?tag='.urlencode($tag).'">'.htmlspecialchars($f->getTagNameFromId($tag)).'</a>';
+
+    if (!empty($pics))
+        echo '<script type="text/javascript"> document.write("<small><a class=\\"slideshow\\" href=\\"'.SELF_URL.'?slideshow&amp;tag='.urlencode($f->getTagId($tag)).'\\">'.__('Slideshow').'</a></small>"); </script>';
+
+    echo '
         </h4>
     </div>';
 
@@ -1579,10 +1598,11 @@ elseif ($mode == 'tag')
         echo '</p>';
     }
 
-    $pics = $f->getByTag($tag);
-
     if (empty($pics))
+    {
         echo '<p class="info">'.__('No picture found.').'</p>';
+    }
+    else
     {
         echo '<ul class="pics">'."\n";
 
@@ -1595,6 +1615,15 @@ elseif ($mode == 'tag')
         }
 
         echo "</ul>\n";
+
+        if (ALLOW_EMBED)
+        {
+            echo '
+            <dl class="details">
+                <dt class="embed">'.__('Embed:').'</dt>
+                <dd class="embed"><input type="text" onclick="this.select();" value="'.htmlspecialchars(embed_html($tag)).'" /></dd>
+            </dl>';
+        }
     }
 }
 elseif ($mode == 'pic')
@@ -1704,7 +1733,7 @@ elseif ($mode == 'pic')
     {
         echo '
         <dt class="embed">'.__('Embed:').'</dt>
-        <dd class="embed"><input type="text" onclick="this.select();" value="'.htmlspecialchars(embed_tag($pic)).'" /></dd>';
+        <dd class="embed"><input type="text" onclick="this.select();" value="'.htmlspecialchars(embed_pic($pic)).'" /></dd>';
     }
 
     echo '
@@ -1746,9 +1775,24 @@ elseif ($mode == 'pic')
 }
 elseif ($mode == 'slideshow' || $mode == 'embed')
 {
-    $list = $f->getDirectory($selected_dir);
+    if (!empty($selected_dir))
+    {
+        $list = $f->getDirectory($selected_dir);
 
-    if ($list === false || empty($list[1]))
+        if (!empty($list[1]))
+            $list = $list[1];
+        else
+            $list = false;
+
+        $back_url = SELF_URL . '?' . $selected_dir;
+    }
+    elseif (!empty($selected_tag))
+    {
+        $list = $f->getByTag($selected_tag);
+        $back_url = SELF_URL . '?tag=' . $selected_tag;
+    }
+
+    if (empty($list))
         echo '<p class="info">'.__('No picture found.').'</p>';
     else
     {
@@ -1828,7 +1872,6 @@ elseif ($mode == 'slideshow' || $mode == 'embed')
                     if (typeof(previous) != "undefined")
                         hidePrevious(previous);
 
-
                     if (document.getElementById("current_nb"))
                         document.getElementById("current_nb").innerHTML = parseInt(current) + 1;
                 }
@@ -1891,7 +1934,7 @@ elseif ($mode == 'slideshow' || $mode == 'embed')
 
         $pics = '';
 
-        foreach ($list[1] as &$pic)
+        foreach ($list as &$pic)
         {
             $path = BASE_URL . (empty($pic['path']) ? '' : $pic['path'].'/') . $pic['filename'];
 
@@ -1946,6 +1989,7 @@ elseif ($mode == 'slideshow' || $mode == 'embed')
 
             window.onload = function()
             {
+                document.getElementById("current_nb").innerHTML = parseInt(current) + 1;
                 loadPicture(current);
             };
             ';
@@ -1964,7 +2008,7 @@ elseif ($mode == 'slideshow' || $mode == 'embed')
                 <li class="pause"><a href="#" onclick="playPause(); return false;" title="'.__('Pause').'">&#9612;&#9612;</a></li>
                 <li class="play"><a href="#" onclick="playPause(); return false;" title="'.__('Restart').'">&#9654;</a></li>
                 <li class="next"><a href="#" onclick="goNext(); return false;" title="'.__('Next').'">&rarr;</a></li>
-                <li class="back"><a href="'.SELF_URL.'?'.htmlspecialchars($selected_dir).'">'.__('Back').'</a></li>
+                <li class="back"><a href="'.htmlspecialchars($back_url).'">'.__('Back').'</a></li>
             </ul>';
         }
         else
@@ -1972,8 +2016,8 @@ elseif ($mode == 'slideshow' || $mode == 'embed')
             echo '
             <ul id="controlBar" class="embed">
                 <li class="prev"><a href="#" onclick="goPrev(); return false;" title="'.__('Previous').'">&larr;</a></li>
-                <li class="back"><a href="'.SELF_URL.'?'.htmlspecialchars($selected_dir).'" onclick="window.open(this.href); return false;">'.htmlspecialchars(GALLERY_TITLE).'</a></li>
-                <li class="current"><b id="current_nb">0</b> / '.count($list[1]).'</li>
+                <li class="back"><a href="'.htmlspecialchars($back_url).'" onclick="window.open(this.href); return false;">'.htmlspecialchars(GALLERY_TITLE).'</a></li>
+                <li class="current"><b id="current_nb">0</b> / '.count($list).'</li>
                 <li class="next"><a href="#" onclick="goNext(); return false;" title="'.__('Next').'">&rarr;</a></li>
             </ul>';
         }

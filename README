@@ -20,6 +20,18 @@
         You should have received a copy of the GNU Affero General Public License
         along with this software. If not, see <http://www.gnu.org/licenses/>.
 
+    CHANGELOG
+    ---------
+
+        1.0 Initial release
+        2.0 Display metadatas (EXIF) in picture details
+            New slideshow and embed options
+            Automatic indexing of pictures at initial setup
+        2.1 Fixed a bug in tag urls
+            Fixed some bugs in automatic indexing
+            Fixed a bug which makes PHP crash with long texts (is_utf8 method)
+            Slideshow and embed available for tags
+
     REQUIREMENTS
     ------------
 
