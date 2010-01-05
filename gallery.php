@@ -858,7 +858,7 @@ function image_url($pic)
 function embed_html($data)
 {
     if (is_array($data))
-        $url = SELF_URL . '?embed=' . (empty($pic['path']) ? '' : $pic['path'].'/') . '#' . $pic['filename'];
+        $url = SELF_URL . '?embed=' . (empty($data['path']) ? '' : $data['path'].'/') . '#' . $data['filename'];
     else
         $url = SELF_URL . '?embed&tag=' . urlencode($data);
 
