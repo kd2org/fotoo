@@ -1733,7 +1733,7 @@ elseif ($mode == 'pic')
     {
         echo '
         <dt class="embed">'.__('Embed:').'</dt>
-        <dd class="embed"><input type="text" onclick="this.select();" value="'.htmlspecialchars(embed_pic($pic)).'" /></dd>';
+        <dd class="embed"><input type="text" onclick="this.select();" value="'.htmlspecialchars(embed_html($pic)).'" /></dd>';
     }
 
     echo '
