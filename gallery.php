@@ -1144,6 +1144,10 @@ body.loading { cursor: wait; }
 
 p.info { color: #fff; padding: 1em; }
 
+#pic_comment { display: block; color: #fff; position: absolute; top: 0px; left: 0px; right: 0px; width: 100%; z-index: 100;
+    text-align: center; text-shadow: 0px 0px 5px #000; font-size: 1.2em; }
+body.loading #pic_comment { display: none; }
+
 #slideshow img { position: absolute; top: 0; left: 0; }
 
 ul { position: absolute; bottom: 0px; left: 0px; right: 0px; z-index: 100;
@@ -1891,6 +1895,8 @@ elseif ($mode == 'slideshow' || $mode == 'embed')
                     document.getElementById("current_nb").innerHTML = parseInt(current) + 1;
             }
 
+            document.getElementById("pic_comment").innerHTML = pic.comment;
+
             window.location.href = "#" + pic.filename;
         }
 
@@ -1947,12 +1953,16 @@ elseif ($mode == 'slideshow' || $mode == 'embed')
                 continue;
             }
 
+            $comment = htmlspecialchars($pic['comment']);
+            $comment = nl2br($comment);
+            $comment = strtr($comment, array("\r" => "", "\n" => ""));
+
             $pics.= '{
                     filename: "' . htmlspecialchars($pic['filename']) . '",
-                    src: "'.htmlspecialchars($path).'",
-                    comment: "' . htmlspecialchars($pic['comment']).'",
-                    width: '.$pic['width'].',
-                    height: '.$pic['height']."},";
+                    src: "' . htmlspecialchars($path) . '",
+                    comment: "' . $comment . '",
+                    width: ' . (int)$pic['width'] . ',
+                    height: ' . (int)$pic['height'] . "},";
         }
 
         echo substr($pics, 0, -1);
@@ -1998,6 +2008,7 @@ elseif ($mode == 'slideshow' || $mode == 'embed')
         echo '
         </script>
         <div id="slideshow">
+            <p id="pic_comment"></p>
         </div>';
 
         if ($mode == 'slideshow')
