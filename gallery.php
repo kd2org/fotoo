@@ -1048,7 +1048,6 @@ if (isset($_GET['feed']))
                 <media:content medium="image" url="'.image_url($photo).'" type="image/jpeg" height="'.$photo['height'].'" width="'.$photo['width'].'" />
                 <media:title>'.htmlspecialchars($photo['filename']).'</media:title>
                 <media:thumbnail url="'.thumb_url($photo).'" />
-                <media:keywords>'.htmlspecialchars(implode(', ', $photo['tags'])).'</media:keywords>
             </item>';
     }
 
