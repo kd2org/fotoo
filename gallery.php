@@ -256,6 +256,11 @@ class fotooManager
     {
         $file = BASE_DIR . '/' . ($path ? $path . '/' : '') . $filename;
 
+        if (!file_exists($file))
+        {
+            return false;
+        }
+
         $file_time = @filemtime($file);
 
         if (!$file_time)
@@ -298,6 +303,8 @@ class fotooManager
         {
             if (!empty($exif['IFD0']['DateTimeOriginal']))
                 $date = strtotime($exif['IDF0']['DateTimeOriginal']);
+            elseif (!empty($exif['EXIF']['DateTimeOriginal']))
+                $date = strtotime($exif['EXIF']['DateTimeOriginal']);
             elseif (!empty($exif['IFD0']['DateTime']))
                 $date = strtotime($exif['IFD0']['DateTime']);
             elseif (!empty($exif['FILE']['FileDateTime']))
@@ -947,7 +954,7 @@ if (typeof need_update != 'undefined')
 
         var file = need_update[update_done];
         var img = document.createElement('img');
-        img.src = update_url + '?updateDir=' + escape(update_dir) + '&updateFile=' + escape(file);
+        img.src = update_url + '?updateDir=' + encodeURI(update_dir) + '&updateFile=' + encodeURI(file);
         img.alt = update_done + '/' + need_update.length;
         img.width = Math.round(update_done * 5);
         img.height = 1;
