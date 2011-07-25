@@ -105,6 +105,8 @@ $french_strings = array(
         =>  'Date :',
     'Embed:'
         =>  'Int&eacute;grer dans un site :',
+    'Embed as image:'
+        =>  'Int&eacute;grer en image seule :',
     '%A <a href="%1">%d</a> <a href="%2">%B</a> <a href="%3">%Y</a> at %H:%M'
         =>  '%A <a href="%1">%d</a> <a href="%2">%B</a> <a href="%3">%Y</a> &agrave; %H:%M',
     'Updating database, please wait, more pictures will appear in a while...'

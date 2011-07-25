@@ -1,6 +1,6 @@
 <?php
 /*
-    Fotoo Gallery v2.2.0
+    Fotoo Gallery v2.2.1
     Copyright 2004-2009 BohwaZ - http://dev.kd2.org/
     Licensed under the GNU AGPLv3
 
@@ -691,7 +691,7 @@ class fotooManager
     public function formatText($text)
     {
         $text = $this->intelligent_utf8_encode($text);
-        $text = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+        $text = escape($text);
 
         // Allow simple, correctly closed, html tags (<strong>, <em>, <code>...)
         $text = preg_replace('!&lt;([a-z]+)&gt;(.*)&lt;/\\1&gt;!isU', '<\\1>\\2</\\1>', $text);
@@ -842,6 +842,11 @@ class fotooManager
     }
 }
 
+function escape($str)
+{
+    return htmlspecialchars($str, ENT_QUOTES, 'UTF-8');
+}
+
 function thumb_url($pic)
 {
     return BASE_URL . 'cache/' . $pic['hash'][0] . '/' . $pic['hash'] . '_thumb.jpg';
@@ -873,6 +878,11 @@ function embed_html($data)
         .   '<iframe src="'.$url.'" width="600" height="450" frameborder="0" scrolling="no"></iframe>'
         .   '</object>';
     return $html;
+}
+
+function embed_img($data)
+{
+    return SELF_URL . '?img=' . (empty($data['path']) ? '' : $data['path'].'/') . $data['filename'];
 }
 
 error_reporting(E_ALL);
@@ -1034,7 +1044,7 @@ if (isset($_GET['feed']))
             $small_url = thumb_url($photo);
 
         $content = '<p><a href="'.img_page_url($photo).'">'
-            . '<img src="'.$small_url.'" alt="'.htmlspecialchars($photo['filename']).'" /></a></p>'
+            . '<img src="'.$small_url.'" alt="'.escape($photo['filename']).'" /></a></p>'
             . '<p>'.$f->formatText($photo['comment']).'</p>';
 
         $title = $photo['path'] ? strtr($photo['path'] . '/' . $photo['filename'], array('/' => ' / ', '_' => ' ')) : $photo['filename'];
@@ -1042,18 +1052,18 @@ if (isset($_GET['feed']))
 
         echo '
             <item rdf:about="'.img_page_url($photo).'">
-                <title>'.htmlspecialchars($title).'</title>
+                <title>'.escape($title).'</title>
                 <link>'.img_page_url($photo).'</link>
                 <dc:date>'.date(DATE_W3C, $photo['time']).'</dc:date>
                 <dc:language></dc:language>
                 <dc:creator></dc:creator>
                 <dc:subject></dc:subject>
-                <description>'.htmlspecialchars($content).'</description>
+                <description>'.escape($content).'</description>
                 <content:encoded>
                     <![CDATA['.$content.']]>
                 </content:encoded>
                 <media:content medium="image" url="'.image_url($photo).'" type="image/jpeg" height="'.$photo['height'].'" width="'.$photo['width'].'" />
-                <media:title>'.htmlspecialchars($photo['filename']).'</media:title>
+                <media:title>'.escape($photo['filename']).'</media:title>
                 <media:thumbnail url="'.thumb_url($photo).'" />
             </item>';
     }
@@ -1280,13 +1290,13 @@ if (isset($_GET['index_all']))
 
         echo "<script type=\"text/javascript\">\n"
             .'var update_msg = "'.__('Updating')."\";\n"
-            .'var update_dir = "'.htmlspecialchars($dir)."\";\n"
+            .'var update_dir = "'.escape($dir)."\";\n"
             .'var update_url = "'.SELF_URL."\";\n"
             ."var need_update = new Array();\n";
 
         foreach ($update_list as $file)
         {
-            echo 'need_update.push("'.htmlspecialchars($file)."\");\n";
+            echo 'need_update.push("'.escape($file)."\");\n";
         }
 
         echo "</script>\n"
@@ -1321,8 +1331,45 @@ if (!empty($_GET['r']))
     $_SERVER['QUERY_STRING'] = '';
 }
 
+// Small image redirect
+if (!empty($_GET['img']) && preg_match('!^(.*)(?:/?([^/]+)[_.](jpe?g))?$!Ui', $_GET['img'], $match))
+{
+    $selected_dir = fotooManager::getValidDirectory($match[1]);
+    $selected_file = $match[2] . '.' . $match[3];
+
+    $pic = $f->getInfos($selected_file, $selected_dir);
+
+    header('Content-Type: ', true);
+
+    if (!is_array($pic))
+    {
+        header('HTTP/1.1 404 Not Found', true, 404);
+        exit;
+    }
+
+    $orig_url = image_url($pic);
+
+    if (file_exists($f->getSmallPath($pic['hash'])))
+    {
+        $small_url = small_url($pic);
+    }
+    elseif ($pic['width'] <= MAX_IMAGE_SIZE && $pic['height'] <= MAX_IMAGE_SIZE)
+    {
+        $small_url = $orig_url;
+        list($nw, $nh) = $f->getNewSize($pic['width'], $pic['height'], 600);
+        $wh = 'width="'.$nw.'" height="'.$nh.'"';
+    }
+    else
+    {
+        $small_url = false;
+    }
+
+    header('HTTP/1.1 302 Found', true, 302);
+    header('Location: '.($small_url ? $small_url : $orig_url));
+    exit;
+}
 // Get which display mode is asked
-if (isset($_GET['date']))
+elseif (isset($_GET['date']))
 {
     $day = $year = $month = $date = false;
     if (!empty($_GET['date']) && preg_match('!^[0-9]{4}(/[0-9]{2}){0,2}$!', $_GET['date']))
@@ -1375,7 +1422,7 @@ elseif (!empty($_GET['tag']))
 {
     $mode = 'tag';
     $tag = $f->getTagNameFromId($_GET['tag']);
-    $title = __('Pictures in tag %TAG', 'REPLACE', array('%TAG' => htmlspecialchars($tag)));
+    $title = __('Pictures in tag %TAG', 'REPLACE', array('%TAG' => escape($tag)));
 }
 else
 {
@@ -1394,13 +1441,13 @@ else
         $selected_dir = fotooManager::getValidDirectory($match[1]);
         if ($selected_dir !== false)
         {
-            $title = strtr(htmlspecialchars($match[1]), array('/' => ' / ', '_' => ' '));
+            $title = strtr(escape($match[1]), array('/' => ' / ', '_' => ' '));
 
             if (!empty($match[2]))
             {
                 $selected_file = $match[2] . '.' . $match[3];
                 $mode = 'pic';
-                $title = strtr(htmlspecialchars($match[2]), array('_' => ' ', '-' => ' - '));
+                $title = strtr(escape($match[2]), array('_' => ' ', '-' => ' - '));
             }
         }
     }
@@ -1474,7 +1521,7 @@ if ($mode == 'date')
         {
             echo '  <li>'
                 .'<a class="thumb" href="'.img_page_url($pic).'"><img src="'
-                .thumb_url($pic).'" alt="'.htmlspecialchars($pic['filename']).'" /></a>'
+                .thumb_url($pic).'" alt="'.escape($pic['filename']).'" /></a>'
                 ."</li>\n";
         }
 
@@ -1533,7 +1580,7 @@ if ($mode == 'date')
             }
 
             echo '  <li><a class="thumb" href="'.img_page_url($pic).'"><img src="'
-                .thumb_url($pic).'" alt="'.htmlspecialchars($pic['filename']).'" /></a>'
+                .thumb_url($pic).'" alt="'.escape($pic['filename']).'" /></a>'
                 ."</li>\n";
         }
 
@@ -1565,7 +1612,7 @@ elseif ($mode == 'tags')
         {
             $size = 100 + round(($nb - $min) * $step);
             echo '<a href="'.SELF_URL.'?tag='.urlencode($f->getTagId($tag)).'" style="font-size: '.$size.'%;">'
-                .htmlspecialchars($tag).'</a> <small>('.$nb.')</small> ';
+                .escape($tag).'</a> <small>('.$nb.')</small> ';
         }
 
         echo '</p>';
@@ -1579,7 +1626,7 @@ elseif ($mode == 'tag')
     echo '<div id="header">
         '.$menu.'
         <h4><strong><a href="'.SELF_URL.'?tags">'.__('Tags').'</a></strong>
-            <a href="'.SELF_URL.'?tag='.urlencode($tag).'">'.htmlspecialchars($f->getTagNameFromId($tag)).'</a>';
+            <a href="'.SELF_URL.'?tag='.urlencode($tag).'">'.escape($f->getTagNameFromId($tag)).'</a>';
 
     if (!empty($pics))
         echo '<script type="text/javascript"> document.write("<small><a class=\\"slideshow\\" href=\\"'.SELF_URL.'?slideshow&amp;tag='.urlencode($f->getTagId($tag)).'\\">'.__('Slideshow').'</a></small>"); </script>';
@@ -1602,7 +1649,7 @@ elseif ($mode == 'tag')
         foreach ($tags as $name=>$nb)
         {
             $size = 100 + round(($nb - $min) * $step);
-            echo '<a href="'.SELF_URL.'?tag='.urlencode($f->getTagId($name)).'" style="font-size: '.$size.'%;">'.htmlspecialchars($name).'</a> ';
+            echo '<a href="'.SELF_URL.'?tag='.urlencode($f->getTagId($name)).'" style="font-size: '.$size.'%;">'.escape($name).'</a> ';
             echo '<small>('.$nb.')</small> ';
         }
         echo '</p>';
@@ -1620,7 +1667,7 @@ elseif ($mode == 'tag')
         {
             echo '  <li>'
                 .'<a class="thumb" href="'.img_page_url($pic)
-                .'"><img src="'.thumb_url($pic).'" alt="'.htmlspecialchars($pic['filename']).'" /></a>'
+                .'"><img src="'.thumb_url($pic).'" alt="'.escape($pic['filename']).'" /></a>'
                 ."</li>\n";
         }
 
@@ -1631,7 +1678,7 @@ elseif ($mode == 'tag')
             echo '
             <dl class="details">
                 <dt class="embed">'.__('Embed:').'</dt>
-                <dd class="embed"><input type="text" onclick="this.select();" value="'.htmlspecialchars(embed_html($tag)).'" /></dd>
+                <dd class="embed"><input type="text" onclick="this.select();" value="'.escape(embed_html($tag)).'" /></dd>
             </dl>';
         }
     }
@@ -1644,9 +1691,6 @@ elseif ($mode == 'pic')
     {
         echo '<h1>'.__('Picture not found').'</h1>
         <h3><a href="'.SELF_URL.'">'.__('Back to homepage').'</a></h3>
-        <script type="text/javascript">
-        window.setTimeout("window.location.href=\''.SELF_URL.'\'", 2000);
-        </script>
         </body></html>';
         exit;
     }
@@ -1666,7 +1710,7 @@ elseif ($mode == 'pic')
             if ($current) $current .= '/';
             $current .= $d;
 
-            echo '  <a href="'.SELF_URL.'?'.htmlspecialchars($current).'">'.htmlspecialchars(strtr($d, '_-', '  '))."</a>\n";
+            echo '  <a href="'.SELF_URL.'?'.escape($current).'">'.escape(strtr($d, '_-', '  '))."</a>\n";
         }
     }
 
@@ -1693,7 +1737,7 @@ elseif ($mode == 'pic')
         <dt class="small">';
 
         if ($small_url)
-            echo '<a href="'.$orig_url.'"><img src="'.$small_url.'" alt="'.htmlspecialchars($pic['filename']).'" '.$wh.' /></a>';
+            echo '<a href="'.$orig_url.'"><img src="'.$small_url.'" alt="'.escape($pic['filename']).'" '.$wh.' /></a>';
         else
             echo __("This picture is too big (%W x %H) to be displayed in this page.", 'REPLACE', array('%W' => $pic['width'], '%H' => $pic['height']));
 
@@ -1723,7 +1767,7 @@ elseif ($mode == 'pic')
         <dd class="tags">';
 
         foreach ($pic['tags'] as $tag_id=>$tag)
-            echo '<a href="'.SELF_URL.'?tag='.urlencode($tag_id).'">'.htmlspecialchars($tag).'</a> ';
+            echo '<a href="'.SELF_URL.'?tag='.urlencode($tag_id).'">'.escape($tag).'</a> ';
 
         echo '</dd>';
     }
@@ -1743,7 +1787,9 @@ elseif ($mode == 'pic')
     {
         echo '
         <dt class="embed">'.__('Embed:').'</dt>
-        <dd class="embed"><input type="text" onclick="this.select();" value="'.htmlspecialchars(embed_html($pic)).'" /></dd>';
+        <dd class="embed"><input type="text" onclick="this.select();" value="'.escape(embed_html($pic)).'" /></dd>
+        <dt class="embed">'.__('Embed as image:').'</dt>
+        <dd class="embed"><input type="text" onclick="this.select();" value="'.escape(embed_img($pic)).'" /></dd>';
     }
 
     echo '
@@ -1959,13 +2005,13 @@ elseif ($mode == 'slideshow' || $mode == 'embed')
                 continue;
             }
 
-            $comment = htmlspecialchars($pic['comment']);
+            $comment = escape($pic['comment']);
             $comment = nl2br($comment);
             $comment = strtr($comment, array("\r" => "", "\n" => ""));
 
             $pics.= '{
-                    filename: "' . htmlspecialchars($pic['filename']) . '",
-                    src: "' . htmlspecialchars($path) . '",
+                    filename: "' . escape($pic['filename']) . '",
+                    src: "' . escape($path) . '",
                     comment: "' . $comment . '",
                     width: ' . (int)$pic['width'] . ',
                     height: ' . (int)$pic['height'] . "},";
@@ -2025,7 +2071,7 @@ elseif ($mode == 'slideshow' || $mode == 'embed')
                 <li class="pause"><a href="#" onclick="playPause(); return false;" title="'.__('Pause').'">&#9612;&#9612;</a></li>
                 <li class="play"><a href="#" onclick="playPause(); return false;" title="'.__('Restart').'">&#9654;</a></li>
                 <li class="next"><a href="#" onclick="goNext(); return false;" title="'.__('Next').'">&rarr;</a></li>
-                <li class="back"><a href="'.htmlspecialchars($back_url).'">'.__('Back').'</a></li>
+                <li class="back"><a href="'.escape($back_url).'">'.__('Back').'</a></li>
             </ul>';
         }
         else
@@ -2033,7 +2079,7 @@ elseif ($mode == 'slideshow' || $mode == 'embed')
             echo '
             <ul id="controlBar" class="embed">
                 <li class="prev"><a href="#" onclick="goPrev(); return false;" title="'.__('Previous').'">&larr;</a></li>
-                <li class="back"><a href="'.htmlspecialchars($back_url).'" onclick="window.open(this.href); return false;">'.htmlspecialchars(GALLERY_TITLE).'</a></li>
+                <li class="back"><a href="'.escape($back_url).'" onclick="window.open(this.href); return false;">'.escape(GALLERY_TITLE).'</a></li>
                 <li class="current"><b id="current_nb">0</b> / '.count($list).'</li>
                 <li class="next"><a href="#" onclick="goNext(); return false;" title="'.__('Next').'">&rarr;</a></li>
             </ul>';
@@ -2061,12 +2107,12 @@ else
             if ($current) $current .= '/';
             $current .= $d;
 
-            echo '  <a href="'.SELF_URL.'?'.htmlspecialchars($current).'">'.htmlspecialchars(strtr($d, '_-', '  '))."</a>\n";
+            echo '  <a href="'.SELF_URL.'?'.escape($current).'">'.escape(strtr($d, '_-', '  '))."</a>\n";
         }
     }
 
     if (!empty($list[1]))
-        echo '  <script type="text/javascript"> document.write("<small><a class=\\"slideshow\\" href=\\"'.SELF_URL.'?slideshow='.htmlspecialchars($selected_dir).'\\">'.__('Slideshow').'</a></small>"); </script>';
+        echo '  <script type="text/javascript"> document.write("<small><a class=\\"slideshow\\" href=\\"'.SELF_URL.'?slideshow='.escape($selected_dir).'\\">'.__('Slideshow').'</a></small>"); </script>';
 
     echo "</h4>
     </div>\n";
@@ -2090,8 +2136,8 @@ else
         foreach ($dirs as $dir)
         {
             echo '  <li><a href="'.SELF_URL.'?'
-                .(!empty($selected_dir) ? htmlspecialchars($selected_dir.'/'.$dir) : htmlspecialchars($dir))
-                .'">'.htmlspecialchars(strtr($dir, '_', ' '))."</a></li>\n";
+                .(!empty($selected_dir) ? escape($selected_dir.'/'.$dir) : escape($dir))
+                .'">'.escape(strtr($dir, '_', ' '))."</a></li>\n";
         }
         echo "</ul>\n";
     }
@@ -2104,7 +2150,7 @@ else
         {
             echo '  <li>'
                 .'<a class="thumb" href="'.img_page_url($pic)
-                .'"><img src="'.thumb_url($pic).'" alt="'.htmlspecialchars($pic['filename']).'" /></a>'
+                .'"><img src="'.thumb_url($pic).'" alt="'.escape($pic['filename']).'" /></a>'
                 ."</li>\n";
         }
 
@@ -2115,13 +2161,13 @@ else
     {
         echo "<script type=\"text/javascript\">\n"
             .'var update_msg = "'.__('Updating')."\";\n"
-            .'var update_dir = "'.htmlspecialchars($selected_dir)."\";\n"
+            .'var update_dir = "'.escape($selected_dir)."\";\n"
             .'var update_url = "'.SELF_URL."\";\n"
             ."var need_update = new Array();\n";
 
         foreach ($update as $file)
         {
-            echo 'need_update.push("'.htmlspecialchars($file)."\");\n";
+            echo 'need_update.push("'.escape($file)."\");\n";
         }
 
         echo "</script>\n"
