@@ -1,7 +1,7 @@
 <?php
 /*
-    Fotoo Gallery v2.2.1
-    Copyright 2004-2009 BohwaZ - http://dev.kd2.org/
+    Fotoo Gallery v2.3.0
+    Copyright 2004-2011 BohwaZ - http://dev.kd2.org/
     Licensed under the GNU AGPLv3
 
     This software is free software: you can redistribute it and/or modify
@@ -24,14 +24,9 @@ if (!version_compare(phpversion(), '5.2', '>='))
     die("You need at least PHP 5.2 to use this application.");
 }
 
-if (!class_exists('SQLiteDatabase'))
+if (!extension_loaded('pdo_sqlite'))
 {
-    die("You need PHP SQLite extension to use this application.");
-}
-
-if (strpos($_SERVER['HTTP_HOST'], '.free.fr'))
-{
-    die("Free.fr n'est pas compatible avec Fotoo Gallery (bug dans SQLite).");
+    die("You need PHP PDO SQLite extension to use this application.");
 }
 
 class fotooManager
@@ -70,7 +65,7 @@ class fotooManager
 
     public function __construct()
     {
-        $init = false;
+        $init = $upgrade = false;
 
         if (!file_exists(CACHE_DIR))
         {
@@ -88,12 +83,19 @@ class fotooManager
             exit;
         }
 
-        if (!file_exists(CACHE_DIR . '/photos.db'))
+        if (file_exists(CACHE_DIR . '/photos.db') && !file_exists(CACHE_DIR . '/photos.sqlite'))
+            $upgrade = true;
+        elseif (!file_exists(CACHE_DIR . '/photos.sqlite'))
             $init = true;
 
-        $this->db = new SQLiteDatabase(CACHE_DIR . '/photos.db', 0600);
+        $this->db = new PDO('sqlite:' . CACHE_DIR . '/photos.sqlite');
+        $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-        if ($init)
+        if ($upgrade)
+        {
+            $this->upgradeDBv3();
+        }
+        elseif ($init)
         {
             header('Location: '.SELF_URL.'?index_all');
             $this->initDB();
@@ -101,49 +103,89 @@ class fotooManager
         }
     }
 
-    private function initDB()
+    protected function upgradeDBv3()
     {
-        $this->db->queryExec('
-        CREATE TABLE photos (
-            id INTEGER UNSIGNED PRIMARY KEY NOT NULL,
-            filename VARCHAR(255) NOT NULL,
-            path VARCHAR(255) NOT NULL,
-            width SMALLINT UNSIGNED NOT NULL,
-            height SMALLINT UNSIGNED NOT NULL,
-            size INT UNSIGNED NOT NULL,
-            year SMALLINT UNSIGNED NOT NULL,
-            month TINYINT UNSIGNED NOT NULL,
-            day TINYINT UNSIGNED NOT NULL,
-            time INTEGER UNSIGNED NOT NULL,
-            comment VARCHAR(255) NOT NULL,
-            details TEXT NOT NULL,
-            hash VARCHAR(50) NOT NULL
-        );
+        $this->initDB();
 
-        CREATE UNIQUE INDEX hash ON photos (hash);
-        CREATE INDEX file ON photos (filename, path);
-        CREATE INDEX date ON photos (year, month, day);
+        if (class_exists('SQLiteDatabase'))
+        {
+            $this->db->beginTransaction();
 
-        CREATE TABLE tags (
-            name VARCHAR(255) NOT NULL,
-            name_id VARCHAR(255) NOT NULL,
-            photo INTEGER UNSIGNED,
-            PRIMARY KEY (name_id, photo)
-        );
+            $old = new SQLiteDatabase(CACHE_DIR . '/photos.db');
+            $res = $old->query('SELECT * FROM photos;');
+
+            while ($row = $res->fetch(SQLITE_NUM))
+            {
+                $row = array_map(array($this->db, 'quote'), $row);
+                $this->db->exec('INSERT INTO photos VALUES ('.implode(',', $row).');');
+            }
+
+            $res = $old->query('SELECT * FROM tags;');
+
+            while ($row = $res->fetch(SQLITE_NUM))
+            {
+                $row = array_map(array($this->db, 'quote'), $row);
+                $this->db->exec('INSERT INTO tags VALUES ('.implode(',', $row).');');
+            }
+
+            $this->db->commit();
+        }
+        else
+        {
+            // If there is no SQLite v2 driver, we just erease the old DB
+            // and re-create index
+            header('Location: '.SELF_URL.'?index_all');
+            unlink(CACHE_DIR . '/photos.db');
+            exit;
+        }
+
+        unlink(CACHE_DIR . '/photos.db');
+        return true;
+    }
+
+    protected function initDB()
+    {
+        $this->db->exec('
+            CREATE TABLE photos (
+                id INTEGER UNSIGNED PRIMARY KEY,
+                filename TEXT,
+                path TEXT,
+                width INTEGER,
+                height INTEGER,
+                size INTEGER,
+                year INTEGER,
+                month INTEGER,
+                day INTEGER,
+                time INTEGER,
+                comment TEXT,
+                details TEXT,
+                hash TEXT
+            );
+
+            CREATE UNIQUE INDEX hash ON photos (hash);
+            CREATE INDEX file ON photos (filename, path);
+            CREATE INDEX date ON photos (year, month, day);
+
+            CREATE TABLE tags (
+                name TEXT,
+                name_id TEXT,
+                photo INTEGER,
+                PRIMARY KEY (name_id, photo)
+            );
         ');
     }
 
     // Returns informations on a photo
     public function getInfos($filename, $path, $from_list=false)
     {
-        $res = $this->db->arrayQuery("SELECT * FROM photos
-            WHERE filename='".sqlite_escape_string($filename)."'
-            AND path='".sqlite_escape_string($path)."'", SQLITE_ASSOC);
+        $query = $this->db->prepare('SELECT * FROM photos WHERE filename = ? AND path = ?;');
+        $query->execute(array($filename, $path));
 
-        if (empty($res[0]))
+        $pic = $query->fetch(PDO::FETCH_ASSOC);
+
+        if (!$pic)
             return false;
 
-        $pic =& $res[0];
         $file = BASE_DIR . '/' . ($path ? $path . '/' : '') . $filename;
 
         // If the file doesn't exists anymore, we just delete it's informations
@@ -165,11 +207,11 @@ class fotooManager
             return false;
         }
 
-        $tags = @$this->db->arrayQuery('SELECT name, name_id FROM tags
-            WHERE photo="'.(int)$pic['id'].'";', SQLITE_ASSOC);
+        $query = $this->db->prepare('SELECT name, name_id FROM tags WHERE photo = ?;');
+        $query->execute(array($pic['id']));
 
         $pic['tags'] = array();
-        foreach ($tags as $row)
+        while ($row = $query->fetch(PDO::FETCH_ASSOC))
         {
             $pic['tags'][$row['name_id']] = $row['name'];
         }
@@ -180,30 +222,22 @@ class fotooManager
             $this->resizeImage($file, $small_path, $pic['width'], $pic['height'], 600);
         }
 
-        return $res[0];
+        return $pic;
     }
 
     public function getPrevAndNext($dir, $file)
     {
-        $prev = $this->db->arrayQuery('SELECT id, hash, path, filename FROM photos
-            WHERE path="'.sqlite_escape_string($dir).'"
-            AND filename < "'.sqlite_escape_string($file).'"
-            ORDER BY filename DESC LIMIT 0,1;', SQLITE_ASSOC);
+        $query = $this->db->prepare('SELECT id, hash, path, filename FROM photos
+            WHERE path = ? AND filename < ? ORDER BY filename COLLATE NOCASE DESC LIMIT 0,1;');
+        $query->execute(array($dir, $file));
 
-        if (!empty($prev[0]))
-            $prev = $prev[0];
-        else
-            $prev = false;
+        $prev = $query->fetch(PDO::FETCH_ASSOC);
 
-        $next = $this->db->arrayQuery('SELECT id, hash, path, filename FROM photos
-            WHERE path="'.sqlite_escape_string($dir).'"
-            AND filename > "'.sqlite_escape_string($file).'"
-            ORDER BY filename ASC LIMIT 0,1;', SQLITE_ASSOC);
+        $query = $this->db->prepare('SELECT id, hash, path, filename FROM photos
+            WHERE path = ? AND filename > ? ORDER BY filename COLLATE NOCASE ASC LIMIT 0,1;');
+        $query->execute(array($dir, $file));
 
-        if (!empty($next[0]))
-            $next = $next[0];
-        else
-            $next = false;
+        $next = $query->fetch(PDO::FETCH_ASSOC);
 
         return array($prev, $next);
     }
@@ -211,8 +245,8 @@ class fotooManager
     // Delete photo informations and thumb
     private function cleanInfos($id, $hash)
     {
-        $this->db->queryExec('DELETE FROM photos WHERE id="'.(int)$id.'";');
-        $this->db->queryExec('DELETE FROM tags WHERE photo="'.(int)$id.'";');
+        $this->db->exec('DELETE FROM photos WHERE id="'.(int)$id.'";');
+        $this->db->exec('DELETE FROM tags WHERE photo="'.(int)$id.'";');
 
         $thumb = $this->getThumbPath($hash);
         if (file_exists($thumb))
@@ -228,8 +262,9 @@ class fotooManager
     // Delete all photos in DB which are deleted in filesystem
     public function cleanDB()
     {
-        $res = $this->db->arrayQuery('SELECT id, hash, path, filename FROM photos ORDER BY id;');
-        foreach ($res as &$row)
+        $query = $this->db->query('SELECT id, hash, path, filename FROM photos ORDER BY id;');
+
+        while ($row = $query->fetch(PDO::FETCH_ASSOC))
         {
             $file = BASE_DIR . '/' . ($row['path'] ? $row['path'] . '/' : '') . $row['filename'];
 
@@ -238,12 +273,15 @@ class fotooManager
                 $this->cleanInfos($row['id'], $row['hash']);
             }
         }
-        unset($res);
+
+        unset($query);
     }
 
     public function getNewPhotos($nb=10)
     {
-        return $this->db->arrayQuery('SELECT * FROM photos ORDER BY time DESC LIMIT 0,'.(int)$nb.';', SQLITE_ASSOC);
+        $query = $this->db->query('SELECT * FROM photos ORDER BY time DESC LIMIT 0,?;');
+        $query->execute(array((int)$nb));
+        return $query->fetchAll(PDO::FETCH_ASSOC);
     }
 
     private function getHash($file, $path, $size, $time)
@@ -269,6 +307,14 @@ class fotooManager
         $file_size = filesize($file);
 
         $hash = $this->getHash($filename, $path, $file_size, $file_time);
+
+        $query = $this->db->prepare('SELECT 1 FROM photos WHERE hash = ? LIMIT 1;');
+        $query->execute(array($hash));
+
+        if ($query->fetchColumn())
+        {
+            return false;
+        }
 
         $size = getimagesize($file, $infos);
 
@@ -409,41 +455,51 @@ class fotooManager
         else
             $details = '';
 
-        @$this->db->unbufferedQuery("INSERT INTO photos
-            (id, filename, path, width, height, size, year, month, day, time, comment, details, hash)
-            VALUES (NULL, '".sqlite_escape_string($filename)."', '".sqlite_escape_string($path)."',
-            '".(int)$width."', '".(int)$height."', '".(int)$file_size."', '".date('Y', $date)."',
-            '".date('m', $date)."', '".date('d', $date)."', '".(int)$date."',
-            '".sqlite_escape_string($comment)."', '".sqlite_escape_string($details)."',
-            '".sqlite_escape_string($hash)."');");
+        $pic = array(
+            'filename'  =>  $filename,
+            'path'      =>  $path,
+            'width'     =>  (int)$width,
+            'height'    =>  (int)$height,
+            'size'      =>  (int)$file_size,
+            'date_y'    =>  date('Y', $date),
+            'date_m'    =>  date('m', $date),
+            'date_d'    =>  date('d', $date),
+            'time'      =>  (int) $date,
+            'comment'   =>  $comment,
+            'details'   =>  $details,
+            'hash'      =>  $hash,
+        );
 
-        $id = $this->db->lastInsertRowid();
+        $query = $this->db->prepare('INSERT INTO photos
+            (filename, path, width, height, size, year, month, day, time, comment, details, hash)
+            VALUES (:filename, :path, :width, :height, :size, :date_y, :date_m, :date_d,
+            :time, :comment, :details, :hash);');
+        $query->execute($pic);
 
-        if (!$id)
-            return false;
+        $pic['id'] = $this->db->lastInsertId();
 
-        foreach ($tags as $tag)
+        if (!$pic['id'])
         {
-            $this->db->unbufferedQuery("INSERT INTO tags (name, name_id, photo)
-                VALUES ('".sqlite_escape_string($tag)."',
-                '".sqlite_escape_string($this->getTagId($tag))."', '".(int)$id."');");
+            var_dump($r);
+            return false;
         }
 
-        return array(
-            'id'    =>  $id,
-            'filename' => $filename,
-            'path'  =>  $path,
-            'width' =>  $width,
-            'height'=>  $height,
-            'time'  =>  $date,
-            'comment'=> $comment,
-            'details'=> $details,
-            'hash'  =>  $hash,
-            'year'  =>  date('Y', $date),
-            'month' =>  date('m', $date),
-            'day'   =>  date('d', $date),
-            'tags'  =>  $tags,
-        );
+        if (!empty($tags))
+        {
+            $this->db->beginTransaction();
+            $query = $this->db->prepare('INSERT OR IGNORE INTO tags (name, name_id, photo) VALUES (?, ?, ?);');
+
+            foreach ($tags as $tag)
+            {
+                $query->execute(array($tag, $this->getTagId($tag), (int)$pic['id']));
+            }
+
+            $this->db->commit();
+        }
+
+        $pic['tags'] = $tags;
+
+        return $pic;
     }
 
     static public function getValidDirectory($path)
@@ -528,9 +584,9 @@ class fotooManager
     {
         if ($d)
         {
-            return $this->db->arrayQuery('SELECT * FROM photos
-                    WHERE year="'.(int)$y.'" AND month="'.(int)$m.'" AND day="'.(int)$d.'"
-                    ORDER BY time;');
+            $query = $this->db->prepare('SELECT * FROM photos WHERE year = ? AND month = ? AND day = ? ORDER BY time;');
+            $query->execute(array((int)$y, (int)$m, (int)$d));
+            return $query->fetchAll(PDO::FETCH_ASSOC);
         }
         else
         {
@@ -544,34 +600,41 @@ class fotooManager
             else
                 $req .= 'GROUP BY year ORDER BY year, month;';
 
-            $res = $this->db->arrayQuery($req, SQLITE_ASSOC);
+            $query = $this->db->query($req);
 
             $list = array();
-            foreach ($res as &$row)
+            while ($row = $query->fetch(PDO::FETCH_ASSOC))
             {
                 $start = 0;
+
                 if ($row['nb'] > 5)
+                {
                     $start = mt_rand(0, $row['nb'] - 5);
+                }
 
                 // Get 5 random pictures for each line
-                $res_sub = $this->db->arrayQuery('SELECT * FROM photos
-                    WHERE year="'.(int)$row['year'].'" '.
-                    ($y ? 'AND month="'.(int)$row['month'].'"' : '').
-                    ($m ? 'AND day="'.(int)$row['day'].'"' : '').'
-                    ORDER BY time LIMIT '.$start.', 5;',
-                    SQLITE_ASSOC);
+                $subquery = 'SELECT * FROM photos WHERE year = '.$this->db->quote((int)$row['year']);
+
+                if ($y)
+                    $subquery .= ' AND month = '.$this->db->quote((int)$row['month']);
+
+                if ($m)
+                    $subquery .= ' AND day = '.$this->db->quote((int)$row['day']);
+
+                $subquery .= 'ORDER BY time LIMIT '.(int)$start.', 5;';
+                $subquery = $this->db->query($subquery)->fetchAll(PDO::FETCH_ASSOC);
 
                 if ($row['nb'] > 5)
                 {
                     $more = $row['nb'] - 5;
-                    foreach ($res_sub as &$row_sub)
+                    foreach ($subquery as &$row_sub)
                     {
                         $row_sub['nb'] = $row['nb'];
                         $row_sub['more'] = $more;
                     }
                 }
 
-                $list = array_merge($list, $res_sub);
+                $list = array_merge($list, $subquery);
             }
 
             return $list;
@@ -580,11 +643,11 @@ class fotooManager
 
     public function getTagList()
     {
-        $res = $this->db->arrayQuery('SELECT COUNT(photo) AS nb, name, name_id FROM tags
-            GROUP BY name ORDER BY name;', SQLITE_ASSOC);
+        $query = $this->db->query('SELECT COUNT(photo) AS nb, name, name_id FROM tags
+            GROUP BY name_id ORDER BY name_id COLLATE NOCASE;');
 
         $tags = array();
-        foreach ($res as &$row)
+        while ($row = $query->fetch(PDO::FETCH_ASSOC))
         {
             $tags[$row['name']] = $row['nb'];
         }
@@ -594,51 +657,24 @@ class fotooManager
 
     public function getByTag($tag)
     {
-        // Can't use SQL JOIN here because SQLite is too slow with JOIN queries
-
-        $tag = $this->getTagId($tag);
-        $res = $this->db->arrayQuery('SELECT photo FROM tags WHERE name_id = \''.sqlite_escape_string($tag).'\';', SQLITE_ASSOC);
-        $photos = array();
-
-        foreach ($res as $row)
-        {
-            $photos[] = (int) $row['photo'];
-        }
-
-        unset($res);
-
-        $pics = $this->db->arrayQuery('SELECT * FROM photos
-            WHERE id IN (\''.implode("','", $photos).'\')
-            ORDER BY photos.time, photos.filename;', SQLITE_ASSOC);
-
-        unset($photos);
-
-        return $pics;
+        $query = $this->db->prepare('SELECT photos.* FROM photos
+            INNER JOIN tags ON tags.photo = photos.id
+            WHERE tags.name_id = ? ORDER BY photos.time, photos.filename COLLATE NOCASE;');
+        $query->execute(array($this->getTagId($tag)));
+        return $query->fetchAll(PDO::FETCH_ASSOC);
     }
 
     public function getNearTags($tag)
     {
-        // Can't use SQL JOIN here because SQLite is too slow with JOIN queries
-
-        $tag = $this->getTagId($tag);
-        $res = $this->db->arrayQuery('SELECT photo FROM tags WHERE name_id = \''.sqlite_escape_string($tag).'\';', SQLITE_ASSOC);
-
-        $orig = array();
-
-        foreach ($res as $row)
-        {
-            $orig[] = (int) $row['photo'];
-        }
-
-        $res = $this->db->arrayQuery('SELECT name, COUNT(photo) AS nb FROM tags
-            WHERE photo IN (\''.implode("','", $orig).'\')
-                AND name_id != \''.sqlite_escape_string($tag).'\'
-            GROUP BY name_id ORDER BY nb DESC;', SQLITE_ASSOC);
-
-        unset($orig);
+        $query = $this->db->prepare('SELECT t2.name, COUNT(t2.photo) AS nb FROM tags
+            INNER JOIN tags AS t2 ON tags.photo = t2.photo
+            WHERE tags.name_id = ? AND t2.name_id != tags.name_id
+            GROUP BY t2.name_id ORDER BY nb DESC;');
+        $query->execute(array($this->getTagId($tag)));
 
         $tags = array();
-        foreach ($res as &$row)
+
+        while ($row = $query->fetch(PDO::FETCH_ASSOC))
         {
             $tags[$row['name']] = $row['nb'];
         }
@@ -648,13 +684,9 @@ class fotooManager
 
     public function getTagNameFromId($tag)
     {
-        $res = $this->db->arrayQuery('SELECT name FROM tags
-            WHERE name_id = \''.sqlite_escape_string($tag).'\' LIMIT 1;', SQLITE_ASSOC);
-
-        if (!empty($res[0]))
-            return $res[0]['name'];
-        else
-            return false;
+        $query = $this->db->prepare('SELECT name FROM tags WHERE name_id = ? LIMIT 1;');
+        $query->execute(array($tag));
+        return $query->fetchColumn();
     }
 
     private function seems_utf8($str)

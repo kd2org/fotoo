@@ -1,6 +1,6 @@
     +-----------------------------------------------------------+
     |   Fotoo Gallery v2                                        |
-    |   Copyright 2004-2008 BohwaZ - http://dev.kd2.org/        |
+    |   Copyright 2004-2011 BohwaZ - http://dev.kd2.org/        |
     |   Licensed under the GNU AGPLv3                           |
     +-----------------------------------------------------------+
 
@@ -31,6 +31,7 @@
             Fixed some bugs in automatic indexing
             Fixed a bug which makes PHP crash with long texts (is_utf8 method)
             Slideshow and embed available for tags
+        2.3 Migrate to PDO/SQLite3 as SQLite2 is deleted from PHP 5.4
 
     REQUIREMENTS
     ------------
