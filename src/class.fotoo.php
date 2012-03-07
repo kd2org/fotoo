@@ -480,6 +480,9 @@ class fotooManager
         if (preg_match('![.]{2,}!', $path))
             return false;
 
+        if ($path == '.')
+            return '';
+
         return $path;
     }
 
