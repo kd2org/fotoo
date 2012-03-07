@@ -901,7 +901,7 @@ elseif ($mode == 'pic')
 }
 elseif ($mode == 'slideshow' || $mode == 'embed')
 {
-    if (!empty($selected_dir))
+    if (isset($selected_dir))
     {
         $list = $f->getDirectory($selected_dir);
 
