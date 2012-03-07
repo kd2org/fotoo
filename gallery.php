@@ -29,10 +29,12 @@ if (!extension_loaded('pdo_sqlite'))
     die("You need PHP PDO SQLite extension to use this application.");
 }
 
+error_reporting(E_ALL);
+
 class fotooManager
 {
     private $db = false;
-    public $html_tags = array('wp' => 'http://en.wikipedia.org/wiki/{KEYWORD}');
+    public $html_tags = array('wp' => 'http://en.wikipedia.org/wiki/KEYWORD');
 
     public function getThumbPath($hash)
     {
@@ -147,7 +149,7 @@ class fotooManager
     {
         $this->db->exec('
             CREATE TABLE photos (
-                id INTEGER UNSIGNED PRIMARY KEY,
+                id INTEGER PRIMARY KEY,
                 filename TEXT,
                 path TEXT,
                 width INTEGER,
@@ -219,7 +221,7 @@ class fotooManager
         $small_path = $this->getSmallPath($hash);
         if (GEN_SMALL == 2 && !$from_list && !file_exists($small_path) && $pic['width'] <= MAX_IMAGE_SIZE && $pic['height'] <= MAX_IMAGE_SIZE)
         {
-            $this->resizeImage($file, $small_path, $pic['width'], $pic['height'], 600);
+            $this->resizeImage($file, $small_path, $pic['width'], $pic['height'], SMALL_IMAGE_SIZE);
         }
 
         return $pic;
@@ -279,8 +281,7 @@ class fotooManager
 
     public function getNewPhotos($nb=10)
     {
-        $query = $this->db->query('SELECT * FROM photos ORDER BY time DESC LIMIT 0,?;');
-        $query->execute(array((int)$nb));
+        $query = $this->db->query('SELECT * FROM photos ORDER BY time DESC LIMIT 0,'.(int)$nb.';');
         return $query->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -448,7 +449,9 @@ class fotooManager
         }
 
         if (GEN_SMALL == 1 && $can_resize)
-            $this->resizeImage($file, $this->getSmallPath($hash), $width, $height, 600);
+        {
+            $this->resizeImage($file, $this->getSmallPath($hash), $width, $height, SMALL_IMAGE_SIZE);
+        }
 
         if (!empty($details))
             $details = json_encode($details);
@@ -471,8 +474,8 @@ class fotooManager
         );
 
         $query = $this->db->prepare('INSERT INTO photos
-            (filename, path, width, height, size, year, month, day, time, comment, details, hash)
-            VALUES (:filename, :path, :width, :height, :size, :date_y, :date_m, :date_d,
+            (id, filename, path, width, height, size, year, month, day, time, comment, details, hash)
+            VALUES (NULL, :filename, :path, :width, :height, :size, :date_y, :date_m, :date_d,
             :time, :comment, :details, :hash);');
         $query->execute($pic);
 
@@ -480,7 +483,6 @@ class fotooManager
 
         if (!$pic['id'])
         {
-            var_dump($r);
             return false;
         }
 
@@ -735,7 +737,7 @@ class fotooManager
         {
             $tag_class = preg_replace('![^a-zA-Z0-9_]!', '_', $tag);
             $text = preg_replace('#(^|\s)'.preg_quote($tag, '#').':([^\s,.]+)#iem',
-                "'\\1<a href=\"'.str_replace('{KEYWORD}', urlencode('\\2'), \$url).'\" class=\"'.\$tag_class.'\">\\2</a>\\3'", $text);
+                "'\\1<a href=\"'.str_replace('KEYWORD', '\\2', \$url).'\" class=\"'.\$tag_class.'\">\\2</a>\\3'", $text);
         }
 
         $text = nl2br($text);
@@ -818,6 +820,7 @@ class fotooManager
             if ($im->readImage($source) && $im->resizeImage($new_width, $new_height, Imagick::FILTER_UNDEFINED, 1))
             {
                 if (file_exists($dest)) @unlink($dest);
+                $im->stripImage();
                 $im->writeImage($dest);
                 $im->destroy();
                 return true;
@@ -879,45 +882,91 @@ function escape($str)
     return htmlspecialchars($str, ENT_QUOTES, 'UTF-8');
 }
 
-function thumb_url($pic)
+function zero_pad($str, $length = 2)
 {
-    return BASE_URL . 'cache/' . $pic['hash'][0] . '/' . $pic['hash'] . '_thumb.jpg';
+    return str_pad($str, $length, '0', STR_PAD_LEFT);
 }
 
-function small_url($pic)
+function get_url($type, $data = null)
 {
-    return BASE_URL.'cache/'.$pic['hash'][0].'/'.$pic['hash'].'_small.jpg';
-}
+    if ($type == 'cache_thumb')
+    {
+        return BASE_URL . 'cache/' . $data['hash'][0] . '/' . $data['hash'] . '_thumb.jpg';
+    }
+    elseif ($type == 'cache_small')
+    {
+        return BASE_URL . 'cache/' . $data['hash'][0] . '/' . $data['hash'] . '_small.jpg';
+    }
+    elseif ($type == 'real_image')
+    {
+        return BASE_URL . (empty($data['path']) ? '' : $data['path'].'/') . $data['filename'];
+    }
 
-function img_page_url($pic)
-{
-    return SELF_URL . '?' . (empty($pic['path']) ? '' : $pic['path'].'/') . $pic['filename'];
-}
+    if ($type == 'image' || $type == 'embed' || $type == 'embed_img')
+    {
+        if (isset($data['filename']))
+            $data = ($data['path'] ? $data['path'].'/' : '') . $data['filename'];
+        elseif (isset($data['path']))
+            $data = $data['path'] ? $data['path'].'/' : '';
+    }
+    elseif ($type == 'embed')
+    {
+        $data = (empty($data['path']) ? '' : $data['path'].'/') . $data['filename'];
+    }
 
-function image_url($pic)
-{
-    return BASE_URL . (empty($pic['path']) ? '' : $pic['path'].'/') . $pic['filename'];
+    if (function_exists('get_custom_url'))
+    {
+        return get_custom_url($type, $data);
+    }
+
+    if ($type == 'image' || $type == 'album')
+    {
+        return SELF_URL . '?' . rawurlencode($data);
+    }
+    elseif ($type == 'embed' || $type == 'slideshow')
+    {
+        return SELF_URL . '?'.$type.'=' . rawurlencode($data);
+    }
+    elseif ($type == 'embed_tag')
+    {
+        return SELF_URL . '?embed&tag=' . rawurlencode($data);
+    }
+    elseif ($type == 'slideshow_tag')
+    {
+        return SELF_URL . '?slideshow&tag=' . rawurlencode($data);
+    }
+    elseif ($type == 'embed_img')
+    {
+        return SELF_URL . '?i=' . rawurlencode($data);
+    }
+    elseif ($type == 'tag')
+    {
+        return SELF_URL . '?tag=' . rawurlencode($data);
+    }
+    elseif ($type == 'date')
+    {
+        return SELF_URL . '?date=' . rawurlencode($data);
+    }
+    elseif ($type == 'tags' || $type == 'timeline' || $type == 'feed')
+    {
+        return SELF_URL . '?' . $type;
+    }
+
+    throw new Exception('Unknown type '.$type);
 }
 
 function embed_html($data)
 {
     if (is_array($data))
-        $url = SELF_URL . '?embed=' . (empty($data['path']) ? '' : $data['path'].'/') . '#' . $data['filename'];
+        $url = get_url('embed', $data);
     else
-        $url = SELF_URL . '?embed&tag=' . urlencode($data);
+        $url = get_url('embed_tag', $data);
 
-    $html = '<object type="text/html" width="600" height="450" data="'.$url.'">'
-        .   '<iframe src="'.$url.'" width="600" height="450" frameborder="0" scrolling="no"></iframe>'
+    $html = '<object type="text/html" width="600" height="450" data="'.escape($url).'">'
+        .   '<iframe src="'.escape($url).'" width="600" height="450" frameborder="0" scrolling="no"></iframe>'
         .   '</object>';
     return $html;
 }
-
-function embed_img($data)
-{
-    return SELF_URL . '?img=' . (empty($data['path']) ? '' : $data['path'].'/') . $data['filename'];
-}
-
-error_reporting(E_ALL);
 
 // Against bad configurations
 if (get_magic_quotes_gpc())
@@ -926,7 +975,9 @@ if (get_magic_quotes_gpc())
 }
 
 if (file_exists(dirname(__FILE__) . '/user_config.php'))
+{
     require dirname(__FILE__) . '/user_config.php';
+}
 
 if (!function_exists('__'))
 {
@@ -946,6 +997,7 @@ if (!defined('BASE_URL'))   define('BASE_URL', 'http://'.$_SERVER['HTTP_HOST'].d
 if (!defined('SELF_URL'))   define('SELF_URL', BASE_URL . (basename($_SERVER['SCRIPT_NAME']) == 'index.php' ? '' : basename($_SERVER['SCRIPT_NAME'])));
 if (!defined('GEN_SMALL'))  define('GEN_SMALL', 0);
 if (!defined('MAX_IMAGE_SIZE')) define('MAX_IMAGE_SIZE', 2048);
+if (!defined('SMALL_IMAGE_SIZE')) define('SMALL_IMAGE_SIZE', 600);
 if (!defined('GALLERY_TITLE'))  define('GALLERY_TITLE', __('My pictures'));
 if (!defined('ALLOW_EMBED'))    define('ALLOW_EMBED', true);
 
@@ -1059,7 +1111,7 @@ if (isset($_GET['feed']))
 
     foreach ($last as &$photo)
     {
-        echo '<rdf:li rdf:resource="'.img_page_url($photo).'" />
+        echo '<rdf:li rdf:resource="'.get_url('image', $photo).'" />
         ';
     }
 
@@ -1071,11 +1123,11 @@ if (isset($_GET['feed']))
     foreach ($last as &$photo)
     {
         if (file_exists($f->getSmallPath($photo['hash'])))
-            $small_url = small_url($photo);
+            $small_url = get_url('cache_small', $photo);
         else
-            $small_url = thumb_url($photo);
+            $small_url = get_url('cache_thumb', $photo);
 
-        $content = '<p><a href="'.img_page_url($photo).'">'
+        $content = '<p><a href="'.escape(get_url('image', $photo)).'">'
             . '<img src="'.$small_url.'" alt="'.escape($photo['filename']).'" /></a></p>'
             . '<p>'.$f->formatText($photo['comment']).'</p>';
 
@@ -1083,9 +1135,9 @@ if (isset($_GET['feed']))
         $title = preg_replace('!\.[a-z]+$!i', '', $title);
 
         echo '
-            <item rdf:about="'.img_page_url($photo).'">
+            <item rdf:about="'.get_url('image', $photo).'">
                 <title>'.escape($title).'</title>
-                <link>'.img_page_url($photo).'</link>
+                <link>'.get_url('image', $photo).'</link>
                 <dc:date>'.date(DATE_W3C, $photo['time']).'</dc:date>
                 <dc:language></dc:language>
                 <dc:creator></dc:creator>
@@ -1094,9 +1146,9 @@ if (isset($_GET['feed']))
                 <content:encoded>
                     <![CDATA['.$content.']]>
                 </content:encoded>
-                <media:content medium="image" url="'.image_url($photo).'" type="image/jpeg" height="'.$photo['height'].'" width="'.$photo['width'].'" />
+                <media:content medium="image" url="'.get_url('real_image', $photo).'" type="image/jpeg" height="'.$photo['height'].'" width="'.$photo['width'].'" />
                 <media:title>'.escape($photo['filename']).'</media:title>
-                <media:thumbnail url="'.thumb_url($photo).'" />
+                <media:thumbnail url="'.get_url('cache_thumb', $photo).'" />
             </item>';
     }
 
@@ -1115,8 +1167,6 @@ if (isset($_GET['style_css']) || isset($_GET['slideshow_css']))
     $img_dir = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAABa1BMVEX%2F%2F%2F%2F%2F92v%2F8GPp1CPklwrjjgX%2F9Wn%2F5FX%2F7F7%2F%2FXH%2F%2Bm7%2F%2FnL%2F6lz%2F6Fr%2F82bj1oXlpRDjkAfmpxDkmQrnuRj110jnuxniigP%2F82f1zz71zT3%2F51nozCD%2F%2B2%2Fkkgf16l7jiQPmsxbmshXp1STlqBD14lXmsRTlqxLjigTp0yP%2F72LihgL120zp0iP%2F30%2FpzyLnxR3%2F%2B3D1zDv%2F8mX%2F%2FXLo0SL%2F2UnoxR717mL11Ub%2F92z%2F7mHp0CLntxf%2F%2BW3loA7%2F4FHnvhr%2F%2BG3%2F51jjkQb%2F5FbmrhP%2F4VHihQH%2F41PozSH%2F4FDknw3knAzlow7mrBP182f%2F%2BW7nwRviiAP%2F617jlAj%2F7WD%2F%2F3P10EHlnAvoyh%2F%2F8WTkmwvkoQ7131HoyB7%2F3Ev%2F9Gf%2F7V%2F%2F4lPo0CHbxj%2FklQj10kP151r%2F5Vf%2F%2B3HnvRr%2F%2FnP%2F3U7owBvowxzmthf18WXpzSH%2F41X%2F6Fn%2F3E319Wr%2F%2F3Tp1CTmqPETAAAAAXRSTlMAQObYZgAAAAFiS0dEAIgFHUgAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQfUDB4RJC2Znk2gAAAAtElEQVR42mNgIAJUVGjaFCHxmSvKysqizPPECtTUBexBAkB%2BQKGFfIZqnI5oJAODMrNuikx8vqOIopuKn6Uw0ITy8nBOLkY%2BJo4Sdp%2F0NLAAt6ETW3QYT2ZyTIQLA4NpeQ5nICOfVoh0sTeLJCsDg365iaxVIlMSr6t7bqiUBgODF3eWHZuxNY%2Bzp16CoFEwAwO%2FARejBBMHL7tDqVmqggfQHUHZtkr%2BQrG%2BLHKs4tr8DGQAAGf6I1yfqMWaAAAAAElFTkSuQmCC';
     $img_forward = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAulBMVEX%2F%2F%2F9ylekzTY42VZt3muyIp%2FSIp%2FV0mOuRr%2Fp3me10l%2Bo0TpA0UJR9n%2B%2BNrPczTpA4W6Q0UJOVsvw0UJUvQX4vQn04W6V5nO41UpcwQn6KqfZxlumPrvlxlemFpvM1U5g2VJkvQXw5XacySYkySog1UpYxSIY4XqiCovIyTI02V54xRoSHp%2FUwRYE2VZowRYIuQXwxSIcySIgvQn6AoPCTsfs4XKc2VJo3WKA3WqMzTY81VJmCo%2FKFpfPmpKZIAAAAAXRSTlMAQObYZgAAAAFiS0dEAIgFHUgAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQfUDB4RITX3hSGzAAAAgklEQVR42mNgIAKom4FIZnm4gJKQJZC0ZhWECYiZcmgxMKja2mhCBQQ4ZPjMGXhsTHgNoSIWfFKswgxMvOIs%2BlARPR05GyYGIxYuRgMwn5nNFshX4WSXVYTzrRiUObmkRSEaFGw1uBkY1NgZRaAmSNgA%2BQzajMYwd%2FDwg0hdSQZyAQCimAm2dQJutQAAAABJRU5ErkJggg%3D%3D';
     $img_info = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAABGlBMVEX%2F%2F%2F90tf93t%2F%2FL4%2F%2FI4v81lf9Aqvw8p%2FxAmv9csv8%2Bmf9gtv%2BOw%2F9Drfw7mf9uwf9qvf5Io%2F%2BBz%2F5gtf9PqP82o%2Fwzofx0xf5TrP9Gr%2FxBnv9asf5Mpv89mf80lP84pPyD0f5Ervw1lP89ov1Kpf5luf5Ko%2F99zP5Tqv9vwv5qvf9Qsf1BrPxQqf9Yr%2F6E0f5zxP5KpP9TrP5JpP5Bq%2Fx3yP5Urf5mu%2F5Wrv57y%2F43lv9UrP9buv1Psv06pvyB0P5Wtf00ofyAzv4%2BqfxXr%2F5Krf13x%2F9SrP50xP5uwf6Az%2F57yv49m%2F9YuP1tv%2F40k%2F9Yr%2F9Pqf9htf9zxf55yP5nu%2F9fvf13x%2F5luv5Bpf2Nw%2F8zk%2F%2F%2F%2F%2F9%2Bzf4NgFg2AAAAAXRSTlMAQObYZgAAAAFiS0dEAIgFHUgAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQfUDB4RJAzV913%2BAAAAx0lEQVR42o2P1RaCUBBFAQEFCwU7ELu7u7tbGP7%2FN7zWu%2Fvt7DWz1jkYhtAQOkXRERrsi4HyOIbqtkoZPlleVwJXl7TJ10zy%2B54656wugLSZ44OvL8ITsKoSAJ2M6EsEEqyjp7aNZTp11zMzFgllqa6MAKA9Mnun8hKxxq1PA3SZcTGzQ8KXmJ7MIwAx2xKiPiTw%2BnzR0QLYHoLXjSNBUhcOZQC71%2BIn38VM%2FES0DewhS1P%2BVg2G485Dwe2Xf2NIHI1jcRL7iycAMB5ogC93MwAAAABJRU5ErkJggg%3D%3D';
-    $img_back = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAyCAYAAACd+7GKAAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A/wD/oL2nkwAAADVJREFUCNeFjUEOACAMwiqT/3/Zm3OJUw5NyBjAKQmYG672hoxEtf5/tNfowu3au8oChgASC4cWARUDoKzWAAAAAElFTkSuQmCC';
-    $img_bg = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAAXNSR0IArs4c6QAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAtJREFUCNdjYDgAAADDAME6JGfnAAAAAElFTkSuQmCC';
 
     if (isset($_GET['style_css']))
     {
@@ -1199,7 +1249,7 @@ body.loading #pic_comment { display: none; }
 #slideshow img { position: absolute; top: 0; left: 0; }
 
 ul { position: absolute; bottom: 0px; left: 0px; right: 0px; z-index: 100;
-    background: repeat-x bottom left url({$img_back}); height: 40px; width: 100%; padding-top: 10px;}
+    background: rgba(0, 0, 0, 0.75); height: 40px; width: 100%; padding-top: 10px;}
 li { float: left; padding: 0 10%; }
 li a { display: block; opacity: 0.50; color: #fff; text-decoration: none; font-size: 2em;
     line-height: 20px; width: 50px; text-align: center; }
@@ -1364,7 +1414,7 @@ if (!empty($_GET['r']))
 }
 
 // Small image redirect
-if (!empty($_GET['img']) && preg_match('!^(.*)(?:/?([^/]+)[_.](jpe?g))?$!Ui', $_GET['img'], $match))
+if (!empty($_GET['i']) && preg_match('!^(.*)(?:/?([^/]+)[_.](jpe?g))?$!Ui', $_GET['i'], $match))
 {
     $selected_dir = fotooManager::getValidDirectory($match[1]);
     $selected_file = $match[2] . '.' . $match[3];
@@ -1379,17 +1429,15 @@ if (!empty($_GET['img']) && preg_match('!^(.*)(?:/?([^/]+)[_.](jpe?g))?$!Ui', $_
         exit;
     }
 
-    $orig_url = image_url($pic);
+    $orig_url = get_url('real_image', $pic);
 
-    if (file_exists($f->getSmallPath($pic['hash'])))
-    {
-        $small_url = small_url($pic);
-    }
-    elseif ($pic['width'] <= MAX_IMAGE_SIZE && $pic['height'] <= MAX_IMAGE_SIZE)
+    if ($pic['width'] <= SMALL_IMAGE_SIZE && $pic['height'] <= SMALL_IMAGE_SIZE)
     {
         $small_url = $orig_url;
-        list($nw, $nh) = $f->getNewSize($pic['width'], $pic['height'], 600);
-        $wh = 'width="'.$nw.'" height="'.$nh.'"';
+    }
+    elseif (file_exists($f->getSmallPath($pic['hash'])))
+    {
+        $small_url = get_url('cache_small', $pic);
     }
     else
     {
@@ -1401,7 +1449,7 @@ if (!empty($_GET['img']) && preg_match('!^(.*)(?:/?([^/]+)[_.](jpe?g))?$!Ui', $_
     exit;
 }
 // Get which display mode is asked
-elseif (isset($_GET['date']))
+elseif (isset($_GET['date']) || isset($_GET['timeline']))
 {
     $day = $year = $month = $date = false;
     if (!empty($_GET['date']) && preg_match('!^[0-9]{4}(/[0-9]{2}){0,2}$!', $_GET['date']))
@@ -1453,8 +1501,9 @@ elseif (isset($_GET['embed']))
 elseif (!empty($_GET['tag']))
 {
     $mode = 'tag';
-    $tag = $f->getTagNameFromId($_GET['tag']);
-    $title = __('Pictures in tag %TAG', 'REPLACE', array('%TAG' => escape($tag)));
+    $tag = $f->getTagId($_GET['tag']);
+    $tag_name = $f->getTagNameFromId($tag);
+    $title = __('Pictures in tag %TAG', 'REPLACE', array('%TAG' => $tag_name));
 }
 else
 {
@@ -1496,11 +1545,11 @@ elseif (file_exists(BASE_DIR . '/user_style.css'))
 else
     $css = SELF_URL . '?style.css';
 
-$f->html_tags['tag'] = SELF_URL . '?tag={KEYWORD}';
-$f->html_tags['date'] = SELF_URL . '?date={KEYWORD}';
+$f->html_tags['tag'] = get_url('tag', 'KEYWORD');
+$f->html_tags['date'] = get_url('date', 'KEYWORD');
 $menu = '<h5><a class="home" href="'.SELF_URL.'">'.__('My Pictures').'</a>
-    <a class="tags" href="'.SELF_URL.'?tags">'.__('By tags').'</a>
-    <a class="date" href="'.SELF_URL.'?date">'.__('By date').'</a></h5>';
+    <a class="tags" href="'.get_url('tags').'">'.__('By tags').'</a>
+    <a class="date" href="'.get_url('timeline').'">'.__('By date').'</a></h5>';
 
 header('Content-Type: text/html; charset=UTF-8');
 
@@ -1514,9 +1563,9 @@ else
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-    <title>'.$title.'</title>
-    <link rel="stylesheet" href="'.$css.'" type="text/css" />
-    <link rel="alternate" type="application/rss+xml" title="RSS" href="'.SELF_URL.'?feed" />
+    <title>'.escape($title).'</title>
+    <link rel="stylesheet" href="'.escape($css).'" type="text/css" />
+    <link rel="alternate" type="application/rss+xml" title="RSS" href="'.escape(get_url('feed')).'" />
 </head>
 
 <body>';
@@ -1524,17 +1573,17 @@ else
 
 if ($mode == 'date')
 {
-    echo '<h1>'.$title.'</h1>';
+    echo '<h1>'.escape($title).'</h1>';
     echo '<div id="header">
         '.$menu.'
-        <h4><strong><a href="'.SELF_URL.'?date">'.__('By date').'</a></strong> ';
+        <h4><strong><a href="'.get_url('timeline').'">'.__('By date').'</a></strong> ';
 
     if ($year)
-        echo '<a href="'.SELF_URL.'?date='.$year.'">'.$year.'</a> ';
+        echo '<a href="'.escape(get_url('date', $year)).'">'.$year.'</a> ';
     if ($month)
-        echo '<a href="'.SELF_URL.'?date='.$year.'/'.$month.'">'.__('%B', 'TIME', strtotime($year.'-'.$month.'-01')).'</a> ';
+        echo '<a href="'.escape(get_url('date', $year.'/'.zero_pad($month))).'">'.__('%B', 'TIME', strtotime($year.'-'.$month.'-01')).'</a> ';
     if ($day)
-        echo '<a href="'.SELF_URL.'?date='.$year.'/'.$month.'/'.$day.'">'.__('%A %d', 'TIME', strtotime($year.'-'.$month.'-'.$day)).'</a> ';
+        echo '<a href="'.escape(get_url('date', $year.'/'.zero_pad($month).'/'.zero_pad($day))).'">'.__('%A %d', 'TIME', strtotime($year.'-'.$month.'-'.$day)).'</a> ';
 
     echo '
         </h4>
@@ -1552,8 +1601,8 @@ if ($mode == 'date')
         foreach ($pics as &$pic)
         {
             echo '  <li>'
-                .'<a class="thumb" href="'.img_page_url($pic).'"><img src="'
-                .thumb_url($pic).'" alt="'.escape($pic['filename']).'" /></a>'
+                .'<a class="thumb" href="'.escape(get_url('image', $pic)).'"><img src="'
+                .escape(get_url('cache_thumb', $pic)).'" alt="'.escape($pic['filename']).'" /></a>'
                 ."</li>\n";
         }
 
@@ -1578,10 +1627,10 @@ if ($mode == 'date')
 
                 if (!$year)
                 {
-                    echo '<h2><a href="'.SELF_URL.'?date='.$pic['year'].'">'.$pic['year'].'</a></h2>';
+                    echo '<h2><a href="'.escape(get_url('date', $pic['year'])).'">'.$pic['year'].'</a></h2>';
 
                     if (isset($pic['more']))
-                        echo '<p class="more"><a href="'.SELF_URL.'?date='.$pic['year'].'">'.__("(%NB more pictures)", 'REPLACE', array('%NB' => $pic['more'])).'</a></p>';
+                        echo '<p class="more"><a href="'.escape(get_url('date', $pic['year'])).'">'.__("(%NB more pictures)", 'REPLACE', array('%NB' => $pic['more'])).'</a></p>';
 
                     echo '<ul class="pics">';
                 }
@@ -1596,14 +1645,14 @@ if ($mode == 'date')
                 if ($current)
                     echo '</ul></li>';
 
-                $url = SELF_URL.'?date='.$pic['year'].'/'.$pic['month'].($month ? '/'.$pic['day'] : '');
+                $url = get_url('date', $pic['year'].'/'.zero_pad($pic['month']).($month ? '/'.zero_pad($pic['day']) : ''));
 
                 echo '
                 <li class="'.($month ? 'day' : 'month').'">
-                    <h3><a href="'.$url.'">'.($month ? __('%A %d', 'TIME', $pic['time']) : __('%B', 'TIME', $pic['time'])).'</a></h3>';
+                    <h3><a href="'.escape($url).'">'.($month ? __('%A %d', 'TIME', $pic['time']) : __('%B', 'TIME', $pic['time'])).'</a></h3>';
 
                 if (isset($pic['more']))
-                    echo '<p class="more"><a href="'.$url.'">'.__("(%NB more pictures)", 'REPLACE', array('%NB' => $pic['more'])).'</a></p>';
+                    echo '<p class="more"><a href="'.escape($url).'">'.__("(%NB more pictures)", 'REPLACE', array('%NB' => $pic['more'])).'</a></p>';
 
                 echo '
                     <ul class="pics">';
@@ -1611,8 +1660,8 @@ if ($mode == 'date')
                 $current = $month ? $pic['day'] : $pic['month'];
             }
 
-            echo '  <li><a class="thumb" href="'.img_page_url($pic).'"><img src="'
-                .thumb_url($pic).'" alt="'.escape($pic['filename']).'" /></a>'
+            echo '  <li><a class="thumb" href="'.escape(get_url('image', $pic)).'"><img src="'
+                .escape(get_url('cache_thumb', $pic)).'" alt="'.escape($pic['filename']).'" /></a>'
                 ."</li>\n";
         }
 
@@ -1643,7 +1692,7 @@ elseif ($mode == 'tags')
         foreach ($tags as $tag=>$nb)
         {
             $size = 100 + round(($nb - $min) * $step);
-            echo '<a href="'.SELF_URL.'?tag='.urlencode($f->getTagId($tag)).'" style="font-size: '.$size.'%;">'
+            echo '<a href="'.escape(get_url('tag', $f->getTagId($tag))).'" style="font-size: '.$size.'%;">'
                 .escape($tag).'</a> <small>('.$nb.')</small> ';
         }
 
@@ -1657,11 +1706,11 @@ elseif ($mode == 'tag')
     echo '<h1>'.$title.'</h1>';
     echo '<div id="header">
         '.$menu.'
-        <h4><strong><a href="'.SELF_URL.'?tags">'.__('Tags').'</a></strong>
-            <a href="'.SELF_URL.'?tag='.urlencode($tag).'">'.escape($f->getTagNameFromId($tag)).'</a>';
+        <h4><strong><a href="'.escape(get_url('tags')).'">'.__('Tags').'</a></strong>
+            <a href="'.escape(get_url('tag', $tag)).'">'.escape($tag_name).'</a>';
 
     if (!empty($pics))
-        echo '<script type="text/javascript"> document.write("<small><a class=\\"slideshow\\" href=\\"'.SELF_URL.'?slideshow&amp;tag='.urlencode($f->getTagId($tag)).'\\">'.__('Slideshow').'</a></small>"); </script>';
+        echo '<small><a class="slideshow" href="'.escape(get_url('slideshow_tag', $tag)).'">'.__('Slideshow').'</a></small>';
 
     echo '
         </h4>
@@ -1681,7 +1730,7 @@ elseif ($mode == 'tag')
         foreach ($tags as $name=>$nb)
         {
             $size = 100 + round(($nb - $min) * $step);
-            echo '<a href="'.SELF_URL.'?tag='.urlencode($f->getTagId($name)).'" style="font-size: '.$size.'%;">'.escape($name).'</a> ';
+            echo '<a href="'.escape(get_url('tag', $f->getTagId($name))).'" style="font-size: '.$size.'%;">'.escape($name).'</a> ';
             echo '<small>('.$nb.')</small> ';
         }
         echo '</p>';
@@ -1698,8 +1747,8 @@ elseif ($mode == 'tag')
         foreach ($pics as &$pic)
         {
             echo '  <li>'
-                .'<a class="thumb" href="'.img_page_url($pic)
-                .'"><img src="'.thumb_url($pic).'" alt="'.escape($pic['filename']).'" /></a>'
+                .'<a class="thumb" href="'.escape(get_url('image', $pic))
+                .'"><img src="'.escape(get_url('cache_thumb', $pic)).'" alt="'.escape($pic['filename']).'" /></a>'
                 ."</li>\n";
         }
 
@@ -1742,21 +1791,23 @@ elseif ($mode == 'pic')
             if ($current) $current .= '/';
             $current .= $d;
 
-            echo '  <a href="'.SELF_URL.'?'.escape($current).'">'.escape(strtr($d, '_-', '  '))."</a>\n";
+            echo '  <a href="'.escape(get_url('album', $current)).'">'.escape(strtr($d, '_-', '  '))."</a>\n";
         }
     }
 
     echo "</h4>\n</div>\n";
 
-    $orig_url = image_url($pic);
+    $orig_url = get_url('real_image', $pic);
     $wh = '';
 
     if (file_exists($f->getSmallPath($pic['hash'])))
-        $small_url = small_url($pic);
+    {
+        $small_url = get_url('cache_small', $pic);
+    }
     elseif ($pic['width'] <= MAX_IMAGE_SIZE && $pic['height'] <= MAX_IMAGE_SIZE)
     {
         $small_url = $orig_url;
-        list($nw, $nh) = $f->getNewSize($pic['width'], $pic['height'], 600);
+        list($nw, $nh) = $f->getNewSize($pic['width'], $pic['height'], SMALL_IMAGE_SIZE);
         $wh = 'width="'.$nw.'" height="'.$nh.'"';
     }
     else
@@ -1769,14 +1820,14 @@ elseif ($mode == 'pic')
         <dt class="small">';
 
         if ($small_url)
-            echo '<a href="'.$orig_url.'"><img src="'.$small_url.'" alt="'.escape($pic['filename']).'" '.$wh.' /></a>';
+            echo '<a href="'.escape($orig_url).'"><img src="'.escape($small_url).'" alt="'.escape($pic['filename']).'" '.$wh.' /></a>';
         else
             echo __("This picture is too big (%W x %H) to be displayed in this page.", 'REPLACE', array('%W' => $pic['width'], '%H' => $pic['height']));
 
         echo '
         </dt>
         <dd class="orig">
-            <a href="'.$orig_url.'">'.__('Download image at original size (%W x %H) - %SIZE KB', 'REPLACE',
+            <a href="'.escape($orig_url).'">'.__('Download image at original size (%W x %H) - %SIZE KB', 'REPLACE',
             array('%W' => $pic['width'], '%H' => $pic['height'], '%SIZE' => round($pic['size'] / 1000))).'</a>
         </dd>
     </dl>
@@ -1799,16 +1850,16 @@ elseif ($mode == 'pic')
         <dd class="tags">';
 
         foreach ($pic['tags'] as $tag_id=>$tag)
-            echo '<a href="'.SELF_URL.'?tag='.urlencode($tag_id).'">'.escape($tag).'</a> ';
+            echo '<a href="'.escape(get_url('tag', $tag_id)).'">'.escape($tag).'</a> ';
 
         echo '</dd>';
     }
 
     $date = __('%A <a href="%1">%d</a> <a href="%2">%B</a> <a href="%3">%Y</a> at %H:%M');
     $date = strtr($date, array(
-        '%1' => SELF_URL . '?date='.$pic['year'].'/'.$pic['month'].'/'.$pic['day'],
-        '%2' => SELF_URL . '?date='.$pic['year'].'/'.$pic['month'],
-        '%3' => SELF_URL . '?date='.$pic['year'],
+        '%1' => escape(get_url('date', $pic['year'].'/'.zero_pad($pic['month']).'/'.zero_pad($pic['day']))),
+        '%2' => escape(get_url('date', $pic['year'].'/'.zero_pad($pic['month']))),
+        '%3' => escape(get_url('date', $pic['year'])),
     ));
     $date = __($date, 'TIME', $pic['time']);
     echo '
@@ -1821,7 +1872,7 @@ elseif ($mode == 'pic')
         <dt class="embed">'.__('Embed:').'</dt>
         <dd class="embed"><input type="text" onclick="this.select();" value="'.escape(embed_html($pic)).'" /></dd>
         <dt class="embed">'.__('Embed as image:').'</dt>
-        <dd class="embed"><input type="text" onclick="this.select();" value="'.escape(embed_img($pic)).'" /></dd>';
+        <dd class="embed"><input type="text" onclick="this.select();" value="'.escape(get_url('embed_img', $pic)).'" /></dd>';
     }
 
     echo '
@@ -1851,13 +1902,13 @@ elseif ($mode == 'pic')
     <ul class="goPrevNext">
         <li class="goPrev">' .
         ($prev ?
-            '<a href="' . img_page_url($prev) . '" title="' . __('Previous') . '"><span>&larr;</span><img src="' .
-            thumb_url($prev) . '" alt="' . __('Previous') . '" /></a>' : '') .
+            '<a href="' . escape(get_url('image', $prev)) . '" title="' . __('Previous') . '"><span>&larr;</span><img src="' .
+            escape(get_url('cache_thumb', $prev)) . '" alt="' . __('Previous') . '" /></a>' : '') .
         '</li>
         <li class="goNext">' .
         ($next ?
-            '<a href="' . img_page_url($next) . '" title="' . __('Next') . '"><span>&rarr;</span><img src="' .
-            thumb_url($next) . '" alt="' . __('Next') . '" /></a>' : '') .
+            '<a href="' . escape(get_url('image', $next)) . '" title="' . __('Next') . '"><span>&rarr;</span><img src="' .
+            escape(get_url('cache_thumb', $next)) . '" alt="' . __('Next') . '" /></a>' : '') .
         '</li>
     </ul>';
 }
@@ -1872,12 +1923,12 @@ elseif ($mode == 'slideshow' || $mode == 'embed')
         else
             $list = false;
 
-        $back_url = SELF_URL . '?' . $selected_dir;
+        $back_url = get_url('album', $selected_dir);
     }
     elseif (!empty($selected_tag))
     {
         $list = $f->getByTag($selected_tag);
-        $back_url = SELF_URL . '?tag=' . $selected_tag;
+        $back_url = get_url('tag', $selected_tag);
     }
 
     if (empty($list))
@@ -2026,7 +2077,7 @@ elseif ($mode == 'slideshow' || $mode == 'embed')
 
         foreach ($list as &$pic)
         {
-            $path = BASE_URL . (empty($pic['path']) ? '' : $pic['path'].'/') . $pic['filename'];
+            $path = get_url('real_image', $pic);
 
             if ($mode == 'embed' && file_exists($f->getSmallPath($pic['hash'])))
             {
@@ -2093,29 +2144,29 @@ elseif ($mode == 'slideshow' || $mode == 'embed')
         </script>
         <div id="slideshow">
             <p id="pic_comment"></p>
-        </div>';
+        </div>
+
+        <ul id="controlBar" class="'.($mode == 'slideshow' ? 'playing' : 'embed').'">
+            <li class="prev"><a href="#" onclick="goPrev(); return false;" title="'.__('Previous').'">&larr;</a></li>';
 
         if ($mode == 'slideshow')
         {
             echo '
-            <ul id="controlBar" class="playing">
-                <li class="prev"><a href="#" onclick="goPrev(); return false;" title="'.__('Previous').'">&larr;</a></li>
-                <li class="pause"><a href="#" onclick="playPause(); return false;" title="'.__('Pause').'">&#9612;&#9612;</a></li>
-                <li class="play"><a href="#" onclick="playPause(); return false;" title="'.__('Restart').'">&#9654;</a></li>
-                <li class="next"><a href="#" onclick="goNext(); return false;" title="'.__('Next').'">&rarr;</a></li>
-                <li class="back"><a href="'.escape($back_url).'">'.__('Back').'</a></li>
-            </ul>';
+            <li class="pause"><a href="#" onclick="playPause(); return false;" title="'.__('Pause').'">&#9612;&#9612;</a></li>
+            <li class="play"><a href="#" onclick="playPause(); return false;" title="'.__('Restart').'">&#9654;</a></li>
+            <li class="next"><a href="#" onclick="goNext(); return false;" title="'.__('Next').'">&rarr;</a></li>
+            <li class="back"><a href="'.escape($back_url).'">'.__('Back').'</a></li>';
         }
         else
         {
             echo '
-            <ul id="controlBar" class="embed">
-                <li class="prev"><a href="#" onclick="goPrev(); return false;" title="'.__('Previous').'">&larr;</a></li>
-                <li class="back"><a href="'.escape($back_url).'" onclick="window.open(this.href); return false;">'.escape(GALLERY_TITLE).'</a></li>
-                <li class="current"><b id="current_nb">0</b> / '.count($list).'</li>
-                <li class="next"><a href="#" onclick="goNext(); return false;" title="'.__('Next').'">&rarr;</a></li>
-            </ul>';
+            <li class="back"><a href="'.escape($back_url).'" onclick="window.open(this.href); return false;">'.escape(GALLERY_TITLE).'</a></li>
+            <li class="current"><b id="current_nb">0</b> / '.count($list).'</li>
+            <li class="next"><a href="#" onclick="goNext(); return false;" title="'.__('Next').'">&rarr;</a></li>';
         }
+
+        echo '
+        </ul>';
     }
 }
 else
@@ -2123,11 +2174,11 @@ else
     $pics = $dirs = $update = $desc = false;
     $list = $f->getDirectory($selected_dir);
 
-    echo "<h1>".$title."</h1>\n";
-
-        echo '<div id="header">'.$menu."<h4>\n";
-
-    echo '  <strong><a href="'.SELF_URL.'">'.__('My Pictures')."</a></strong>\n";
+    echo '
+        <h1>'.escape($title).'</h1>
+        <div id="header">
+            '.$menu.'
+            <h4><strong><a href="'.SELF_URL.'">'.__('My Pictures').'</a></strong>';
 
     if (!empty($selected_dir))
     {
@@ -2139,15 +2190,15 @@ else
             if ($current) $current .= '/';
             $current .= $d;
 
-            echo '  <a href="'.SELF_URL.'?'.escape($current).'">'.escape(strtr($d, '_-', '  '))."</a>\n";
+            echo '  <a href="'.escape(get_url('album', $current)).'">'.escape(strtr($d, '_-', '  '))."</a>\n";
         }
     }
 
     if (!empty($list[1]))
-        echo '  <script type="text/javascript"> document.write("<small><a class=\\"slideshow\\" href=\\"'.SELF_URL.'?slideshow='.escape($selected_dir).'\\">'.__('Slideshow').'</a></small>"); </script>';
+        echo '<small><a class="slideshow" href="'.escape(get_url('slideshow', $selected_dir)).'">'.__('Slideshow').'</a></small>';
 
-    echo "</h4>
-    </div>\n";
+    echo '</h4>
+    </div>';
 
     if ($list === false)
         echo '<p class="info">'.__('No picture found.').'</p>';
@@ -2167,8 +2218,7 @@ else
         echo '<ul class="dirs">'."\n";
         foreach ($dirs as $dir)
         {
-            echo '  <li><a href="'.SELF_URL.'?'
-                .(!empty($selected_dir) ? escape($selected_dir.'/'.$dir) : escape($dir))
+            echo '  <li><a href="'.escape(get_url('album', (!empty($selected_dir) ? $selected_dir.'/'.$dir : $dir)))
                 .'">'.escape(strtr($dir, '_', ' '))."</a></li>\n";
         }
         echo "</ul>\n";
@@ -2181,8 +2231,8 @@ else
         foreach ($pics as &$pic)
         {
             echo '  <li>'
-                .'<a class="thumb" href="'.img_page_url($pic)
-                .'"><img src="'.thumb_url($pic).'" alt="'.escape($pic['filename']).'" /></a>'
+                .'<a class="thumb" href="'.escape(get_url('image', $pic))
+                .'"><img src="'.escape(get_url('cache_thumb', $pic)).'" alt="'.escape($pic['filename']).'" /></a>'
                 ."</li>\n";
         }
 
