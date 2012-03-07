@@ -10,7 +10,7 @@ function zero_pad($str, $length = 2)
     return str_pad($str, $length, '0', STR_PAD_LEFT);
 }
 
-function get_url($type, $data = null)
+function get_url($type, $data = null, $args = null)
 {
     if ($type == 'cache_thumb')
     {
@@ -25,7 +25,7 @@ function get_url($type, $data = null)
         return BASE_URL . (empty($data['path']) ? '' : $data['path'].'/') . $data['filename'];
     }
 
-    if ($type == 'image' || $type == 'embed' || $type == 'embed_img')
+    if (is_array($data) && isset($data['filename']) && isset($data['path']))
     {
         if (isset($data['filename']))
             $data = ($data['path'] ? $data['path'].'/' : '') . $data['filename'];
@@ -39,43 +39,54 @@ function get_url($type, $data = null)
 
     if (function_exists('get_custom_url'))
     {
-        return get_custom_url($type, $data);
+        $url = get_custom_url($type, $data);
     }
-
-    if ($type == 'image' || $type == 'album')
+    elseif ($type == 'image' || $type == 'album')
     {
-        return SELF_URL . '?' . rawurlencode($data);
+        $url = SELF_URL . '?' . rawurlencode($data);
     }
     elseif ($type == 'embed' || $type == 'slideshow')
     {
-        return SELF_URL . '?'.$type.'=' . rawurlencode($data);
+        $url = SELF_URL . '?'.$type.'=' . rawurlencode($data);
     }
     elseif ($type == 'embed_tag')
     {
-        return SELF_URL . '?embed&tag=' . rawurlencode($data);
+        $url = SELF_URL . '?embed&tag=' . rawurlencode($data);
     }
     elseif ($type == 'slideshow_tag')
     {
-        return SELF_URL . '?slideshow&tag=' . rawurlencode($data);
+        $url = SELF_URL . '?slideshow&tag=' . rawurlencode($data);
     }
     elseif ($type == 'embed_img')
     {
-        return SELF_URL . '?i=' . rawurlencode($data);
+        $url = SELF_URL . '?i=' . rawurlencode($data);
     }
     elseif ($type == 'tag')
     {
-        return SELF_URL . '?tag=' . rawurlencode($data);
+        $url = SELF_URL . '?tag=' . rawurlencode($data);
     }
     elseif ($type == 'date')
     {
-        return SELF_URL . '?date=' . rawurlencode($data);
+        $url = SELF_URL . '?date=' . rawurlencode($data);
     }
     elseif ($type == 'tags' || $type == 'timeline' || $type == 'feed')
     {
-        return SELF_URL . '?' . $type;
+        $url = SELF_URL . '?' . $type;
+    }
+    else
+    {
+        throw new Exception('Unknown type '.$type);
     }
 
-    throw new Exception('Unknown type '.$type);
+    if (!is_null($args))
+    {
+        if (strpos($url, '?') === false)
+            $url .= '?' . $args;
+        else
+            $url .= '&' . $args;
+    }
+
+    return $url;
 }
 
 function embed_html($data)

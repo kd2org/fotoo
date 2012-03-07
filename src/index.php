@@ -144,7 +144,7 @@ if (isset($_GET['feed']))
     exit;
 }
 
-if (isset($_GET['style_css']) || isset($_GET['slideshow_css']))
+if (isset($_GET['style_css']))
 {
     header('Content-Type: text/css');
 
@@ -218,43 +218,6 @@ a:link { color: darkblue; }
 a:visited { color: black; }
 a:hover { color: darkred; }
 EOF_STYLE_CSS;
-    }
-    else
-    {
-        echo <<<EOF_SLIDESHOW_CSS
-* { margin: 0; padding: 0; }
-body { background: #000; font-family: Sans-serif; position: absolute; top: 0; left: 0; bottom: 0; right: 0; font-size: 12px; overflow: hidden; }
-ul { list-style-type: none; }
-body.loading { cursor: wait; }
-
-p.info { color: #fff; padding: 1em; }
-
-#pic_comment { display: block; color: #fff; position: absolute; top: 0px; left: 0px; right: 0px; width: 100%; z-index: 100;
-    text-align: center; text-shadow: 0px 0px 5px #000; font-size: 1.2em; }
-body.loading #pic_comment { display: none; }
-
-#slideshow img { position: absolute; top: 0; left: 0; }
-
-ul { position: absolute; bottom: 0px; left: 0px; right: 0px; z-index: 100;
-    background: rgba(0, 0, 0, 0.75); height: 40px; width: 100%; padding-top: 10px;}
-li { float: left; padding: 0 10%; }
-li a { display: block; opacity: 0.50; color: #fff; text-decoration: none; font-size: 2em;
-    line-height: 20px; width: 50px; text-align: center; }
-li a:hover { opacity: 1.0; text-shadow: 0px 0px 5px #000; }
-li.back a { font-size: 2em; font-weight: bold; }
-li.next a, #controlBar li.prev a { font-size: 4em; }
-li.play a { font-size: 3em; }
-
-.playing li.play { display: none; }
-.pause li.pause { display: none; }
-
-ul.embed { height: 30px; padding-top: 20px; }
-ul.embed li { padding: 0 3%; }
-ul.embed li.current { color: #fff; font-size: 1.5em; line-height: 20px; opacity: 0.75; width: 70px; }
-ul.embed li.back a { font-size: 1.2em; width: 280px; }
-b { font-weight: normal; }
-
-EOF_SLIDESHOW_CSS;
     }
     exit;
 }
@@ -465,25 +428,32 @@ elseif (isset($_GET['tags']))
     $title = __('Pictures by tag');
     $mode = 'tags';
 }
-elseif (isset($_GET['slideshow']))
+elseif (isset($_GET['slideshow']) || isset($_GET['embed']))
 {
-    $mode = 'slideshow';
+    $mode = isset($_GET['embed']) ? 'embed' : 'slideshow';
     $title = __('Slideshow');
 
     if (!empty($_GET['tag']))
-        $selected_tag = $f->getTagId($_GET['tag']);
+    {
+        $selected_tag = explode('/', $_GET['tag']);
+        $current_index = isset($selected_tag[1]) ? (int) $selected_tag[1] : 1;
+        $selected_tag = $f->getTagId($selected_tag[0]);
+    }
     else
-        $selected_dir = fotooManager::getValidDirectory($_GET['slideshow']);
-}
-elseif (isset($_GET['embed']))
-{
-    $mode = 'embed';
-    $title = __('Slideshow');
+    {
+        $src = isset($_GET['embed']) ? $_GET['embed'] : $_GET['slideshow'];
+        $selected_file = basename($src);
 
-    if (!empty($_GET['tag']))
-        $selected_tag = $f->getTagId($_GET['tag']);
-    else
-        $selected_dir = fotooManager::getValidDirectory($_GET['embed']);
+        if (preg_match('!\.jpe?g$!i', $selected_file))
+        {
+            $selected_dir = fotooManager::getValidDirectory(dirname($src));
+        }
+        else
+        {
+            $selected_dir = fotooManager::getValidDirectory($src);
+            $selected_file = false;
+        }
+    }
 }
 elseif (!empty($_GET['tag']))
 {
@@ -525,9 +495,7 @@ else
     }
 }
 
-if ($mode == 'slideshow' || $mode == 'embed')
-    $css = SELF_URL . '?slideshow.css';
-elseif (file_exists(BASE_DIR . '/user_style.css'))
+if (file_exists(BASE_DIR . '/user_style.css'))
     $css = BASE_URL . 'user_style.css';
 else
     $css = SELF_URL . '?style.css';
@@ -540,22 +508,25 @@ $menu = '<h5><a class="home" href="'.SELF_URL.'">'.__('My Pictures').'</a>
 
 header('Content-Type: text/html; charset=UTF-8');
 
-if ($mode != 'slideshow' && $mode != 'embed' && file_exists(BASE_DIR . '/user_header.php'))
-    require BASE_DIR . '/user_header.php';
-else
+if ($mode != 'slideshow' && $mode != 'embed')
 {
-    if (!$title) $title = GALLERY_TITLE;
-    else $title .= ' - '.GALLERY_TITLE;
-    echo '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
-<head>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-    <title>'.escape($title).'</title>
-    <link rel="stylesheet" href="'.escape($css).'" type="text/css" />
-    <link rel="alternate" type="application/rss+xml" title="RSS" href="'.escape(get_url('feed')).'" />
-</head>
+    if (file_exists(BASE_DIR . '/user_header.php'))
+        require BASE_DIR . '/user_header.php';
+    else
+    {
+        if (!$title) $title = GALLERY_TITLE;
+        else $title .= ' - '.GALLERY_TITLE;
+        echo '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+    <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <title>'.escape($title).'</title>
+        <link rel="stylesheet" href="'.escape($css).'" type="text/css" />
+        <link rel="alternate" type="application/rss+xml" title="RSS" href="'.escape(get_url('feed')).'" />
+    </head>
 
-<body>';
+    <body>';
+    }
 }
 
 if ($mode == 'date')
@@ -901,127 +872,7 @@ elseif ($mode == 'pic')
 }
 elseif ($mode == 'slideshow' || $mode == 'embed')
 {
-    if (isset($selected_dir))
-    {
-        $list = $f->getDirectory($selected_dir);
-
-        if (!empty($list[1]))
-            $list = $list[1];
-        else
-            $list = false;
-
-        $back_url = get_url('album', $selected_dir);
-    }
-    elseif (!empty($selected_tag))
-    {
-        $list = $f->getByTag($selected_tag);
-        $back_url = get_url('tag', $selected_tag);
-    }
-
-    if (empty($list))
-        echo '<p class="info">'.__('No picture found.').'</p>';
-    else
-    {
-        echo '<script type="text/javascript">';
-        require 'slideshow.js';
-        echo '
-        var pictures = new Array(';
-
-        $pics = '';
-
-        foreach ($list as &$pic)
-        {
-            $path = get_url('real_image', $pic);
-
-            if ($mode == 'embed' && file_exists($f->getSmallPath($pic['hash'])))
-            {
-                $path = small_url($pic);
-            }
-            elseif ($pic['width'] > MAX_IMAGE_SIZE || $pic['height'] > MAX_IMAGE_SIZE)
-            {
-                continue;
-            }
-
-            $comment = escape($pic['comment']);
-            $comment = nl2br($comment);
-            $comment = strtr($comment, array("\r" => "", "\n" => ""));
-
-            $pics.= '{
-                    filename: "' . escape($pic['filename']) . '",
-                    src: "' . escape($path) . '",
-                    comment: "' . $comment . '",
-                    width: ' . (int)$pic['width'] . ',
-                    height: ' . (int)$pic['height'] . "},";
-        }
-
-        echo substr($pics, 0, -1);
-        unset($pics, $i, $path);
-
-        echo ');
-
-        if (window.location.hash)
-        {
-            var load_pic = window.location.hash.substr(1);
-            for (i in pictures)
-            {
-                if (pictures[i].filename == load_pic)
-                {
-                    current = i;
-                    break;
-                }
-            }
-        };
-
-        window.onload = function() {
-            playPause();
-        };
-        window.onresize = function() {
-            window.clearTimeout(slideEvent);
-            window.setTimeout("window.location.reload();", 10);
-        };';
-
-        if ($mode == 'embed')
-        {
-            echo '
-            max_width = 600;
-            max_height = 450;
-
-            window.onload = function()
-            {
-                document.getElementById("current_nb").innerHTML = parseInt(current) + 1;
-                loadPicture(current);
-            };
-            ';
-        }
-
-        echo '
-        </script>
-        <div id="slideshow">
-            <p id="pic_comment"></p>
-        </div>
-
-        <ul id="controlBar" class="'.($mode == 'slideshow' ? 'playing' : 'embed').'">
-            <li class="prev"><a href="#" onclick="goPrev(); return false;" title="'.__('Previous').'">&larr;</a></li>';
-
-        if ($mode == 'slideshow')
-        {
-            echo '
-            <li class="pause"><a href="#" onclick="playPause(); return false;" title="'.__('Pause').'">&#9612;&#9612;</a></li>
-            <li class="play"><a href="#" onclick="playPause(); return false;" title="'.__('Restart').'">&#9654;</a></li>
-            <li class="next"><a href="#" onclick="goNext(); return false;" title="'.__('Next').'">&rarr;</a></li>
-            <li class="back"><a href="'.escape($back_url).'">'.__('Back').'</a></li>';
-        }
-        else
-        {
-            echo '
-            <li class="back"><a href="'.escape($back_url).'" onclick="window.open(this.href); return false;">'.escape(GALLERY_TITLE).'</a></li>
-            <li class="current"><b id="current_nb">0</b> / '.count($list).'</li>
-            <li class="next"><a href="#" onclick="goNext(); return false;" title="'.__('Next').'">&rarr;</a></li>';
-        }
-
-        echo '
-        </ul>';
-    }
+    require 'slideshow.php';
 }
 else
 {
@@ -1111,13 +962,16 @@ else
     }
 }
 
-if (file_exists(BASE_DIR . '/user_footer.php'))
-    require_once BASE_DIR . '/user_footer.php';
-else
+if ($mode != 'embed' && $mode != 'slideshow')
 {
-    echo '
-</body>
-</html>';
+    if (file_exists(BASE_DIR . '/user_footer.php'))
+        require_once BASE_DIR . '/user_footer.php';
+    else
+    {
+        echo '
+    </body>
+    </html>';
+    }
 }
 
 if ((time() % 100 == 0) || isset($cleanUpdate))

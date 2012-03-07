@@ -1,7 +1,7 @@
 <?php
 /*
-    Fotoo Gallery v2.2.0
-    Copyright 2004-2009 BohwaZ - http://dev.kd2.org/
+    Fotoo Gallery v2.3.0
+    Copyright 2004-2011 BohwaZ - http://dev.kd2.org/
     Licensed under the GNU AGPLv3
 
     This software is free software: you can redistribute it and/or modify
@@ -61,9 +61,51 @@ define('MAX_IMAGE_SIZE', 2048);
 // eg. if you type wp:Belgium in your comment tag, it will make a link to wikipedia
 // You can add anything you want
 $f->html_tags = array(
-    'wp:fr' =>  'http://fr.wikipedia.org/wiki/{KEYWORD}',
-    'wp'    =>  'http://en.wikipedia.org/wiki/{KEYWORD}',
+    'wp:fr' =>  'http://fr.wikipedia.org/wiki/KEYWORD',
+    'wp'    =>  'http://en.wikipedia.org/wiki/KEYWORD',
 );
+
+// Activation of custom-URLs (if you use RewriteRules for example)
+
+function get_custom_url($type, $data = null)
+{
+    if ($type == 'image')
+    {
+        return BASE_URL . 'image/' . $data;
+    }
+    elseif ($type == 'album')
+    {
+        return BASE_URL . 'album/' . $data;
+    }
+    elseif ($type == 'embed' || $type == 'slideshow')
+    {
+        return BASE_URL . $type . '/' . $data;
+    }
+    elseif ($type == 'embed_tag')
+    {
+        return BASE_URL . 'tag/embed/' . $data;
+    }
+    elseif ($type == 'slideshow_tag')
+    {
+        return BASE_URL . 'tag/slideshow/' . $data;
+    }
+    elseif ($type == 'embed_img')
+    {
+        return BASE_URL . 'r/' . $data;
+    }
+    elseif ($type == 'tag')
+    {
+        return BASE_URL . 'tag/' . $data;
+    }
+    elseif ($type == 'date')
+    {
+        return BASE_URL . 'date/' . $data;
+    }
+    elseif ($type == 'tags' || $type == 'timeline' || $type == 'feed')
+    {
+        return BASE_URL . $type;
+    }
+}
 
 // Strings translation
 $french_strings = array(
