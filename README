@@ -32,12 +32,13 @@
             Fixed a bug which makes PHP crash with long texts (is_utf8 method)
             Slideshow and embed available for tags
         2.3 Migrate to PDO/SQLite3 as SQLite2 is deleted from PHP 5.4
+            New slideshow and embed code with HD/Zoom features
 
     REQUIREMENTS
     ------------
 
         * PHP >= 5.2.0
-        * SQLite native extension
+        * PDO::SQLite3 extension
         * (optional) PHP Imagick or PHP Imlib extension (it will make thumbnail generation faster)
         * GD (if Imagick and Imlib are not installed), used for thumbnail generation when there is no
           Exif thumbnail available
