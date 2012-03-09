@@ -2151,6 +2151,10 @@ else
                     return true;
             }
         };
+
+        window.onmouseover = function (e) {
+            window.focus();
+        };
     } ());
     </script>
     ';
