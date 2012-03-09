@@ -213,6 +213,11 @@ else
 
             var bar = document.getElementById("controlBar");
 
+            if (bar.className == "embed" && c != "prev" && c != "next")
+            {
+                return false;
+            }
+
             for (i in bar.children)
             {
                 if (bar.children[i].className == c)
