@@ -32,7 +32,7 @@ if (!function_exists('__'))
 {
     function __($str, $mode=false, $datas=false) {
         if ($mode == 'TIME')
-            return strftime($str, $time);
+            return strftime($str, $datas);
         elseif ($mode == 'REPLACE')
             return strtr($str, $datas);
         else
