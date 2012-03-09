@@ -89,7 +89,7 @@ echo '
     ul { list-style-type: none; }
     body.loading { cursor: wait; }
 
-    p.info { color: #fff; padding: 1em; }
+    p.info { padding: 1em; }
 
     #pic_comment {
         position: absolute; top: 0px; width: 75%; z-index: 100; margin: 0 12%;
@@ -97,40 +97,14 @@ echo '
         background: rgba(70, 70, 70, 0.75); width: 75%; margin: 0 12%; text-align: center; padding: 0.5em;
         border: 1px solid #666; border-radius: 0 0 2em 2em; }
 
-    .nozoom {
-        display: table;
-        width: 100%; height: 100%;
-        position: absolute; top: 0px; left: 0px; right: 0px; bottom: 0px;
-        text-align: center; vertical-align: middle;
-    }
+    .nozoom { display: table; width: 100%; height: 100%; position: absolute; top: 0px; left: 0px; right: 0px; bottom: 0px; text-align: center; vertical-align: middle; }
+    .nozoom #picture { position: relative; vertical-align: middle; display: table-cell; width: 100%; height: 100%;}
+    .zoom #picture, .hd #picture { background: no-repeat center center; width: 100%; height: 100%; position: absolute; top: 0px; left: 0px; right: 0px; bottom: 0px; }
+    .zoom #picture { background-size: contain; }
+    .zoom #picture img, .hd #picture img { display: none; }
 
-    .nozoom #picture {
-        position: relative;
-        vertical-align: middle;
-        display: table-cell;
-        width: 100%; height: 100%;
-    }
-
-    .zoom #picture, .hd #picture {
-        background: no-repeat center center;
-        width: 100%; height: 100%;
-        position: absolute; top: 0px; left: 0px; right: 0px; bottom: 0px;
-    }
-    .zoom #picture {
-        background-size: contain;
-    }
-    .zoom #picture img, .hd #picture img {
-        display: none;
-    }
-
-    #embed #picture img {
-        max-width: 100%;
-        max-height: 100%;
-    }
-
-    #embed #pic_comment {
-        width: 90%; margin: 0 5%; font-size: 1em; border-radius: 0 0 1em 1em;
-    }
+    #embed #picture img { max-width: 100%; max-height: 100%;}
+    #embed #pic_comment { width: 90%; margin: 0 5%; font-size: 1em; border-radius: 0 0 1em 1em; }
 
     ul { position: absolute; bottom: 0px; z-index: 100; width: 75%; margin: 0 12%; text-align: center;
         padding: 0.5em; border-radius: 2em 2em 0 0; font-size: 1.5em;
@@ -144,9 +118,7 @@ echo '
     li a:hover b { background: #666; border-color: #fff; }
     li.zoom a, li.hd a { font-size: 0.8em; }
 
-    ul.embed {
-        width: 90%; margin: 0 5%; font-size: 1em; border-radius: 1em 1em 0 0;
-    }
+    ul.embed { width: 90%; margin: 0 5%; font-size: 1em; border-radius: 1em 1em 0 0; }
     </style>
 </head>
 
@@ -231,7 +203,51 @@ else
 
     echo '
         <li class="back"><a href="'.escape($back_url).'"'.($mode == 'embed' ? ' onclick="return !window.open(this.href);"' : '').'>'.__('Back').'</a></li>
-    </ul>';
+    </ul>
+
+    <script type="text/javascript">
+    (function () {
+        function clickToolbar(e, c)
+        {
+            e.preventDefault();
+
+            var bar = document.getElementById("controlBar");
+
+            for (i in bar.children)
+            {
+                if (bar.children[i].className == c)
+                {
+                    window.location.href = bar.children[i].firstChild.href;
+                }
+            }
+
+            return true;
+        }
+
+        window.onkeypress = function(e) {
+            e = e || window.event;
+
+            switch (e.keyCode)
+            {
+                case 37:
+                    return clickToolbar(e, "prev");
+                case 39:
+                    return clickToolbar(e, "next");
+                case 8:
+                    return clickToolbar(e, "back");
+                case 72:
+                case 104:
+                    return clickToolbar(e, "hd");
+                case 90:
+                case 122:
+                    return clickToolbar(e, "zoom");
+                default:
+                    return true;
+            }
+        };
+    } ());
+    </script>
+    ';
 }
 
 echo '
