@@ -1210,21 +1210,21 @@ ul.pics li a:hover img { border-color: #999; border-radius: 1em; background: #ee
 ul.dirs li a { display: inline-block; width: 12em; border: .3em double #ccc; border-radius: 1em; padding: .5em; }
 ul.dirs li a:hover { background: #eee; border-color: #999; }
 
-dl.pic { width: 70%; float: left; text-align: center; }
+dl.pic { width: 65%; float: left; text-align: center; }
 dl.pic dd.orig { margin: .5em 0; }
-dl.metas, dl.details { float: right; width: 27%; border: .1em solid #ccc; background: #eee; padding: .5em; margin-bottom: 1em; border-radius: .5em; }
+dl.metas, dl.details { float: right; width: 30%; border: .1em solid #ccc; background: #eee; padding: .5em; margin-bottom: 1em; border-radius: .5em; }
 dl.metas dt, dl.details dt { font-weight: bold; }
 input { font-size: .7em; padding: 2pt; width: 97%; border: .1em solid #ccc; border-radius: .5em; background: #eee; color: #666; }
 dl.metas dd { margin: 0.2em 0 1em; }
 dl.details { font-size: 0.9em; }
 dl.details dt, dl.details dd { float: left; }
 dl.details dt { clear: left; margin-right: .5em; }
-ul.goPrevNext { float: right; width: 30%; clear: right; text-align: right; }
+ul.goPrevNext { float: right; width: 32%; clear: right; text-align: right; }
 ul.goPrevNext li { display: table-cell; width: 50%; text-align: center; }
 ul.goPrevNext img { display: none; }
 ul.goPrevNext li a { width: 160px; height: 160px; display: inline-block; position: relative; overflow: hidden; text-align: center; background-position: center center; background-repeat: no-repeat; margin: .5em; }
-ul.goPrevNext li a span { position: absolute; width: 100%; height: 100%; font-size: 70pt; color: #fff; text-shadow: 0px 0px 5px #000;  }
-ul.goPrevNext li a:hover span { color: #000; opacity: 0.7; }
+ul.goPrevNext li a span { position: absolute; width: 100%; height: 100%; font-size: 70pt; color: #fff; text-shadow: 0px 0px 5px #000; line-height: 160px; }
+ul.goPrevNext li a:hover span { opacity: 0.7; font-size: 140pt; color: #000; text-shadow: 0px 0px 1px #fff; }
 
 p.tags, p.related_tags { margin: 1em; }
 p.tags small, p.related_tags small { margin-right: 1em; color: #999; }
