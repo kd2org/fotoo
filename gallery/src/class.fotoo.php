@@ -433,9 +433,9 @@ class fotooManager
             'width'     =>  (int)$width,
             'height'    =>  (int)$height,
             'size'      =>  (int)$file_size,
-            'date_y'    =>  date('Y', $date),
-            'date_m'    =>  date('m', $date),
-            'date_d'    =>  date('d', $date),
+            'year'      =>  date('Y', $date),
+            'month'     =>  date('m', $date),
+            'day'       =>  date('d', $date),
             'time'      =>  (int) $date,
             'comment'   =>  $comment,
             'details'   =>  $details,
@@ -444,7 +444,7 @@ class fotooManager
 
         $query = $this->db->prepare('INSERT INTO photos
             (id, filename, path, width, height, size, year, month, day, time, comment, details, hash)
-            VALUES (NULL, :filename, :path, :width, :height, :size, :date_y, :date_m, :date_d,
+            VALUES (NULL, :filename, :path, :width, :height, :size, :year, :month, :day,
             :time, :comment, :details, :hash);');
         $query->execute($pic);
 

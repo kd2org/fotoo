@@ -32,8 +32,8 @@ $french_strings = array(
         =>  'Mots-cl&eacute;s',
     "Other tags related to '%TAG':"
         =>  "Autres mots-cl&eacute;s en rapport avec '%TAG' :",
-    'Download image at original size (%W x %H) - %SIZE KB'
-        =>  "T&eacute;l&eacute;charger l'image au format original (%W x %H) - %SIZE Ko",
+    'Download image at full size (%W x %H) - %SIZE KB'
+        =>  "T&eacute;l&eacute;charger l'image en grand format (%W x %H) - %SIZE Ko",
     'Comment:'
         =>  'Commentaire :',
     'Tags:'

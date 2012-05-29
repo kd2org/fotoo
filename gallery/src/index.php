@@ -148,64 +148,56 @@ if (isset($_GET['style_css']))
 {
     header('Content-Type: text/css');
 
-    $img_home = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAgVBMVEX%2F%2F%2F%2F%2B%2Ffr%2F%2F%2F%2Fx5svn06W%2FrYL06tPw48T69%2B769er17drv4sH%2B%2Fv39%2Bvb48uT2793s27SzoXn38ODq163r163q2Kzp2Kzz6dLz6M%2Fv4sP38eHu4L748eLz6dHt3Lfs3Ljw4sPu4L3s3Lfy6M%2Ft3bhmXEXMuIv%2FgICdjmvMAAD8%2BfNB06UXAAAAAXRSTlMAQObYZgAAAAFiS0dEAIgFHUgAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQfUDB4RJBdfkpQSAAAAfElEQVR42o3MyRKCQAxF0WaeZwFRAQdId%2Fj%2FDzQNVEpc8Xb3VCVCbJNSHCYR5V8fhNq2f4S6qS41C3X%2BHqch34X6HnWe94xemyCCdW1dt%2F9YgLjeQJiVj1uZhbA%2FhTRQtCBl8Bc1z2rxGRJDg5EwxKYGM2ZwCv2jcECc2ReExg8II8b%2F0AAAAABJRU5ErkJggg%3D%3D';
-    $img_tag = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8%2F9hAAAABmJLR0QA%2FwD%2FAP%2BgvaeTAAAAE3RFWHRBdXRob3IATWF1cmljZSBTdmF52MWWvwAAAaNJREFUeNrEU7FOAkEQnb2QGBIRKS38E402BgtCIXaCDedhDJY0WmlLSYgNiSIhWPER%2FIM%2FoAbt5E4SE%2FZ2x5nZQ6%2BncJLh3ezNvHszOyhEhFXMgxUt83HRBCAVlpUYg%2FJsDdAPWGMACZHRWHdOiITWxJKT4Ra27rowDc4xF%2FiSQG9BxTETiitGipnIYyTns9f7PmQUILw3qPisDmYWUkEsyRAziQallzG7Bksxn3uFAoklQiTt6%2FU6xGEkkph5s1QSVNbJhaWblBMR1dIQuWeWRMnf47H0zJavHJHUVEEiW9mkNb2gUsp98wMMJxOcBg3keSSIs9EIZ4NHXFrU7WLa5p0OPu%2FtIykgmSQnWy7LLLLFA3c%2F9PV8tQZRr%2Bdi45R9tdsuXjgFPAM3IOoxe1ikARnXQvVEcMP3BXOXTYetVooA%2BRqtioZDzB9Xkp4tRIOBuyqt3XWyyzPvg4bc1bXErN7jyW%2F3H9Tn6EkOFE%2BbmHmojH8O8sW1nV2Y395I26xevdROfzeON9Gmtk420LoYZPuYlGOU%2FrlG%2FfufaWWCHwEGAEtagFSXeJBuAAAAAElFTkSuQmCC';
-    $img_date = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAflBMVEX%2F%2F%2F%2Bbm5vuExPuJSXuUlPuWlnuLi7uSkruQULuNzjuHBzDwsPJysnuDAyZmpqampq3t7eamZqqq6u%2Fvr%2B6urrGxsa%2Bv76fn5%2Bnp6ecnJy9vL2%2Bvr6cm5uam5q5urmzs7Ovr6%2FHxsebnJyjo6PKycruX1%2FMzMyZmZn%2F%2F%2F%2FuAAALeyOvAAAAAXRSTlMAQObYZgAAAAFiS0dEAIgFHUgAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQfUDB4RJToDVvkmAAAAZElEQVR42oWNRw6AMBADQ%2B%2B99x6S%2F38QFhBEAQn7Nh7JCL2zLIqs6YYqmSKlHHDopxGTJyuAiOC969EAgMUYHoDkWqECgJkxagCYN2zGGAEM945Pg31pAKRV2fpdH%2BZTVrjoPxuqaxRtezAMLwAAAABJRU5ErkJggg%3D%3D';
-    $img_dir = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAABa1BMVEX%2F%2F%2F%2F%2F92v%2F8GPp1CPklwrjjgX%2F9Wn%2F5FX%2F7F7%2F%2FXH%2F%2Bm7%2F%2FnL%2F6lz%2F6Fr%2F82bj1oXlpRDjkAfmpxDkmQrnuRj110jnuxniigP%2F82f1zz71zT3%2F51nozCD%2F%2B2%2Fkkgf16l7jiQPmsxbmshXp1STlqBD14lXmsRTlqxLjigTp0yP%2F72LihgL120zp0iP%2F30%2FpzyLnxR3%2F%2B3D1zDv%2F8mX%2F%2FXLo0SL%2F2UnoxR717mL11Ub%2F92z%2F7mHp0CLntxf%2F%2BW3loA7%2F4FHnvhr%2F%2BG3%2F51jjkQb%2F5FbmrhP%2F4VHihQH%2F41PozSH%2F4FDknw3knAzlow7mrBP182f%2F%2BW7nwRviiAP%2F617jlAj%2F7WD%2F%2F3P10EHlnAvoyh%2F%2F8WTkmwvkoQ7131HoyB7%2F3Ev%2F9Gf%2F7V%2F%2F4lPo0CHbxj%2FklQj10kP151r%2F5Vf%2F%2B3HnvRr%2F%2FnP%2F3U7owBvowxzmthf18WXpzSH%2F41X%2F6Fn%2F3E319Wr%2F%2F3Tp1CTmqPETAAAAAXRSTlMAQObYZgAAAAFiS0dEAIgFHUgAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQfUDB4RJC2Znk2gAAAAtElEQVR42mNgIAJUVGjaFCHxmSvKysqizPPECtTUBexBAkB%2BQKGFfIZqnI5oJAODMrNuikx8vqOIopuKn6Uw0ITy8nBOLkY%2BJo4Sdp%2F0NLAAt6ETW3QYT2ZyTIQLA4NpeQ5nICOfVoh0sTeLJCsDg365iaxVIlMSr6t7bqiUBgODF3eWHZuxNY%2Bzp16CoFEwAwO%2FARejBBMHL7tDqVmqggfQHUHZtkr%2BQrG%2BLHKs4tr8DGQAAGf6I1yfqMWaAAAAAElFTkSuQmCC';
-    $img_forward = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAulBMVEX%2F%2F%2F9ylekzTY42VZt3muyIp%2FSIp%2FV0mOuRr%2Fp3me10l%2Bo0TpA0UJR9n%2B%2BNrPczTpA4W6Q0UJOVsvw0UJUvQX4vQn04W6V5nO41UpcwQn6KqfZxlumPrvlxlemFpvM1U5g2VJkvQXw5XacySYkySog1UpYxSIY4XqiCovIyTI02V54xRoSHp%2FUwRYE2VZowRYIuQXwxSIcySIgvQn6AoPCTsfs4XKc2VJo3WKA3WqMzTY81VJmCo%2FKFpfPmpKZIAAAAAXRSTlMAQObYZgAAAAFiS0dEAIgFHUgAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQfUDB4RITX3hSGzAAAAgklEQVR42mNgIAKom4FIZnm4gJKQJZC0ZhWECYiZcmgxMKja2mhCBQQ4ZPjMGXhsTHgNoSIWfFKswgxMvOIs%2BlARPR05GyYGIxYuRgMwn5nNFshX4WSXVYTzrRiUObmkRSEaFGw1uBkY1NgZRaAmSNgA%2BQzajMYwd%2FDwg0hdSQZyAQCimAm2dQJutQAAAABJRU5ErkJggg%3D%3D';
-    $img_info = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAABGlBMVEX%2F%2F%2F90tf93t%2F%2FL4%2F%2FI4v81lf9Aqvw8p%2FxAmv9csv8%2Bmf9gtv%2BOw%2F9Drfw7mf9uwf9qvf5Io%2F%2BBz%2F5gtf9PqP82o%2Fwzofx0xf5TrP9Gr%2FxBnv9asf5Mpv89mf80lP84pPyD0f5Ervw1lP89ov1Kpf5luf5Ko%2F99zP5Tqv9vwv5qvf9Qsf1BrPxQqf9Yr%2F6E0f5zxP5KpP9TrP5JpP5Bq%2Fx3yP5Urf5mu%2F5Wrv57y%2F43lv9UrP9buv1Psv06pvyB0P5Wtf00ofyAzv4%2BqfxXr%2F5Krf13x%2F9SrP50xP5uwf6Az%2F57yv49m%2F9YuP1tv%2F40k%2F9Yr%2F9Pqf9htf9zxf55yP5nu%2F9fvf13x%2F5luv5Bpf2Nw%2F8zk%2F%2F%2F%2F%2F9%2Bzf4NgFg2AAAAAXRSTlMAQObYZgAAAAFiS0dEAIgFHUgAAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQfUDB4RJAzV913%2BAAAAx0lEQVR42o2P1RaCUBBFAQEFCwU7ELu7u7tbGP7%2FN7zWu%2Fvt7DWz1jkYhtAQOkXRERrsi4HyOIbqtkoZPlleVwJXl7TJ10zy%2B54656wugLSZ44OvL8ITsKoSAJ2M6EsEEqyjp7aNZTp11zMzFgllqa6MAKA9Mnun8hKxxq1PA3SZcTGzQ8KXmJ7MIwAx2xKiPiTw%2BnzR0QLYHoLXjSNBUhcOZQC71%2BIn38VM%2FES0DewhS1P%2BVg2G485Dwe2Xf2NIHI1jcRL7iycAMB5ogC93MwAAAABJRU5ErkJggg%3D%3D';
-
     if (isset($_GET['style_css']))
     {
         echo <<<EOF_STYLE_CSS
-* { margin: 0; padding: 0; }
-ul { list-style-type: none; }
-body { font-family: Sans-serif; background: #fff; color: #000; padding: 1em; }
-h1 { font-size: 2em; }
-hr { visibility: hidden; clear: both; }
+h1, h2, h3, h4, h5, h6, ul, ol, body, div, hr, li, dl, dt, dd, p { margin: 0; padding: 0; }
+ul, ol { list-style-type: none; }
 a img { border: none; }
 
-#header { border: 1px solid #ccc; background: #eef; padding: 0.2em; height: 1.4em; margin-bottom: 0.5em; }
-#header h4, #header h5 { font-weight: normal; }
-#header h5 { float: right; font-size: 1em; }
-#header h5 a { padding-left: 2em; background: no-repeat 0.2em 0; }
-#header h5 a.home { background-image: url({$img_home}); }
-#header h5 a.date { background-image: url({$img_date}); }
-#header h5 a.tags { background-image: url({$img_tag}); }
-#header h4 a { padding-left: 2em; background: no-repeat 0.2em 0 url({$img_forward}); }
-#header h4 small a { background-image: url({$img_dir}); color: #999; margin-left: 2em; }
+body { font-family: "Trebuchet MS", Sans-serif; background: #fff; color: #000; padding: 1em; }
 
-ul.pics { clear: left; }
-ul.pics li { float: left; margin: 0.5%; width: 19%; height: 160px; text-align: center; }
-ul.pics li a img { border: 1px solid white; }
-ul.pics li a:hover img { outline: 3px solid black; }
-ul.dirs li { float: left; width: 18%; margin: 0.5em; }
-ul.dirs li a { display: block; border: 2px solid #cc6; padding: 0.5em 0.5em 0.5em 2em; background: no-repeat 0.5em 0.5em url({$img_dir}); }
-ul.dirs li a:hover { background-color: #ffc; }
+h1 { font-size: 2em; text-align: center; margin-bottom: .2em; }
 
-dl.pic { width: 60%; float: left; text-align: center; }
-dl.pic dd.orig { margin: 0.5em 0; }
-dl.metas, dl.details { float: right; width: 35%; border: 1px solid #ccc; background: #efe; padding: 0.5em; margin-bottom: 1em; }
-dl.metas dt { font-weight: bold; padding-left: 1.7em; background: no-repeat 0.1em 0.1em; }
-dl.metas dt.tags { background-image: url({$img_tag}); }
-dl.metas dt.date { background-image: url({$img_date}); }
-dl.metas dt.comment { background-image: url({$img_info}); }
-dl.metas dt.embed { background-image: url({$img_forward}); }
-dl.metas dd.embed input { padding: 0.2em; width: 97%; }
+#header { border-radius: .5em; border: .1em solid #ccc; background: #eee; padding: .5em; margin-bottom: .5em; height: 1.3em; }
+#header .breadcrumbs li:before { content: " > "; }
+#header .menu { float: right; }
+#header ul li { display: inline; }
+#header .menu li:before { content: "| "; }
+#header .menu li:first-child:before { content: ""; }
+
+ul.actions { text-align: right; }
+ul.actions li { display: inline-block; }
+ul.actions li a { border: .1em solid #ccf; border-radius: .5em; padding: .2em .5em; background: #eef; }
+
+ul.pics, ul.dirs { text-align: left; display: inline-block; }
+ul.pics li, ul.dirs li { text-align: center; display: inline-block; margin: 0.5em; vertical-align: middle; }
+ul.pics li a { display: inline-block; max-width: 170px; max-height: 170px; overflow: hidden; }
+ul.pics li a img { padding: .1em; border: .1em solid transparent; overflow: hidden; }
+ul.pics li a:hover img { border-color: #999; border-radius: 1em; background: #eee; }
+ul.dirs li a { display: inline-block; width: 12em; border: .3em double #ccc; border-radius: 1em; padding: .5em; }
+ul.dirs li a:hover { background: #eee; border-color: #999; }
+
+dl.pic { width: 70%; float: left; text-align: center; }
+dl.pic dd.orig { margin: .5em 0; }
+dl.metas, dl.details { float: right; width: 27%; border: .1em solid #ccc; background: #eee; padding: .5em; margin-bottom: 1em; border-radius: .5em; }
+dl.metas dt, dl.details dt { font-weight: bold; }
+input { font-size: .7em; padding: 2pt; width: 97%; border: .1em solid #ccc; border-radius: .5em; background: #eee; color: #666; }
 dl.metas dd { margin: 0.2em 0 1em; }
 dl.details { font-size: 0.9em; }
-dl.details dt { width: 40%; float: left; text-align: right; margin-right: 0.5em; clear: left;}
-dl.details dd { width: 55%; float: left; }
-ul.goPrevNext { float: right; width: 35%; clear: right; }
-ul.goPrevNext li { float: left; position: relative; width: 50%; text-align: center; min-height: 1px; }
-ul.goPrevNext li a { display: block; width: 100%; color: #000; text-decoration: none; opacity: 0.50; overflow: hidden; }
-ul.goPrevNext li span { display: block; width: 100%; font-size: 50px; line-height: 40px; }
-ul.goPrevNext li a:hover { opacity: 1.0; }
+dl.details dt, dl.details dd { float: left; }
+dl.details dt { clear: left; margin-right: .5em; }
+ul.goPrevNext { float: right; width: 30%; clear: right; text-align: right; }
+ul.goPrevNext li { display: table-cell; width: 50%; text-align: center; }
+ul.goPrevNext img { display: none; }
+ul.goPrevNext li a { width: 160px; height: 160px; display: inline-block; position: relative; overflow: hidden; text-align: center; background-position: center center; background-repeat: no-repeat; margin: .5em; }
+ul.goPrevNext li a span { position: absolute; width: 100%; height: 100%; font-size: 70pt; color: #fff; text-shadow: 0px 0px 5px #000;  }
+ul.goPrevNext li a:hover span { color: #000; opacity: 0.7; }
 
 p.tags, p.related_tags { margin: 1em; }
-p.tags small, p.related_tags small { margin-right: 1em; }
+p.tags small, p.related_tags small { margin-right: 1em; color: #999; }
 
-div.desc, p.info { border-bottom: 2px solid #99f; border-top: 2px solid #99f; padding: 0.5em; padding-left: 2em; margin: 1em 0; background: no-repeat 0.2em 0.5em url({$img_info}); }
+div.desc, p.info { border-bottom: 2px solid #99f; border-top: 2px solid #99f; padding: 0.5em; margin: 1em 0;  }
 p.info { border: 2px solid #cc6; background-color: #ffc; clear: both; }
 
 ul.dates li.year { clear: left; }
@@ -214,9 +206,9 @@ ul.dates ul { margin-left: 2em; }
 ul.dates h3, ul.dates h2 { display: inline; }
 ul.dates p.more { display: inline; margin-left: 2em; }
 
-a:link { color: darkblue; }
-a:visited { color: black; }
-a:hover { color: darkred; }
+a:link { color: #009; }
+a:visited { color: #006; }
+a:hover { color: #900; }
 EOF_STYLE_CSS;
     }
     exit;
@@ -502,9 +494,11 @@ else
 
 $f->html_tags['tag'] = get_url('tag', 'KEYWORD');
 $f->html_tags['date'] = get_url('date', 'KEYWORD');
-$menu = '<h5><a class="home" href="'.SELF_URL.'">'.__('My Pictures').'</a>
-    <a class="tags" href="'.get_url('tags').'">'.__('By tags').'</a>
-    <a class="date" href="'.get_url('timeline').'">'.__('By date').'</a></h5>';
+$menu = '<ul class="menu">
+    <li><a class="home" href="'.SELF_URL.'">'.__('My Pictures').'</a></li>
+    <li><a class="tags" href="'.get_url('tags').'">'.__('By tags').'</a></li>
+    <li><a class="date" href="'.get_url('timeline').'">'.__('By date').'</a></li>
+</ul>';
 
 header('Content-Type: text/html; charset=UTF-8');
 
@@ -534,17 +528,18 @@ if ($mode == 'date')
     echo '<h1>'.escape($title).'</h1>';
     echo '<div id="header">
         '.$menu.'
-        <h4><strong><a href="'.get_url('timeline').'">'.__('By date').'</a></strong> ';
+        <ul class="breadcrumbs">
+            <li><strong><a href="'.get_url('timeline').'">'.__('By date').'</a></strong></li>';
 
     if ($year)
-        echo '<a href="'.escape(get_url('date', $year)).'">'.$year.'</a> ';
+        echo '<li><a href="'.escape(get_url('date', $year)).'">'.$year.'</a></li>';
     if ($month)
-        echo '<a href="'.escape(get_url('date', $year.'/'.zero_pad($month))).'">'.__('%B', 'TIME', strtotime($year.'-'.$month.'-01')).'</a> ';
+        echo '<li><a href="'.escape(get_url('date', $year.'/'.zero_pad($month))).'">'.__('%B', 'TIME', strtotime($year.'-'.$month.'-01')).'</a></li>';
     if ($day)
-        echo '<a href="'.escape(get_url('date', $year.'/'.zero_pad($month).'/'.zero_pad($day))).'">'.__('%A %d', 'TIME', strtotime($year.'-'.$month.'-'.$day)).'</a> ';
+        echo '<li><a href="'.escape(get_url('date', $year.'/'.zero_pad($month).'/'.zero_pad($day))).'">'.__('%A %d', 'TIME', strtotime($year.'-'.$month.'-'.$day)).'</a></li>';
 
     echo '
-        </h4>
+        </ul>
     </div>';
 
     $pics = $f->getByDate($year, $month, $day);
@@ -664,15 +659,14 @@ elseif ($mode == 'tag')
     echo '<h1>'.$title.'</h1>';
     echo '<div id="header">
         '.$menu.'
-        <h4><strong><a href="'.escape(get_url('tags')).'">'.__('Tags').'</a></strong>
-            <a href="'.escape(get_url('tag', $tag)).'">'.escape($tag_name).'</a>';
+        <ul class="breadcrumbs">
+            <li><strong><a href="'.escape(get_url('tags')).'">'.__('Tags').'</a></strong></li>
+            <li><a href="'.escape(get_url('tag', $tag)).'">'.escape($tag_name).'</a></li>
+        </ul>
+    </div>';
 
     if (!empty($pics))
-        echo '<small><a class="slideshow" href="'.escape(get_url('slideshow_tag', $tag)).'">'.__('Slideshow').'</a></small>';
-
-    echo '
-        </h4>
-    </div>';
+        echo '<ul class="actions"><li class="slideshow"><a class="slideshow" href="'.escape(get_url('slideshow_tag', $tag)).'">'.__('Slideshow').'</a></li></ul>';
 
     $tags = $f->getNearTags($tag);
 
@@ -715,7 +709,7 @@ elseif ($mode == 'tag')
         if (ALLOW_EMBED)
         {
             echo '
-            <dl class="details">
+            <dl class="metas">
                 <dt class="embed">'.__('Embed:').'</dt>
                 <dd class="embed"><input type="text" onclick="this.select();" value="'.escape(embed_html($tag)).'" /></dd>
             </dl>';
@@ -737,7 +731,8 @@ elseif ($mode == 'pic')
     echo '
     <h1>'.$title.'</h1>
     <div id="header">'.$menu.'
-        <h4><strong><a href="'.SELF_URL.'">'.__('My Pictures')."</a></strong>\n";
+        <ul class="breadcrumbs">
+            <li><strong><a href="'.SELF_URL.'">'.__('My Pictures')."</a></strong></li>\n";
 
     if (!empty($selected_dir))
     {
@@ -749,11 +744,11 @@ elseif ($mode == 'pic')
             if ($current) $current .= '/';
             $current .= $d;
 
-            echo '  <a href="'.escape(get_url('album', $current)).'">'.escape(strtr($d, '_-', '  '))."</a>\n";
+            echo '<li><a href="'.escape(get_url('album', $current)).'">'.escape(strtr($d, '_-', '  '))."</a></li>\n";
         }
     }
 
-    echo "</h4>\n</div>\n";
+    echo "</ul>\n</div>\n";
 
     $orig_url = get_url('real_image', $pic);
     $wh = '';
@@ -785,7 +780,7 @@ elseif ($mode == 'pic')
         echo '
         </dt>
         <dd class="orig">
-            <a href="'.escape($orig_url).'">'.__('Download image at original size (%W x %H) - %SIZE KB', 'REPLACE',
+            <a href="'.escape($orig_url).'">'.__('Download image at full size (%W x %H) - %SIZE KB', 'REPLACE',
             array('%W' => $pic['width'], '%H' => $pic['height'], '%SIZE' => round($pic['size'] / 1000))).'</a>
         </dd>
     </dl>
@@ -860,12 +855,12 @@ elseif ($mode == 'pic')
     <ul class="goPrevNext">
         <li class="goPrev">' .
         ($prev ?
-            '<a href="' . escape(get_url('image', $prev)) . '" title="' . __('Previous') . '"><span>&larr;</span><img src="' .
+            '<a href="' . escape(get_url('image', $prev)) . '" title="' . __('Previous') . '" style="background-image: url(' . escape(get_url('cache_thumb', $prev)) . ')"><span>&larr;</span><img src="' .
             escape(get_url('cache_thumb', $prev)) . '" alt="' . __('Previous') . '" /></a>' : '') .
         '</li>
         <li class="goNext">' .
         ($next ?
-            '<a href="' . escape(get_url('image', $next)) . '" title="' . __('Next') . '"><span>&rarr;</span><img src="' .
+            '<a href="' . escape(get_url('image', $next)) . '" title="' . __('Next') . '" style="background-image: url(' . escape(get_url('cache_thumb', $next)) . ')"><span>&rarr;</span><img src="' .
             escape(get_url('cache_thumb', $next)) . '" alt="' . __('Next') . '" /></a>' : '') .
         '</li>
     </ul>';
@@ -883,7 +878,7 @@ else
         <h1>'.escape($title).'</h1>
         <div id="header">
             '.$menu.'
-            <h4><strong><a href="'.SELF_URL.'">'.__('My Pictures').'</a></strong>';
+            <ul class="breadcrumbs"><li><strong><a href="'.SELF_URL.'">'.__('My Pictures').'</a></strong></li>';
 
     if (!empty($selected_dir))
     {
@@ -895,15 +890,15 @@ else
             if ($current) $current .= '/';
             $current .= $d;
 
-            echo '  <a href="'.escape(get_url('album', $current)).'">'.escape(strtr($d, '_-', '  '))."</a>\n";
+            echo '<li><a href="'.escape(get_url('album', $current)).'">'.escape(strtr($d, '_-', '  '))."</a></li>\n";
         }
     }
 
-    if (!empty($list[1]))
-        echo '<small><a class="slideshow" href="'.escape(get_url('slideshow', $selected_dir)).'">'.__('Slideshow').'</a></small>';
-
-    echo '</h4>
+    echo '</ul>
     </div>';
+
+    if (!empty($list[1]))
+        echo '<ul class="actions"><li class="slideshow"><a href="'.escape(get_url('slideshow', $selected_dir)).'">'.__('Slideshow').'</a></li></ul>';
 
     if ($list === false)
         echo '<p class="info">'.__('No picture found.').'</p>';
