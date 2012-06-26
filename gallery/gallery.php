@@ -1223,7 +1223,7 @@ ul.goPrevNext { float: right; width: 32%; clear: right; text-align: right; }
 ul.goPrevNext li { display: table-cell; width: 50%; text-align: center; }
 ul.goPrevNext img { display: none; }
 ul.goPrevNext li a { width: 160px; height: 160px; display: inline-block; position: relative; overflow: hidden; text-align: center; background-position: center center; background-repeat: no-repeat; margin: .5em; }
-ul.goPrevNext li a span { position: absolute; width: 100%; height: 100%; font-size: 70pt; color: #fff; text-shadow: 0px 0px 5px #000; line-height: 160px; }
+ul.goPrevNext li a span { position: absolute; left: 0; top: 0; width: 100%; height: 100%; font-size: 70pt; color: #fff; text-shadow: 0px 0px 5px #000; line-height: 160px; }
 ul.goPrevNext li a:hover span { opacity: 0.7; font-size: 140pt; color: #000; text-shadow: 0px 0px 1px #fff; }
 
 p.tags, p.related_tags { margin: 1em; }
