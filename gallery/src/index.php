@@ -170,7 +170,7 @@ ul.actions { text-align: right; }
 ul.actions li { display: inline-block; }
 ul.actions li a { border: .1em solid #ccf; border-radius: .5em; padding: .2em .5em; background: #eef; }
 
-ul.pics, ul.dirs { text-align: left; display: inline-block; }
+ul.pics, ul.dirs { text-align: center; display: inline-block; }
 ul.pics li, ul.dirs li { text-align: center; display: inline-block; margin: 0.5em; vertical-align: middle; }
 ul.pics li a { display: inline-block; max-width: 170px; max-height: 170px; overflow: hidden; }
 ul.pics li a img { padding: .1em; border: .1em solid transparent; overflow: hidden; }
