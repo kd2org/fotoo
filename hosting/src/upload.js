@@ -1,6 +1,7 @@
 (function () {
     var can_submit = true;
     var last_filename = '';
+    var loading_gif = 'data:image/gif;base64,R0lGODlhEAAQAPIAAP%2F%2F%2FwAAAMLCwkJCQgAAAGJiYoKCgpKSkiH%2BGkNyZWF0ZWQgd2l0aCBhamF4bG9hZC5pbmZvACH5BAAKAAAAIf8LTkVUU0NBUEUyLjADAQAAACwAAAAAEAAQAAADMwi63P4wyklrE2MIOggZnAdOmGYJRbExwroUmcG2LmDEwnHQLVsYOd2mBzkYDAdKa%2BdIAAAh%2BQQACgABACwAAAAAEAAQAAADNAi63P5OjCEgG4QMu7DmikRxQlFUYDEZIGBMRVsaqHwctXXf7WEYB4Ag1xjihkMZsiUkKhIAIfkEAAoAAgAsAAAAABAAEAAAAzYIujIjK8pByJDMlFYvBoVjHA70GU7xSUJhmKtwHPAKzLO9HMaoKwJZ7Rf8AYPDDzKpZBqfvwQAIfkEAAoAAwAsAAAAABAAEAAAAzMIumIlK8oyhpHsnFZfhYumCYUhDAQxRIdhHBGqRoKw0R8DYlJd8z0fMDgsGo%2FIpHI5TAAAIfkEAAoABAAsAAAAABAAEAAAAzIIunInK0rnZBTwGPNMgQwmdsNgXGJUlIWEuR5oWUIpz8pAEAMe6TwfwyYsGo%2FIpFKSAAAh%2BQQACgAFACwAAAAAEAAQAAADMwi6IMKQORfjdOe82p4wGccc4CEuQradylesojEMBgsUc2G7sDX3lQGBMLAJibufbSlKAAAh%2BQQACgAGACwAAAAAEAAQAAADMgi63P7wCRHZnFVdmgHu2nFwlWCI3WGc3TSWhUFGxTAUkGCbtgENBMJAEJsxgMLWzpEAACH5BAAKAAcALAAAAAAQABAAAAMyCLrc%2FjDKSatlQtScKdceCAjDII7HcQ4EMTCpyrCuUBjCYRgHVtqlAiB1YhiCnlsRkAAAOwAAAAAAAAAAAA%3D%3D';
 
     function checkBeforeSubmit()
     {
@@ -17,20 +18,17 @@
 
         var file = document.getElementById("f_file");
 
-        var thumb = document.getElementById("resizedThumb").firstChild;
-
-        if (thumb && thumb.src)
-        {
-            var thumb_field = document.createElement('input');
-            thumb_field.type = 'hidden';
-            thumb_field.name = file.name + '[thumb]';
-            thumb_field.value = thumb.src.substr(thumb.src.indexOf(',') + 1);
-            file.parentNode.appendChild(thumb_field);
-        }
+        var name = document.createElement('input');
+        name.type = 'hidden';
+        name.name = file.name + '[name]';
+        name.value = file.value.replace(/^.*[\/\\]([^\/\\]*)$/, '$1');
+        file.parentNode.appendChild(name);
 
         file.type = "hidden";
         file.name = file.name + "[content]";
         file.value = img.src.substr(img.src.indexOf(',') + 1);
+
+        document.getElementById("resizedThumb").innerHTML += "<br />Uploading in progress, please wait... <img class=\"loading\" src=\"" + loading_gif + "\" alt=\"\" />";
 
         return true;
     }
@@ -65,7 +63,7 @@
 
         var div_thumb = document.createElement('div');
         div_thumb.id = "resizedThumb";
-        div_thumb.innerHTML = "Select a file...";
+        div_thumb.innerHTML = 'Please select a picture...';
 
         var div_img = document.createElement('div');
         div_img.id = "resizedImg";
@@ -92,6 +90,7 @@
         {
             var img = ($img.lastChild || $img.appendChild(new Image));
             img.src = data;
+            img.className = "preview";
 
             if ($thumb && $thumb_size)
             {
@@ -137,7 +136,7 @@
 
             if (($file.files || []).length && /^image\/jpeg/.test((file = $file.files[0]).type))
             {
-                if ($thumb) $thumb.innerHTML = "Traitement en cours... <img src=\"pics/loading.gif\" alt=\"\" />";
+                if ($thumb) $thumb.innerHTML = "Resizing... <img class=\"loading\" src=\"" + loading_gif + "\" alt=\"\" />";
                 can_submit = false;
 
                 file = new FileReader;
@@ -149,11 +148,11 @@
             }
             else if (file && /^image\//.test(file.type))
             {
-                if ($thumb) $thumb.innerHTML = "Image reconnue, cliquer sur Envoyer pour l'ajouter.";
+                if ($thumb) $thumb.innerHTML = "Image is recognized, please hit Upload to send.";
             }
             else if (file)
             {
-                $thumb.innerHTML = '<p class="warning">Le fichier choisi n\'est pas une image.</p>';
+                $thumb.innerHTML = '<p class="warning">The chosen file is not an image.</p>';
             }
         }, false);
     }
