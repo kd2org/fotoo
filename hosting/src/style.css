@@ -73,6 +73,10 @@ body > header h1 a {
 	font-style: italic;
 }
 
+body > header h2 {
+	color: darkred;
+}
+
 body > footer {
 	font-size: .9em;
 	color: #666;
@@ -112,7 +116,7 @@ label:hover {
 	border-bottom: 1px dashed #fff;
 }
 
-input[type=text], input[type=file] {
+input[type=text], input[type=file], input[type=password] {
 	padding: .3em;
 	width: 95%;
 }
@@ -125,7 +129,7 @@ fieldset dl dd {
 	margin: .5em;
 }
 
-.upload fieldset {
+fieldset {
 	width: 50%;
 	margin: 0 auto;
 }
@@ -153,20 +157,32 @@ fieldset dl dd {
 	max-width: 50em;
 }
 
-.browse figure {
+figure {
 	display: inline-block;
 	margin: 1em;
 	vertical-align: middle;
+	position: relative;
+	min-width: 150px;
 }
 
-.browse figure figcaption {
+figure figcaption {
 	font-size: small;
 	margin-top: .5em;
 }
 
 figure a:hover img {
-	box-shadow: 2px 2px 5px #000;
+	box-shadow: 0px 0px 10px #000;
 	background: #fff;
+}
+
+figure .private {
+	background: rgb(150, 0, 0);
+	background: rgba(150, 0, 0, 0.75);
+	color: #fff;
+	position: absolute;
+	padding: .5em 1em;
+	font-weight: bold;
+	top: 1em;
 }
 
 .pagination .selected {
@@ -174,7 +190,8 @@ figure a:hover img {
 	font-size: 125%;
 }
 
-#resizedThumb {
+#resizedThumb, p.admin {
+	background: rgb(100, 100, 100);
 	background: rgba(0, 0, 0, 0.25);
 	padding: 1em;
 	width: 400px;
@@ -192,4 +209,17 @@ figure a:hover img {
 
 #resizedThumb img {
 	box-shadow: 0px 0px 10px #000;
+}
+
+article h2 {
+	margin-bottom: .5em;
+}
+
+p.error {
+	color: red;
+	margin: .8em;
+}
+
+p.admin a {
+	color: darkred;
 }

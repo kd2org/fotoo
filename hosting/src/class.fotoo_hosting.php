@@ -7,8 +7,6 @@ class Fotoo_Hosting
 	private $db = null;
 	private $config = null;
 
-	public $admin = false;
-
 	public function __construct(&$config)
 	{
 		$init = file_exists($config->db_file) ? false : true;
@@ -346,7 +344,7 @@ class Fotoo_Hosting
 	public function getList($page)
 	{
 		$begin = ($page - 1) * $this->config->nb_pictures_by_page;
-		$where = $this->admin ? '' : 'WHERE private != 1';
+		$where = $this->logged() ? '' : 'WHERE private != 1';
 
 		$out = array();
 		$res = $this->db->query('SELECT * FROM pictures '.$where.' ORDER BY date DESC LIMIT '.$begin.','.$this->config->nb_pictures_by_page.';');
@@ -361,7 +359,7 @@ class Fotoo_Hosting
 
 	public function countList()
 	{
-		$where = $this->admin ? '' : 'WHERE private != 1';
+		$where = $this->logged() ? '' : 'WHERE private != 1';
 		return $this->db->querySingle('SELECT COUNT(*) FROM pictures '.$where.';');
 	}
 
@@ -415,6 +413,38 @@ class Fotoo_Hosting
 	{
 		return $this->config->image_page_url
 			. 'r.' . $img['hash'];
+	}
+
+	public function login($password)
+	{
+		if ($this->config->admin_password === $password)
+		{
+			session_start();
+			$_SESSION['logged'] = true;
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+
+	public function logged()
+	{
+		if (array_key_exists(session_name(), $_COOKIE) && !isset($_SESSION))
+		{
+			session_start();
+		}
+
+		return empty($_SESSION['logged']) ? false : true;
+	}
+
+	public function logout()
+	{
+		session_start();
+		$_SESSION = null;
+		session_destroy();
+		return true;
 	}
 }
 

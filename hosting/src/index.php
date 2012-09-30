@@ -229,7 +229,7 @@ require __DIR__ . '/class.fotoo_hosting.php';
 
 $config = new Fotoo_Hosting_Config;
 
-$config_file = dirname(__FILE__) . '/config.php';
+$config_file = __DIR__ . '/config.php';
 
 if (file_exists($config_file))
 {
@@ -249,7 +249,7 @@ if (!is_bool($config->allow_upload) && is_callable($config->allow_upload))
 
 $fh = new Fotoo_Hosting($config);
 
-if ($fh->admin && !empty($_GET['delete']))
+if ($fh->logged() && !empty($_GET['delete']))
 {
     if ($fh->remove($_GET['delete']))
     {
@@ -315,7 +315,43 @@ if (isset($_GET['upload']))
 
 $html = $title = '';
 
-if (isset($_GET['list']))
+if (isset($_GET['login']))
+{
+    $title = 'Login';
+    $error = '';
+
+    if (!empty($_POST['password']))
+    {
+        if ($fh->login(trim($_POST['password'])))
+        {
+            header('Location: ' . $config->base_url);
+            exit;
+        }
+        else
+        {
+            $error = '<p class="error">Wrong password.</p>';
+        }
+    }
+
+    $html = '
+        <article class="browse">
+            <h2>'.$title.'</h2>
+            '.$error.'
+            <form method="post" action="' . $config->base_url . '?login">
+            <fieldset>
+                <dl>
+                    <dt><label for="f_password">Password</label></dt>
+                    <dd><input type="password" name="password" id="f_password" /></dd>
+                </dl>
+            </fieldset>
+            <p class="submit">
+                <input type="submit" id="f_submit" value="Login" />
+            </p>
+            </form>
+        </article>
+    ';
+}
+elseif (isset($_GET['list']))
 {
     $title = 'Browse pictures';
 
@@ -340,7 +376,7 @@ if (isset($_GET['list']))
 
         $html .= '
         <figure>
-            <a href="'.$url.'"><img src="'.$thumb_url.'" alt="'.$label.'" /></a>
+            <a href="'.$url.'">'.($img['private'] ? '<span class="private">Private</span>' : '').'<img src="'.$thumb_url.'" alt="'.$label.'" /></a>
             <figcaption><a href="'.$url.'">'.$label.'</a></figcaption>
         </figure>';
     }
@@ -418,8 +454,8 @@ elseif (!isset($_GET['classic']) && !isset($_GET['error']) && !empty($_SERVER['Q
                 | Size: '.$img['width'].' × '.$img['height'].'
             </p>
         </header>
-        <figure class="thumb">
-            <a href="'.$img_url.'"><img src="'.$thumb_url.'" alt="'.htmlspecialchars($title).'" /></a>
+        <figure>
+            <a href="'.$img_url.'">'.($img['private'] ? '<span class="private">Private</span>' : '').'<img src="'.$thumb_url.'" alt="'.htmlspecialchars($title).'" /></a>
         </figure>
         <footer>
             <p>
@@ -427,7 +463,7 @@ elseif (!isset($_GET['classic']) && !isset($_GET['error']) && !empty($_SERVER['Q
             </p>
         </footer>';
 
-    if ($fh->admin)
+    if ($fh->logged())
     {
         $html .= '
         <p class="admin">
@@ -515,7 +551,7 @@ echo '<!DOCTYPE html>
 <body>
 <header>
     <h1><a href="'.$config->base_url.'">'.$config->title.'</a></h1>
-    '.($fh->admin ? '<p class="admin">(admin mode)</p>' : '').'
+    '.($fh->logged() ? '<h2>(admin mode)</h2>' : '').'
     <nav>
         <ul>
             <li><a href="'.$config->base_url.'">Upload a file</a></li>
@@ -528,7 +564,8 @@ echo '<!DOCTYPE html>
     '.$html.'
 </div>
 <footer>
-    Powered by Fotoo Hosting application from <a href="http://kd2.org/">KD2.org</a>.
+    Powered by Fotoo Hosting application from <a href="http://kd2.org/">KD2.org</a>
+    | '.($fh->logged() ? '<a href="'.$config->base_url.'?logout">Logout</a>' : '<a href="'.$config->base_url.'?login">Login</a>').'
 </footer>
 </body>
 </html>';
