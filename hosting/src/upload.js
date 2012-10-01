@@ -148,6 +148,12 @@
                 for (var i = 0; i < this.files.length; i++)
                 {
                     var file = this.files[i];
+
+                    if (!(/^image\/jpeg/.test(file.type)))
+                    {
+                        continue;
+                    }
+
                     var id = encodeURIComponent(file.name + file.type + file.size);
 
                     if (document.getElementById(id))

@@ -258,18 +258,34 @@ if (!is_bool($config->allow_upload) && is_callable($config->allow_upload))
 
 $fh = new Fotoo_Hosting($config);
 
-if ($fh->logged() && !empty($_GET['delete']))
+if ($fh->logged())
 {
-    if ($fh->remove($_GET['delete']))
+    if (!empty($_GET['delete']))
     {
-        header('Location: '.$config->base_url);
-    }
-    else
-    {
-        echo "Can't delete picture";
-    }
+        if ($fh->remove($_GET['delete']))
+        {
+            header('Location: '.$config->base_url);
+        }
+        else
+        {
+            echo "Can't delete picture";
+        }
 
-    exit;
+        exit;
+    }
+    elseif (!empty($_GET['deleteAlbum']))
+    {
+        if ($fh->removeAlbum($_GET['deleteAlbum']))
+        {
+            header('Location: ' . $config->base_url . '?albums');
+        }
+        else
+        {
+            echo "Can't delete album";
+        }
+
+        exit;
+    }
 }
 
 if (isset($_POST['album_create']))
@@ -448,6 +464,64 @@ elseif (isset($_GET['list']))
         </nav>';
     }
 }
+elseif (isset($_GET['albums']))
+{
+    $title = 'Browse albums';
+
+    if (!empty($_GET['albums']) && is_numeric($_GET['albums']))
+        $page = (int) $_GET['albums'];
+    else
+        $page = 1;
+
+    $list = $fh->getAlbumList($page);
+    $max = $fh->countAlbumList();
+
+    $html = '
+        <article class="albums">
+            <h2>'.$title.'</h2>';
+
+    foreach ($list as $album)
+    {
+        $url = $config->album_page_url . $album['hash'];
+        $nb = $fh->countAlbumPictures($album['hash']);
+
+        $html .= '
+        <figure>
+            <h2><a href="'.$url.'">'.escape($album['title']).'</a></h2>
+            <h6>('.$nb.' pictures)</h6>
+            <a href="'.$url.'">'.($album['private'] ? '<span class="private">Private</span>' : '');
+
+        foreach ($album['extract'] as $img)
+        {
+            $thumb_url = $fh->getImageThumbUrl($img);
+            $html .= '<img src="'.$thumb_url.'" alt="" />';
+        }
+
+        $html .= '</a>
+        </figure>';
+    }
+
+    $html .= '
+        </article>';
+
+    if ($max > $config->nb_pictures_by_page)
+    {
+        $max_page = ceil($max / round($config->nb_pictures_by_page / 2));
+        $html .= '
+        <nav class="pagination">
+            <ul>
+        ';
+
+        for ($p = 1; $p <= $max_page; $p++)
+        {
+            $html .= '<li'.($page == $p ? ' class="selected"' : '').'><a href="'.$config->base_url.'?albums='.$p.'">'.$p.'</a></li>';
+        }
+
+        $html .= '
+            </ul>
+        </nav>';
+    }
+}
 elseif (!empty($_GET['a']))
 {
     $album = $fh->getAlbum($_GET['a']);
@@ -476,6 +550,14 @@ elseif (!empty($_GET['a']))
         <article class="browse">
             <h2>'.escape($title).'</h2>';
 
+    if ($fh->logged())
+    {
+        $html .= '
+        <p class="admin">
+            <a href="?deleteAlbum='.rawurlencode($album['hash']).'" onclick="return confirm(\'Really?\');">Delete album</a>
+        </p>';
+    }
+
     foreach ($list as &$img)
     {
         $thumb_url = $fh->getImageThumbUrl($img);
@@ -501,9 +583,11 @@ elseif (!empty($_GET['a']))
             <ul>
         ';
 
+        $url = $config->album_page_url . ((strpos($config->album_page_url, '?') === false) ? '?p=' : '&amp;p=');
+
         for ($p = 1; $p <= $max_page; $p++)
         {
-            $html .= '<li'.($page == $p ? ' class="selected"' : '').'><a href="?list='.$p.'">'.$p.'</a></li>';
+            $html .= '<li'.($page == $p ? ' class="selected"' : '').'><a href="'.$url.$p.'">'.$p.'</a></li>';
         }
 
         $html .= '
@@ -621,18 +705,18 @@ else
                 <h2>Upload an album</h2>
                 <p class="info">
                     Maximum file size: '.round($config->max_file_size / 1024 / 1024, 2).'MB
-                    | Image types accepted: '.implode(', ', $config->allowed_formats).'
+                    | Image types accepted: JPEG only
                 </p>
             </header>
             <fieldset>
                 <dl>
                     <dt><label for="f_title">Title:</label></dt>
-                    <dd><input type="text" name="title" id="f_title" maxlength="100" /></dd>
+                    <dd><input type="text" name="title" id="f_title" maxlength="100" required="required" /></dd>
                     <dt><label for="f_private">Private</label></dt>
                     <dd class="private"><label><input type="checkbox" name="private" id="f_private" value="1" />
                         (If checked, this album won\'t appear in &quot;browse pictures&quot;)</label></dd>
                     <dt><label for="f_files">Files:</label></dt>
-                    <dd id="f_file_container"><input type="file" name="upload" id="f_files" multiple="multiple" /></dd>
+                    <dd id="f_file_container"><input type="file" name="upload" id="f_files" multiple="multiple" accept="image/jpeg" required="required" /></dd>
                 </dl>
             </fieldset>
             <div id="albumParent">Please select some files...</div>

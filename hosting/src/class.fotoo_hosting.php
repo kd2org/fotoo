@@ -366,11 +366,25 @@ class Fotoo_Hosting
 
 	public function getAlbumList($page)
 	{
-		$begin = ($page - 1) * $this->config->nb_pictures_by_page;
+		$begin = ($page - 1) * round($this->config->nb_pictures_by_page / 2);
 		$where = $this->logged() ? '' : 'WHERE private != 1';
 
 		$out = array();
-		$res = $this->db->query('SELECT * FROM albums '.$where.' ORDER BY date DESC LIMIT '.$begin.','.$this->config->nb_pictures_by_page.';');
+		$res = $this->db->query('SELECT * FROM albums '.$where.' ORDER BY date DESC LIMIT '.$begin.','.round($this->config->nb_pictures_by_page / 2).';');
+
+		while ($row = $res->fetchArray(SQLITE3_ASSOC))
+		{
+			$row['extract'] = $this->getAlbumExtract($row['hash']);
+			$out[] = $row;
+		}
+
+		return $out;
+	}
+
+	public function getAlbumExtract($hash)
+	{
+		$out = array();
+		$res = $this->db->query('SELECT * FROM pictures WHERE album = \''.$this->db->escapeString($hash).'\' ORDER BY RANDOM() LIMIT 2;');
 
 		while ($row = $res->fetchArray(SQLITE3_ASSOC))
 		{
@@ -396,7 +410,7 @@ class Fotoo_Hosting
 		$begin = ($page - 1) * $this->config->nb_pictures_by_page;
 
 		$out = array();
-		$res = $this->db->query('SELECT * FROM pictures WHERE album = \''.$this->db->escapeString($hash).'\' ORDER BY date DESC LIMIT '.$begin.','.$this->config->nb_pictures_by_page.';');
+		$res = $this->db->query('SELECT * FROM pictures WHERE album = \''.$this->db->escapeString($hash).'\' ORDER BY date LIMIT '.$begin.','.$this->config->nb_pictures_by_page.';');
 
 		while ($row = $res->fetchArray(SQLITE3_ASSOC))
 		{
@@ -409,6 +423,25 @@ class Fotoo_Hosting
 	public function countAlbumPictures($hash)
 	{
 		return $this->db->querySingle('SELECT COUNT(*) FROM pictures WHERE album = \''.$this->db->escapeString($hash).'\';');
+	}
+
+	public function removeAlbum($hash)
+	{
+		$res = $this->db->query('SELECT * FROM pictures WHERE album = \''.$this->db->escapeString($hash).'\';');
+
+		while ($row = $res->fetchArray(SQLITE3_ASSOC))
+		{
+			$file = $this->_getPath($row);
+
+			if (file_exists($file))
+				unlink($file);
+
+			if ($this->get($row['hash']))
+				return false;
+		}
+
+		$this->db->exec('DELETE FROM albums WHERE hash = \''.$this->db->escapeString($hash).'\';');
+		return true;
 	}
 
 	protected function _getPath($img, $optional = '')
@@ -467,7 +500,7 @@ class Fotoo_Hosting
 	{
 		if ($this->config->admin_password === $password)
 		{
-			session_start();
+			@session_start();
 			$_SESSION['logged'] = true;
 			return true;
 		}
