@@ -53,6 +53,7 @@ class Fotoo_Hosting_Config
     private $base_url = null;
     private $storage_url = null;
     private $image_page_url = null;
+    private $album_page_url = null;
 
     private $max_width = null;
 
@@ -84,6 +85,7 @@ class Fotoo_Hosting_Config
             case 'title':
             case 'style':
             case 'image_page_url':
+            case 'album_page_url':
             case 'admin_password':
                 $this->$key = (string) $value;
                 break;
@@ -166,6 +168,7 @@ class Fotoo_Hosting_Config
             case 'title':           return 'Title of the service.';
             case 'style':           return 'CSS style used on the pages.';
             case 'image_page_url':  return 'URL to the picture information page, hash is added at the end.';
+            case 'album_page_url':  return 'URL to the album page, hash is added at the end.';
             case 'allow_upload':    return 'Allow upload of files? You can use this to restrict upload access. Can be a boolean or a PHP callback. See the FAQ for more informations.';
             case 'admin_password':  return 'Password to access admin UI? (edit/delete files, see private pictures)';
             case 'allowed_formats': return 'Allowed formats, separated by a comma';
@@ -185,6 +188,7 @@ class Fotoo_Hosting_Config
 
         $this->storage_url = $this->base_url . str_replace(dirname(__FILE__) . '/', '', $this->storage_path);
         $this->image_page_url = $this->base_url . '?';
+        $this->album_page_url = $this->base_url . '?a=';
 
         if (substr(basename($_SERVER['PHP_SELF']), 0, 5) != 'index')
             $this->base_url .= basename($_SERVER['PHP_SELF']);
@@ -225,6 +229,11 @@ class Fotoo_Hosting_Config
     }
 }
 
+function escape($str)
+{
+    return htmlspecialchars($str, ENT_QUOTES, 'utf-8', false);
+}
+
 require __DIR__ . '/class.fotoo_hosting.php';
 
 $config = new Fotoo_Hosting_Config;
@@ -263,6 +272,38 @@ if ($fh->logged() && !empty($_GET['delete']))
     exit;
 }
 
+if (isset($_POST['album_create']))
+{
+    if (!empty($_POST['title']))
+    {
+        $id = $fh->createAlbum($_POST['title'], empty($_POST['private']) ? false : true);
+        echo "$id";
+        exit;
+    }
+
+    header('HTTP/1.1 400 Bad Request', true, 400);
+    die("Bad Request");
+}
+
+if (isset($_POST['album_append']))
+{
+    if (!empty($_POST['album']) && !empty($_POST['content']) && isset($_POST['name']) && isset($_POST['filename']))
+    {
+        if ($fh->appendToAlbum($_POST['album'], $_POST['name'], array('content' => $_POST['content'], 'name' => $_POST['filename'])))
+        {
+            echo "OK";
+        }
+        else
+        {
+            echo "FAIL";
+        }
+        exit;
+    }
+
+    header('HTTP/1.1 400 Bad Request', true, 400);
+    die("Bad Request");
+}
+
 if (isset($_GET['upload']))
 {
     $error = false;
@@ -291,7 +332,6 @@ if (isset($_GET['upload']))
     if ($error)
     {
         $url = $config->base_url . '?error=' . $error;
-        $url.= isset($_GET['classic']) ? '&classic' : '';
         header('Location: ' . $url);
         exit;
     }
@@ -315,7 +355,13 @@ if (isset($_GET['upload']))
 
 $html = $title = '';
 
-if (isset($_GET['login']))
+if (isset($_GET['logout']))
+{
+    $fh->logout();
+    header('Location: ' . $config->base_url);
+    exit;
+}
+elseif (isset($_GET['login']))
 {
     $title = 'Login';
     $error = '';
@@ -372,7 +418,7 @@ elseif (isset($_GET['list']))
         $thumb_url = $fh->getImageThumbUrl($img);
         $url = $fh->getUrl($img);
 
-        $label = $img['filename'] ? htmlspecialchars(preg_replace('![_-]!', ' ', $img['filename'])) : 'View image';
+        $label = $img['filename'] ? escape(preg_replace('![_-]!', ' ', $img['filename'])) : 'View image';
 
         $html .= '
         <figure>
@@ -402,7 +448,70 @@ elseif (isset($_GET['list']))
         </nav>';
     }
 }
-elseif (!isset($_GET['classic']) && !isset($_GET['error']) && !empty($_SERVER['QUERY_STRING']))
+elseif (!empty($_GET['a']))
+{
+    $album = $fh->getAlbum($_GET['a']);
+
+    if (empty($album))
+    {
+        header('HTTP/1.1 404 Not Found', true, 404);
+        echo '
+            <h1>Not Found</h1>
+            <p><a href="'.$config->base_url.'">'.$config->title.'</a></p>
+        ';
+        exit;
+    }
+
+    $title = $album['title'];
+
+    if (!empty($_GET['p']) && is_numeric($_GET['p']))
+        $page = (int) $_GET['p'];
+    else
+        $page = 1;
+
+    $list = $fh->getAlbumPictures($album['hash'], $page);
+    $max = $fh->countAlbumPictures($album['hash']);
+
+    $html = '
+        <article class="browse">
+            <h2>'.escape($title).'</h2>';
+
+    foreach ($list as &$img)
+    {
+        $thumb_url = $fh->getImageThumbUrl($img);
+        $url = $fh->getUrl($img);
+
+        $label = $img['filename'] ? escape(preg_replace('![_-]!', ' ', $img['filename'])) : 'View image';
+
+        $html .= '
+        <figure>
+            <a href="'.$url.'">'.($img['private'] ? '<span class="private">Private</span>' : '').'<img src="'.$thumb_url.'" alt="'.$label.'" /></a>
+            <figcaption><a href="'.$url.'">'.$label.'</a></figcaption>
+        </figure>';
+    }
+
+    $html .= '
+        </article>';
+
+    if ($max > $config->nb_pictures_by_page)
+    {
+        $max_page = ceil($max / $config->nb_pictures_by_page);
+        $html .= '
+        <nav class="pagination">
+            <ul>
+        ';
+
+        for ($p = 1; $p <= $max_page; $p++)
+        {
+            $html .= '<li'.($page == $p ? ' class="selected"' : '').'><a href="?list='.$p.'">'.$p.'</a></li>';
+        }
+
+        $html .= '
+            </ul>
+        </nav>';
+    }
+}
+elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUERY_STRING']))
 {
     $query = explode('.', $_SERVER['QUERY_STRING']);
     $hash = ($query[0] == 'r') ? $query[1] : $query[0];
@@ -448,14 +557,14 @@ elseif (!isset($_GET['classic']) && !isset($_GET['error']) && !empty($_SERVER['Q
     $html = '
     <article class="picture">
         <header>
-            '.(trim($img['filename']) ? '<h2>' . htmlspecialchars(strtr($img['filename'], '-_.', '   ')) . '</h2>' : '').'
+            '.(trim($img['filename']) ? '<h2>' . escape(strtr($img['filename'], '-_.', '   ')) . '</h2>' : '').'
             <p class="info">
                 Uploaded on <time datetime="'.date(DATE_W3C, $img['date']).'">'.strftime('%c', $img['date']).'</time>
                 | Size: '.$img['width'].' × '.$img['height'].'
             </p>
         </header>
         <figure>
-            <a href="'.$img_url.'">'.($img['private'] ? '<span class="private">Private</span>' : '').'<img src="'.$thumb_url.'" alt="'.htmlspecialchars($title).'" /></a>
+            <a href="'.$img_url.'">'.($img['private'] ? '<span class="private">Private</span>' : '').'<img src="'.$thumb_url.'" alt="'.escape($title).'" /></a>
         </figure>
         <footer>
             <p>
@@ -474,11 +583,11 @@ elseif (!isset($_GET['classic']) && !isset($_GET['error']) && !empty($_SERVER['Q
     $html .= '
         <aside class="examples">
             <dt>Short URL for full size</dt>
-            <dd><input type="text" onclick="this.select();" value="'.htmlspecialchars($short_url).'" /></dd>
+            <dd><input type="text" onclick="this.select();" value="'.escape($short_url).'" /></dd>
             <dt>BBCode</dt>
-            <dd><input type="text" onclick="this.select();" value="'.htmlspecialchars($bbcode).'" /></dd>
+            <dd><input type="text" onclick="this.select();" value="'.escape($bbcode).'" /></dd>
             <dt>HTML code</dt>
-            <dd><input type="text" onclick="this.select();" value="'.htmlspecialchars($html_code).'" /></dd>
+            <dd><input type="text" onclick="this.select();" value="'.escape($html_code).'" /></dd>
         </aside>
     </article>
     ';
@@ -500,39 +609,72 @@ else
 
     if (!empty($_GET['error']))
     {
-        $html .= '<p class="error">'.htmlspecialchars(Fotoo_Hosting::getErrorMessage($_GET['error'])).'</p>';
+        $html .= '<p class="error">'.escape(Fotoo_Hosting::getErrorMessage($_GET['error'])).'</p>';
     }
 
-    $html .= '
-    <form method="post" enctype="multipart/form-data" action="'.$config->base_url.'?upload" id="f_upload">
-    <article class="upload">
-        <header>
-            <h2>Upload a file</h2>
-            <p class="info">
-                Maximum file size: '.round($config->max_file_size / 1024 / 1024, 2).'MB
-                | Image types accepted: '.implode(', ', $config->allowed_formats).'
+    if (isset($_GET['album']))
+    {
+        $html .= '
+        <form method="post" action="'.$config->base_url.'?upload" id="f_upload">
+        <article class="upload">
+            <header>
+                <h2>Upload an album</h2>
+                <p class="info">
+                    Maximum file size: '.round($config->max_file_size / 1024 / 1024, 2).'MB
+                    | Image types accepted: '.implode(', ', $config->allowed_formats).'
+                </p>
+            </header>
+            <fieldset>
+                <dl>
+                    <dt><label for="f_title">Title:</label></dt>
+                    <dd><input type="text" name="title" id="f_title" maxlength="100" /></dd>
+                    <dt><label for="f_private">Private</label></dt>
+                    <dd class="private"><label><input type="checkbox" name="private" id="f_private" value="1" />
+                        (If checked, this album won\'t appear in &quot;browse pictures&quot;)</label></dd>
+                    <dt><label for="f_files">Files:</label></dt>
+                    <dd id="f_file_container"><input type="file" name="upload" id="f_files" multiple="multiple" /></dd>
+                </dl>
+            </fieldset>
+            <div id="albumParent">Please select some files...</div>
+            <p class="submit">
+                <input type="submit" id="f_submit" value="Upload" />
             </p>
-        </header>
-        <fieldset>
-            <input type="hidden" name="MAX_FILE_SIZE" value="'.($config->max_file_size - 1024).'" />
-            <dl>
-                <dt><label for="f_file">File:</label></dt>
-                <dd id="f_file_container"><input type="file" name="upload" id="f_file" /></dd>
-                <dt><label for="f_name">Name:</label></dt>
-                <dd><input type="text" name="name" id="f_name" maxlength="30" /></dd>
-                <dt><label for="f_private">Private</label></dt>
-                <dd class="private"><label><input type="checkbox" name="private" id="f_private" value="1" />
-                    (If checked, picture won\'t appear in pictures list)</label></dd>
-            </dl>
-        </fieldset>
-        <div id="resizeParent"></div>
-        <p class="submit">
-            <input type="submit" id="f_submit" value="Upload" />
-        </p>
-    </article>
-    </form>
-    <script type="text/javascript" src="'.$js_url.'"></script>
-    ';
+        </article>
+        </form>';
+    }
+    else
+    {
+        $html .= '
+        <form method="post" enctype="multipart/form-data" action="'.$config->base_url.'?upload" id="f_upload">
+        <article class="upload">
+            <header>
+                <h2>Upload a file</h2>
+                <p class="info">
+                    Maximum file size: '.round($config->max_file_size / 1024 / 1024, 2).'MB
+                    | Image types accepted: '.implode(', ', $config->allowed_formats).'
+                </p>
+            </header>
+            <fieldset>
+                <input type="hidden" name="MAX_FILE_SIZE" value="'.($config->max_file_size - 1024).'" />
+                <dl>
+                    <dt><label for="f_file">File:</label></dt>
+                    <dd id="f_file_container"><input type="file" name="upload" id="f_file" /></dd>
+                    <dt><label for="f_name">Name:</label></dt>
+                    <dd><input type="text" name="name" id="f_name" maxlength="30" /></dd>
+                    <dt><label for="f_private">Private</label></dt>
+                    <dd class="private"><label><input type="checkbox" name="private" id="f_private" value="1" />
+                        (If checked, picture won\'t appear in pictures list)</label></dd>
+                </dl>
+            </fieldset>
+            <div id="resizeParent"></div>
+            <p class="submit">
+                <input type="submit" id="f_submit" value="Upload" />
+            </p>
+        </article>
+        </form>';
+    }
+
+    $html .= '<script type="text/javascript" src="'.$js_url.'"></script>';
 }
 
 $css_url = file_exists(__DIR__ . '/style.css')
@@ -543,7 +685,7 @@ echo '<!DOCTYPE html>
 <html>
 <head>
     <meta name="charset" content="utf-8" />
-    <title>'.($title ? htmlspecialchars($title) . ' - ' : '').$config->title.'</title>
+    <title>'.($title ? escape($title) . ' - ' : '').$config->title.'</title>
     <meta name="viewport" content="width=device-width" />
     <link rel="stylesheet" type="text/css" href="'.$css_url.'" />
 </head>
@@ -555,8 +697,8 @@ echo '<!DOCTYPE html>
     <nav>
         <ul>
             <li><a href="'.$config->base_url.'">Upload a file</a></li>
-            <li><a href="'.$config->base_url.'?album">Upload an album</a></li>
             <li><a href="'.$config->base_url.'?list">Browse pictures</a></li>
+            <li><a href="'.$config->base_url.'?albums">Browse albums</a></li>
         </ul>
     </nav>
 </header>

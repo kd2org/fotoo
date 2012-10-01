@@ -150,7 +150,7 @@ class Fotoo_Hosting
 		return true;
 	}
 
-	public function upload($file, $name = '', $private = false)
+	public function upload($file, $name = '', $private = false, $album = null)
 	{
 		if (isset($file['content']))
 		{
@@ -288,7 +288,7 @@ class Fotoo_Hosting
 		$hash = substr($hash, -2) . '/' . $base;
 
 		$this->db->exec('INSERT INTO pictures (hash, filename, date, format,
-			width, height, thumb, private, size)
+			width, height, thumb, private, size, album)
 			VALUES (
 				\''.$this->db->escapeString($hash).'\',
 				\''.$this->db->escapeString($name).'\',
@@ -298,7 +298,8 @@ class Fotoo_Hosting
 				\''.(int)$height.'\',
 				\''.(int)$thumb.'\',
 				\''.($private ? '1' : '0').'\',
-				\''.(int)$size.'\'
+				\''.(int)$size.'\',
+				'.(is_null($album) ? 'NULL' : '\''.$this->db->escapeString($album).'\'').'
 			);');
 
 		return $hash;
@@ -344,10 +345,10 @@ class Fotoo_Hosting
 	public function getList($page)
 	{
 		$begin = ($page - 1) * $this->config->nb_pictures_by_page;
-		$where = $this->logged() ? '' : 'WHERE private != 1';
+		$where = $this->logged() ? '' : 'AND private != 1';
 
 		$out = array();
-		$res = $this->db->query('SELECT * FROM pictures '.$where.' ORDER BY date DESC LIMIT '.$begin.','.$this->config->nb_pictures_by_page.';');
+		$res = $this->db->query('SELECT * FROM pictures WHERE album IS NULL '.$where.' ORDER BY date DESC LIMIT '.$begin.','.$this->config->nb_pictures_by_page.';');
 
 		while ($row = $res->fetchArray(SQLITE3_ASSOC))
 		{
@@ -359,8 +360,55 @@ class Fotoo_Hosting
 
 	public function countList()
 	{
+		$where = $this->logged() ? '' : 'AND private != 1';
+		return $this->db->querySingle('SELECT COUNT(*) FROM pictures WHERE album IS NULL '.$where.';');
+	}
+
+	public function getAlbumList($page)
+	{
+		$begin = ($page - 1) * $this->config->nb_pictures_by_page;
+		$where = $this->logged() ? '' : 'WHERE private != 1';
+
+		$out = array();
+		$res = $this->db->query('SELECT * FROM albums '.$where.' ORDER BY date DESC LIMIT '.$begin.','.$this->config->nb_pictures_by_page.';');
+
+		while ($row = $res->fetchArray(SQLITE3_ASSOC))
+		{
+			$out[] = $row;
+		}
+
+		return $out;
+	}
+
+	public function countAlbumList()
+	{
 		$where = $this->logged() ? '' : 'WHERE private != 1';
 		return $this->db->querySingle('SELECT COUNT(*) FROM pictures '.$where.';');
+	}
+
+	public function getAlbum($hash)
+	{
+		return $this->db->querySingle('SELECT * FROM albums WHERE hash = \''.$this->db->escapeString($hash).'\';', true);
+	}
+
+	public function getAlbumPictures($hash, $page)
+	{
+		$begin = ($page - 1) * $this->config->nb_pictures_by_page;
+
+		$out = array();
+		$res = $this->db->query('SELECT * FROM pictures WHERE album = \''.$this->db->escapeString($hash).'\' ORDER BY date DESC LIMIT '.$begin.','.$this->config->nb_pictures_by_page.';');
+
+		while ($row = $res->fetchArray(SQLITE3_ASSOC))
+		{
+			$out[] = $row;
+		}
+
+		return $out;
+	}
+
+	public function countAlbumPictures($hash)
+	{
+		return $this->db->querySingle('SELECT COUNT(*) FROM pictures WHERE album = \''.$this->db->escapeString($hash).'\';');
 	}
 
 	protected function _getPath($img, $optional = '')
@@ -441,10 +489,32 @@ class Fotoo_Hosting
 
 	public function logout()
 	{
-		session_start();
+		$this->logged();
 		$_SESSION = null;
 		session_destroy();
 		return true;
+	}
+
+	public function createAlbum($title, $private = false)
+	{
+		$hash = self::baseConv(hexdec(uniqid()));
+		$this->db->exec('INSERT INTO albums (hash, title, date, private)
+			VALUES (\''.$this->db->escapeString($hash).'\',
+			\''.$this->db->escapeString(trim($title)).'\',
+			datetime(\'now\'), \''.(int)(bool)$private.'\');');
+		return $hash;
+	}
+
+	public function appendToAlbum($album, $name, $file)
+	{
+		$album = $this->db->querySingle('SELECT * FROM albums WHERE hash = \''.$this->db->escapeString($album).'\';', true);
+
+		if (!$album)
+		{
+			return false;
+		}
+
+		return $this->upload($file, $name, $album['private'], $album['hash']);
 	}
 }
 
