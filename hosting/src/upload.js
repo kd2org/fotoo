@@ -192,6 +192,7 @@
                 {
                     if (to_resize.length < 1)
                     {
+                        can_submit = true;
                         return;
                     }
 
@@ -332,11 +333,14 @@
             $thumb.innerHTML = "";
             var img = ($thumb.lastChild || $thumb.appendChild(new Image));
             img.src = data;
-            can_submit = true;
 
             if ($onload)
             {
                 $onload();
+            }
+            else
+            {
+                can_submit = true;
             }
         }
 
