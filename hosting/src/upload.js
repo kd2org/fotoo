@@ -143,6 +143,7 @@
                 }
 
                 var found = new Array;
+                var to_resize = new Array;
 
                 for (var i = 0; i < this.files.length; i++)
                 {
@@ -174,14 +175,7 @@
                     fig.appendChild(caption);
                     parent.appendChild(fig);
 
-                    resize(
-                        file,
-                        config.max_width, // size
-                        resized_img, // image resized
-                        config.thumb_width, // thumb size
-                        resized_thumb // thumb resized
-                    );
-
+                    to_resize.push(new Array(file, resized_img, resized_thumb));
                     found.push(id);
                 }
 
@@ -193,6 +187,30 @@
                         parent.removeChild(parent.childNodes[i]);
                     }
                 }
+
+                function resizeFromList()
+                {
+                    if (to_resize.length < 1)
+                    {
+                        return;
+                    }
+
+                    var current = to_resize[0];
+                    resize(
+                        current[0],
+                        config.max_width, // size
+                        current[1], // image resized
+                        config.thumb_width, // thumb size
+                        current[2], // thumb resized
+                        function () {
+                            resizeFromList();
+                        }
+                    );
+
+                    to_resize.splice(0, 1);
+                }
+
+                resizeFromList();
             };
 
             document.getElementById("f_upload").onsubmit = function ()
@@ -285,7 +303,7 @@
         }
     };
 
-    function resize($file, $size, $img, $thumb_size, $thumb)
+    function resize($file, $size, $img, $thumb_size, $thumb, $onload)
     {
         function resampled(data)
         {
@@ -303,6 +321,10 @@
                     resampledThumb
                 );
             }
+            else if ($onload)
+            {
+                $onload();
+            }
         }
 
         function resampledThumb(data)
@@ -311,6 +333,11 @@
             var img = ($thumb.lastChild || $thumb.appendChild(new Image));
             img.src = data;
             can_submit = true;
+
+            if ($onload)
+            {
+                $onload();
+            }
         }
 
         function load(e) {
