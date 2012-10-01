@@ -54,7 +54,7 @@
         file.name = file.name + "[content]";
         file.value = img.src.substr(img.src.indexOf(',') + 1);
 
-        document.getElementById("resizedThumb").innerHTML += "<br />Uploading in progress, please wait... <img class=\"loading\" src=\"" + loading_gif + "\" alt=\"\" />";
+        document.getElementById("resizedThumb").innerHTML += "<br />Uploading... <img class=\"loading\" src=\"" + loading_gif + "\" alt=\"\" />";
 
         return true;
     }

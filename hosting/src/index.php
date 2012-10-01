@@ -264,7 +264,7 @@ if ($fh->logged())
     {
         if ($fh->remove($_GET['delete']))
         {
-            header('Location: '.$config->base_url);
+            header('Location: '.$config->base_url.'?list');
         }
         else
         {
