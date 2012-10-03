@@ -2191,7 +2191,6 @@ class Fotoo_Hosting_Config
     private $thumb_width = null;
 
     private $title = null;
-    private $style = null;
 
     private $max_file_size = null;
     private $allow_upload = null;
@@ -2214,7 +2213,6 @@ class Fotoo_Hosting_Config
             case 'base_url':
             case 'storage_url':
             case 'title':
-            case 'style':
             case 'image_page_url':
             case 'album_page_url':
             case 'admin_password':
@@ -2297,7 +2295,6 @@ class Fotoo_Hosting_Config
             case 'base_url':        return 'URL of the webservice index.';
             case 'storage_url':     return 'URL to where the pictures are stored. Filename is added at the end.';
             case 'title':           return 'Title of the service.';
-            case 'style':           return 'CSS style used on the pages.';
             case 'image_page_url':  return 'URL to the picture information page, hash is added at the end.';
             case 'album_page_url':  return 'URL to the album page, hash is added at the end.';
             case 'allow_upload':    return 'Allow upload of files? You can use this to restrict upload access. Can be a boolean or a PHP callback. See the FAQ for more informations.';
