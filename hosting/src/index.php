@@ -504,7 +504,7 @@ elseif (isset($_GET['albums']))
     $html .= '
         </article>';
 
-    if ($max > $config->nb_pictures_by_page)
+    if ($max > round($config->nb_pictures_by_page / 2))
     {
         $max_page = ceil($max / round($config->nb_pictures_by_page / 2));
         $html .= '

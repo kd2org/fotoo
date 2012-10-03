@@ -397,7 +397,7 @@ class Fotoo_Hosting
 	public function countAlbumList()
 	{
 		$where = $this->logged() ? '' : 'WHERE private != 1';
-		return $this->db->querySingle('SELECT COUNT(*) FROM pictures '.$where.';');
+		return $this->db->querySingle('SELECT COUNT(*) FROM albums '.$where.';');
 	}
 
 	public function getAlbum($hash)

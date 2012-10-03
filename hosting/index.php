@@ -1206,7 +1206,7 @@ class Fotoo_Hosting
 	public function countAlbumList()
 	{
 		$where = $this->logged() ? '' : 'WHERE private != 1';
-		return $this->db->querySingle('SELECT COUNT(*) FROM pictures '.$where.';');
+		return $this->db->querySingle('SELECT COUNT(*) FROM albums '.$where.';');
 	}
 
 	public function getAlbum($hash)
@@ -2635,7 +2635,7 @@ elseif (isset($_GET['albums']))
     $html .= '
         </article>';
 
-    if ($max > $config->nb_pictures_by_page)
+    if ($max > round($config->nb_pictures_by_page / 2))
     {
         $max_page = ceil($max / round($config->nb_pictures_by_page / 2));
         $html .= '
