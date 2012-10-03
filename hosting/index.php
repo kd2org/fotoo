@@ -1,4 +1,6 @@
-<?php if (isset($_GET["js"])): header("Content-Type: text/javascript"); ?>
+<?php
+// Fotoo Hosting single-file release v0.2.0
+?><?php if (isset($_GET["js"])): header("Content-Type: text/javascript"); ?>
 (function () {
     if (!Array.prototype.indexOf)
     {
@@ -550,8 +552,7 @@
         this.document.createElement("canvas")
     ));
 } ());
-<?php exit; endif; ?>
-<?php if (isset($_GET["css"])): header("Content-Type: text/css"); ?>
+<?php exit; endif; ?><?php if (isset($_GET["css"])): header("Content-Type: text/css"); ?>
 html, body, div, span, applet, object, iframe,
 h1, h2, h3, h4, h5, h6, p, blockquote, pre,
 a, abbr, acronym, address, big, cite, code,
@@ -806,8 +807,7 @@ p.admin a {
 	right: 0px;
 	bottom: 40%;
 	top: auto;
-}<?php exit; endif; ?>
-<?php
+}<?php exit; endif; ?><?php
 
 class Fotoo_Hosting
 {
