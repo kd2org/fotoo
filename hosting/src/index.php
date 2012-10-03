@@ -545,7 +545,15 @@ elseif (!empty($_GET['a']))
 
     $html = '
         <article class="browse">
-            <h2>'.escape($title).'</h2>';
+            <h2>'.escape($title).'</h2>
+            <p class="info">
+                Uploaded on <time datetime="'.date(DATE_W3C, $album['date']).'">'.strftime('%c', $album['date']).'</time>
+                | '.(int)$max.' picture'.((int)$max > 1 ? 's' : '').'
+            </p>
+            <aside class="examples">
+                <dt>Share this album using this URL:</dt>
+                <dd><input type="text" onclick="this.select();" value="'.escape($config->album_page_url . $album['hash']).'" /></dd>
+            </aside>';
 
     if ($fh->logged())
     {

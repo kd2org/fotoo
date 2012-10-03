@@ -402,7 +402,7 @@ class Fotoo_Hosting
 
 	public function getAlbum($hash)
 	{
-		return $this->db->querySingle('SELECT * FROM albums WHERE hash = \''.$this->db->escapeString($hash).'\';', true);
+		return $this->db->querySingle('SELECT *, strftime(\'%s\', date) AS date FROM albums WHERE hash = \''.$this->db->escapeString($hash).'\';', true);
 	}
 
 	public function getAlbumPictures($hash, $page)

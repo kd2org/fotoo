@@ -143,12 +143,12 @@ fieldset {
 	margin: 1em 0;
 }
 
-.picture .examples dt {
+.examples dt {
 	margin: .5em 0;
 	font-weight: bold;
 }
 
-.picture .examples input {
+.examples input {
 	text-align: center;
 	background: rgb(213, 214, 182);
 	border: 1px solid #fff;

@@ -4,7 +4,7 @@ all : fotoo
 
 fotoo :
 	@echo "<?php" > ${DEST}
-	@echo "// Fotoo Hosting single-file release v0.2.0" >> ${DEST}
+	@echo "// Fotoo Hosting single-file release v2.0.0" >> ${DEST}
 	@echo -n "?>" >> ${DEST}
 	@echo '<?php if (isset($$_GET["js"])): header("Content-Type: text/javascript"); ?>' >> ${DEST}
 	@cat upload.js >> ${DEST}

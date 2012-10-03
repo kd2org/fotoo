@@ -1,5 +1,5 @@
 <?php
-// Fotoo Hosting single-file release v0.2.0
+// Fotoo Hosting single-file release v2.0.0
 ?><?php if (isset($_GET["js"])): header("Content-Type: text/javascript"); ?>
 (function () {
     if (!Array.prototype.indexOf)
@@ -698,12 +698,12 @@ fieldset {
 	margin: 1em 0;
 }
 
-.picture .examples dt {
+.examples dt {
 	margin: .5em 0;
 	font-weight: bold;
 }
 
-.picture .examples input {
+.examples input {
 	text-align: center;
 	background: rgb(213, 214, 182);
 	border: 1px solid #fff;
@@ -1211,7 +1211,7 @@ class Fotoo_Hosting
 
 	public function getAlbum($hash)
 	{
-		return $this->db->querySingle('SELECT * FROM albums WHERE hash = \''.$this->db->escapeString($hash).'\';', true);
+		return $this->db->querySingle('SELECT *, strftime(\'%s\', date) AS date FROM albums WHERE hash = \''.$this->db->escapeString($hash).'\';', true);
 	}
 
 	public function getAlbumPictures($hash, $page)
@@ -2676,7 +2676,15 @@ elseif (!empty($_GET['a']))
 
     $html = '
         <article class="browse">
-            <h2>'.escape($title).'</h2>';
+            <h2>'.escape($title).'</h2>
+            <p class="info">
+                Uploaded on <time datetime="'.date(DATE_W3C, $album['date']).'">'.strftime('%c', $album['date']).'</time>
+                | '.(int)$max.' picture'.((int)$max > 1 ? 's' : '').'
+            </p>
+            <aside class="examples">
+                <dt>Share this album using this URL:</dt>
+                <dd><input type="text" onclick="this.select();" value="'.escape($config->album_page_url . $album['hash']).'" /></dd>
+            </aside>';
 
     if ($fh->logged())
     {
