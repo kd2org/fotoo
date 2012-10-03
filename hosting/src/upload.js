@@ -27,37 +27,7 @@
     var last_filename = '';
     var loading_gif = 'data:image/gif;base64,R0lGODlhEAAQAPIAAP%2F%2F%2FwAAAMLCwkJCQgAAAGJiYoKCgpKSkiH%2BGkNyZWF0ZWQgd2l0aCBhamF4bG9hZC5pbmZvACH5BAAKAAAAIf8LTkVUU0NBUEUyLjADAQAAACwAAAAAEAAQAAADMwi63P4wyklrE2MIOggZnAdOmGYJRbExwroUmcG2LmDEwnHQLVsYOd2mBzkYDAdKa%2BdIAAAh%2BQQACgABACwAAAAAEAAQAAADNAi63P5OjCEgG4QMu7DmikRxQlFUYDEZIGBMRVsaqHwctXXf7WEYB4Ag1xjihkMZsiUkKhIAIfkEAAoAAgAsAAAAABAAEAAAAzYIujIjK8pByJDMlFYvBoVjHA70GU7xSUJhmKtwHPAKzLO9HMaoKwJZ7Rf8AYPDDzKpZBqfvwQAIfkEAAoAAwAsAAAAABAAEAAAAzMIumIlK8oyhpHsnFZfhYumCYUhDAQxRIdhHBGqRoKw0R8DYlJd8z0fMDgsGo%2FIpHI5TAAAIfkEAAoABAAsAAAAABAAEAAAAzIIunInK0rnZBTwGPNMgQwmdsNgXGJUlIWEuR5oWUIpz8pAEAMe6TwfwyYsGo%2FIpFKSAAAh%2BQQACgAFACwAAAAAEAAQAAADMwi6IMKQORfjdOe82p4wGccc4CEuQradylesojEMBgsUc2G7sDX3lQGBMLAJibufbSlKAAAh%2BQQACgAGACwAAAAAEAAQAAADMgi63P7wCRHZnFVdmgHu2nFwlWCI3WGc3TSWhUFGxTAUkGCbtgENBMJAEJsxgMLWzpEAACH5BAAKAAcALAAAAAAQABAAAAMyCLrc%2FjDKSatlQtScKdceCAjDII7HcQ4EMTCpyrCuUBjCYRgHVtqlAiB1YhiCnlsRkAAAOwAAAAAAAAAAAA%3D%3D';
     var album_id = null;
-
-    function checkBeforeSubmit()
-    {
-        if (!can_submit)
-        {
-            alert('File is loading, please wait...');
-            return false;
-        }
-
-        var img = document.getElementById("resizedImg").firstChild;
-
-        if (!img || !img.src)
-            return true;
-
-        can_submit = false;
-        var file = document.getElementById("f_file");
-
-        var name = document.createElement('input');
-        name.type = 'hidden';
-        name.name = file.name + '[name]';
-        name.value = file.value.replace(/^.*[\/\\]([^\/\\]*)$/, '$1');
-        file.parentNode.appendChild(name);
-
-        file.type = "hidden";
-        file.name = file.name + "[content]";
-        file.value = img.src.substr(img.src.indexOf(',') + 1);
-
-        document.getElementById("resizedThumb").innerHTML += "<br />Uploading... <img class=\"loading\" src=\"" + loading_gif + "\" alt=\"\" />";
-
-        return true;
-    }
+    var xhr = new XMLHttpRequest;
 
     function cleanFileName(filename)
     {
@@ -73,46 +43,67 @@
         return filename;
     }
 
-    function uploadPicture(index)
+    function uploadPicture(index, element_index)
     {
-        var current = document.getElementById('albumParent').childNodes[index];
-        var xhr = new XMLHttpRequest;
+        var file = document.getElementById('f_files').files[index];
+
+        if (!(/^image\/jpe?g$/i.test(file.type)))
+        {
+            uploadPicture(index+1, element_index);
+            return;
+        }
+
+        var current = document.getElementById('albumParent').childNodes[element_index];
+        var resized_img = document.createElement('div');
+        resized_img.style.display = "none";
 
         var name = current.getElementsByTagName('input')[0];
-        var img = current.getElementsByTagName('img')[0]
-
         name.disabled = true;
 
-        var msg = document.createElement('span');
-        msg.innerHTML = "Uploading... <img class=\"loading\" src=\"" + loading_gif + "\" alt=\"\" />";
-        current.querySelector('.resizedThumb').appendChild(msg);
+        var progress = document.createElement('span');
+        current.appendChild(progress);
 
-        var params = "album_append=1&name=" + encodeURIComponent(name.value) + "&album=" + encodeURIComponent(album_id);
-        params += "&filename=" + encodeURIComponent(document.getElementById('f_files').files[index].name);
-        params += "&content=" + encodeURIComponent(img.src.substr(img.src.indexOf(',') + 1));
-
-        xhr.open('POST', config.base_url + '?album', true);
-        xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-        xhr.setRequestHeader("Content-length", params.length);
-        xhr.setRequestHeader("Connection", "close");
-
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState == 4 && xhr.status == 200)
+        resize(
+            file,
+            config.max_width,
+            resized_img,
+            progress,
+            function()
             {
-                msg.innerHTML = "Uploaded <b>✔</b>";
+                var img = resized_img.firstChild
 
-                if (index + 1 < document.getElementById('albumParent').childNodes.length)
-                {
-                    uploadPicture(index+1);
-                }
-                else
-                {
-                    location.href = config.album_page_url + album_id;
-                }
+                progress.innerHTML = "Uploading... <img class=\"loading\" src=\"" + loading_gif + "\" alt=\"\" />";
+
+                var params = "album_append=1&name=" + encodeURIComponent(name.value) + "&album=" + encodeURIComponent(album_id);
+                params += "&filename=" + encodeURIComponent(file.name);
+                params += "&content=" + encodeURIComponent(img.src.substr(img.src.indexOf(',') + 1));
+
+                xhr.open('POST', config.base_url + '?album', true);
+                xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+                xhr.setRequestHeader("Content-length", params.length);
+                xhr.setRequestHeader("Connection", "close");
+
+                xhr.onreadystatechange = function () {
+                    if (xhr.readyState == 4 && xhr.status == 200)
+                    {
+                        progress.innerHTML = "Uploaded <b>✔</b>";
+                        img.parentNode.removeChild(img);
+
+                        if (index + 1 < document.getElementById('f_files').files.length)
+                        {
+                            uploadPicture(index+1, element_index+1);
+                        }
+                        else
+                        {
+                            location.href = config.album_page_url + album_id;
+                        }
+                    }
+                };
+
+                xhr.send(params);
+                params = null;
             }
-        };
-
-        xhr.send(params);
+        );
     }
 
     window.onload = function ()
@@ -131,12 +122,20 @@
             link.parentNode.insertBefore(album_li, link);
         }
 
+        document.getElementById('f_submit').style.display = 'none';
+
         var parent = document.getElementById('albumParent');
 
+        // Mode album
         if (parent)
         {
             document.getElementById("f_files").onchange = function ()
             {
+                if (this.files.length < 1)
+                {
+                    return false;
+                }
+
                 if (parent.firstChild && parent.firstChild.nodeType == Node.TEXT_NODE)
                 {
                     parent.removeChild(parent.firstChild);
@@ -149,7 +148,7 @@
                 {
                     var file = this.files[i];
 
-                    if (!(/^image\/jpeg/.test(file.type)))
+                    if (!(/^image\/jpe?g$/i.test(file.type)))
                     {
                         continue;
                     }
@@ -169,19 +168,18 @@
                     name.type = 'text';
                     name.value = cleanFileName(file.name);
 
-                    var resized_img = document.createElement('div');
-                    resized_img.style.display = "none";
-                    resized_img.className = 'resizedImage';
-                    var resized_thumb = document.createElement('div');
-                    resized_thumb.className = 'resizedThumb';
+                    var thumb = document.createElement('div');
+                    thumb.className = 'thumb';
+
+                    var progress = document.createElement('p');
 
                     caption.appendChild(name);
-                    fig.appendChild(resized_img);
-                    fig.appendChild(resized_thumb);
+                    fig.appendChild(thumb);
+                    fig.appendChild(progress);
                     fig.appendChild(caption);
                     parent.appendChild(fig);
 
-                    to_resize.push(new Array(file, resized_img, resized_thumb));
+                    to_resize.push(new Array(file, thumb, progress));
                     found.push(id);
                 }
 
@@ -199,17 +197,18 @@
                     if (to_resize.length < 1)
                     {
                         can_submit = true;
+                        document.getElementById('f_submit').style.display = 'inline';
                         return;
                     }
 
                     var current = to_resize[0];
                     resize(
-                        current[0],
-                        config.max_width, // size
+                        current[0], // file
+                        config.thumb_width, // size
                         current[1], // image resized
-                        config.thumb_width, // thumb size
-                        current[2], // thumb resized
+                        current[2], // progress element
                         function () {
+                            current[2].parentNode.removeChild(current[2]);
                             resizeFromList();
                         }
                     );
@@ -248,6 +247,7 @@
                 }
 
                 can_submit = false;
+                document.getElementById('f_submit').style.display = 'none';
 
                 var xhr = new XMLHttpRequest;
 
@@ -263,7 +263,7 @@
                     if (xhr.readyState == 4 && xhr.status == 200)
                     {
                         album_id = xhr.responseText;
-                        uploadPicture(0);
+                        uploadPicture(0, 0);
                     }
                 };
 
@@ -272,73 +272,144 @@
                 return false;
             };
         }
-        else
+        else // Single file mode
         {
             var parent = document.getElementById('resizeParent');
 
-            var div_thumb = document.createElement('div');
-            div_thumb.id = "resizedThumb";
-            div_thumb.innerHTML = 'Please select a picture...';
+            var figure = document.createElement('figure');
+            var thumb = document.createElement('div');
 
-            var div_img = document.createElement('div');
-            div_img.id = "resizedImg";
-            div_img.style.display = "none";
+            var progress = document.createElement('figcaption');
+            progress.innerHTML = 'Please select a picture...';
 
-            parent.appendChild(div_img);
-            parent.appendChild(div_thumb);
+            figure.appendChild(progress);
+            figure.appendChild(thumb);
+            parent.appendChild(figure);
 
             document.getElementById("f_file").onchange = function ()
             {
-                resize(
-                    this.files.length ? this.files[0] : null,
-                    config.max_width, // size
-                    document.getElementById("resizedImg"), // image resized
-                    config.thumb_width, // thumb size
-                    document.getElementById("resizedThumb") // thumb resized
-                );
+                if (!this.files.length)
+                {
+                    return false;
+                }
+
+                if (/^image\/jpe?g$/i.test(this.files[0].type))
+                {
+                    can_submit = false;
+
+                    resize(
+                        this.files[0],
+                        config.thumb_width, // thumb size
+                        thumb, // thumb resized
+                        progress,
+                        function () {
+                            if (thumb.firstChild)
+                            {
+                                progress.parentNode.removeChild(progress);
+                            }
+                            can_submit = true;
+                            document.getElementById('f_submit').style.display = 'inline';
+                        }
+                    );
+                }
+                else if (/^image\//.test(this.files[0].type))
+                {
+                    progress.innerHTML = "Image is recognized.";
+                    can_submit = true;
+                    document.getElementById('f_submit').style.display = 'inline';
+                }
+                else
+                {
+                    progress.innerHTML = 'The chosen file is not an image.';
+                    return false;
+                }
 
                 if (document.getElementById("f_name").value != last_filename)
                     return;
 
-                var filename = cleanFileName(this.value);
-
-                last_filename = filename;
-                document.getElementById("f_name").value = filename;
+                last_filename = this.files[0].name;
+                document.getElementById("f_name").value = cleanFileName(this.files[0].name);
             }
 
-            document.getElementById("f_upload").onsubmit = checkBeforeSubmit;
+            document.getElementById("f_upload").onsubmit = function ()
+            {
+                if (can_submit == 2)
+                {
+                    return true;
+                }
+
+                if (!can_submit)
+                {
+                    alert('File is loading, please wait...');
+                    return false;
+                }
+
+                var file = document.getElementById('f_file');
+
+                if (!file.files.length)
+                {
+                    alert('You must choose a file before sending.');
+                    return false;
+                }
+
+                var div_img = document.createElement('div');
+                div_img.style.display = "none";
+
+                parent.appendChild(div_img);
+
+                can_submit = false;
+                document.getElementById('f_submit').style.display = 'none';
+
+                if (/^image\/jpe?g$/i.test(file.files[0].type))
+                {
+                    var progress = document.createElement('span');
+                    parent.firstChild.appendChild(progress);
+
+                    resize(
+                        file.files[0],
+                        config.max_width, // thumb size
+                        div_img, // thumb resized
+                        progress,
+                        function () {
+                            progress.innerHTML = "Uploading... <img class=\"loading\" src=\"" + loading_gif + "\" alt=\"\" />";
+
+                            var img = div_img.firstChild;
+
+                            var name = document.createElement('input');
+                            name.type = 'hidden';
+                            name.name = file.name + '[name]';
+                            name.value = file.value.replace(/^.*[\/\\]([^\/\\]*)$/, '$1');
+                            file.parentNode.appendChild(name);
+
+                            file.type = "hidden";
+                            file.name = file.name + "[content]";
+                            file.value = img.src.substr(img.src.indexOf(',') + 1);
+
+                            can_submit = 2;
+                            document.getElementById('f_upload').submit();
+                        }
+                    );
+
+                    return false;
+                }
+                else
+                {
+                    var progress = document.createElement('p');
+                    progress.innerHTML = "Uploading... <img class=\"loading\" src=\"" + loading_gif + "\" alt=\"\" />";
+                    parent.firstChild.appendChild(progress);
+                    return true;
+                }
+            };
         }
     };
 
-    function resize($file, $size, $img, $thumb_size, $thumb, $onload)
+    function resize($file, $size, $img, $progress, $onload)
     {
         function resampled(data)
         {
             var img = ($img.lastChild || $img.appendChild(new Image));
             img.src = data;
             img.className = "preview";
-
-            if ($thumb && $thumb_size)
-            {
-                var thumb_size = parseInt($thumb_size, 10);
-                Resample(
-                    data,
-                    thumb_size,
-                    null,
-                    resampledThumb
-                );
-            }
-            else if ($onload)
-            {
-                $onload();
-            }
-        }
-
-        function resampledThumb(data)
-        {
-            $thumb.innerHTML = "";
-            var img = ($thumb.lastChild || $thumb.appendChild(new Image));
-            img.src = data;
 
             if ($onload)
             {
@@ -369,9 +440,13 @@
 
         var size = parseInt($size, 10);
 
-        if ((/^image\/jpeg/.test($file.type)))
+        if ((/^image\/jpe?g/.test($file.type)))
         {
-            if ($thumb) $thumb.innerHTML = "Resizing... <img class=\"loading\" src=\"" + loading_gif + "\" alt=\"\" />";
+            if ($progress)
+            {
+                $progress.innerHTML = "Resizing... <img class=\"loading\" src=\"" + loading_gif + "\" alt=\"\" />";
+            }
+
             can_submit = false;
 
             var file = new FileReader;
@@ -381,13 +456,9 @@
             file._resize = size;
             file.readAsDataURL($file);
         }
-        else if ($file && /^image\//.test($file.type))
+        else
         {
-            if ($thumb) $thumb.innerHTML = "Image is recognized.";
-        }
-        else if ($file)
-        {
-            $thumb.innerHTML = '<p class="warning">The chosen file is not an image.</p>';
+            return false;
         }
     }
 
