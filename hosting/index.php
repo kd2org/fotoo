@@ -1,5 +1,5 @@
 <?php
-// Fotoo Hosting single-file release v2.0.0
+// Fotoo Hosting single-file release version 2.0.1
 ?><?php if (isset($_GET["js"])): header("Content-Type: text/javascript"); ?>
 (function () {
     if (!Array.prototype.indexOf)
@@ -296,6 +296,11 @@
                     return false;
                 }
 
+                progress.style.display = "block";
+                thumb.innerHTML = '';
+                document.getElementById('f_submit').style.display = 'none';
+                can_submit = false;
+
                 if (/^image\/jpe?g$/i.test(this.files[0].type))
                 {
                     can_submit = false;
@@ -308,23 +313,29 @@
                         function () {
                             if (thumb.firstChild)
                             {
-                                progress.parentNode.removeChild(progress);
+                                progress.style.display = "none";
                             }
                             can_submit = true;
                             document.getElementById('f_submit').style.display = 'inline';
                         }
                     );
                 }
-                else if (/^image\//.test(this.files[0].type))
-                {
-                    progress.innerHTML = "Image is recognized.";
-                    can_submit = true;
-                    document.getElementById('f_submit').style.display = 'inline';
-                }
                 else
                 {
-                    progress.innerHTML = 'The chosen file is not an image.';
-                    return false;
+                    var r = new RegExp('\.(' + config.allowed_formats.join('|') + ')$', 'i');
+
+                    if (/^image\//i.test(this.files[0].type) && r.test(this.files[0].name))
+                    {
+                        progress.innerHTML = "Image is recognized.";
+                        can_submit = true;
+                        document.getElementById('f_submit').style.display = 'inline';
+                    }
+                    else
+                    {
+                        progress.innerHTML = 'The chosen file is not an image.';
+                        document.getElementById('f_submit').style.display = 'none';
+                        return false;
+                    }
                 }
 
                 if (document.getElementById("f_name").value != last_filename)
@@ -991,18 +1002,6 @@ class Fotoo_Hosting
 
 		$options = array();
 		$options[image::USE_GD_FAST_RESIZE_TRICK] = true;
-		$ext = false;
-
-		if (!preg_match('!\.(\w+)$!i', $file['name'], $match))
-		{
-			$ext = strtolower($match[1]);
-		}
-
-		// Pour les formats exotiques, on essaye Imagick
-		if ($ext != 'jpeg' && $ext != 'png' && $ext != 'jpg' && $ext != 'gif')
-		{
-			$options[image::FORCE_IMAGICK] = true;
-		}
 
 		$img = image::identify($file['tmp_name'], $options);
 
@@ -1013,9 +1012,9 @@ class Fotoo_Hosting
 			throw new FotooException("Invalid image format.", UPLOAD_ERR_INVALID_IMAGE);
 		}
 
-		if ($img['format'] == 'PNG' || $img['format'] == 'JPEG' || $img['format'] == 'GIF')
+		if ($img['format'] != 'PNG' && $img['format'] != 'JPEG' && $img['format'] != 'GIF')
 		{
-			$options[image::FORCE_IMAGICK] = false;
+			$options[image::FORCE_IMAGICK] = true;
 		}
 
 		$size = filesize($file['tmp_name']);
@@ -2131,7 +2130,7 @@ function fastimagecopyresampled (&$dst_image, $src_image, $dst_x, $dst_y, $src_x
 
 ?><?php
 /**
-    Fotoo Hosting v2.0.0
+    Fotoo Hosting
     Copyright 2010-2012 BohwaZ - http://dev.kd2.org/
     Licensed under the GNU AGPLv3
 
@@ -2224,12 +2223,26 @@ class Fotoo_Hosting_Config
             case 'allowed_formats':
                 if (is_string($value))
                 {
-                    $this->$key = explode(',', strtoupper(str_replace(' ', '', $value)));
+                    $value = explode(',', strtoupper(str_replace(' ', '', $value)));
                 }
                 else
                 {
-                    $this->$key = (array) $value;
+                    $value = (array) $value;
                 }
+
+                // If Imagick is not present then we can't process images different than JPEG, GIF and PNG
+                foreach ($value as $f=>$format)
+                {
+                    $format = strtoupper($format);
+
+                    if ($format != 'PNG' && $format != 'JPEG' && $format != 'GIF' && !class_exists('Imagick'))
+                    {
+                        unset($value[$f]);
+                    }
+                }
+
+                $this->$key = $value;
+
                 break;
             default:
                 throw new FotooException("Unknown configuration property $key");
@@ -2250,6 +2263,7 @@ class Fotoo_Hosting_Config
 
         unset($vars['db_file']);
         unset($vars['storage_path']);
+        unset($vars['admin_password']);
 
         return json_encode($vars);
     }

@@ -1,6 +1,6 @@
 <?php
 /**
-    Fotoo Hosting v2.0.0
+    Fotoo Hosting
     Copyright 2010-2012 BohwaZ - http://dev.kd2.org/
     Licensed under the GNU AGPLv3
 
@@ -93,12 +93,26 @@ class Fotoo_Hosting_Config
             case 'allowed_formats':
                 if (is_string($value))
                 {
-                    $this->$key = explode(',', strtoupper(str_replace(' ', '', $value)));
+                    $value = explode(',', strtoupper(str_replace(' ', '', $value)));
                 }
                 else
                 {
-                    $this->$key = (array) $value;
+                    $value = (array) $value;
                 }
+
+                // If Imagick is not present then we can't process images different than JPEG, GIF and PNG
+                foreach ($value as $f=>$format)
+                {
+                    $format = strtoupper($format);
+
+                    if ($format != 'PNG' && $format != 'JPEG' && $format != 'GIF' && !class_exists('Imagick'))
+                    {
+                        unset($value[$f]);
+                    }
+                }
+
+                $this->$key = $value;
+
                 break;
             default:
                 throw new FotooException("Unknown configuration property $key");
@@ -119,6 +133,7 @@ class Fotoo_Hosting_Config
 
         unset($vars['db_file']);
         unset($vars['storage_path']);
+        unset($vars['admin_password']);
 
         return json_encode($vars);
     }

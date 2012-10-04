@@ -293,6 +293,11 @@
                     return false;
                 }
 
+                progress.style.display = "block";
+                thumb.innerHTML = '';
+                document.getElementById('f_submit').style.display = 'none';
+                can_submit = false;
+
                 if (/^image\/jpe?g$/i.test(this.files[0].type))
                 {
                     can_submit = false;
@@ -305,23 +310,29 @@
                         function () {
                             if (thumb.firstChild)
                             {
-                                progress.parentNode.removeChild(progress);
+                                progress.style.display = "none";
                             }
                             can_submit = true;
                             document.getElementById('f_submit').style.display = 'inline';
                         }
                     );
                 }
-                else if (/^image\//.test(this.files[0].type))
-                {
-                    progress.innerHTML = "Image is recognized.";
-                    can_submit = true;
-                    document.getElementById('f_submit').style.display = 'inline';
-                }
                 else
                 {
-                    progress.innerHTML = 'The chosen file is not an image.';
-                    return false;
+                    var r = new RegExp('\.(' + config.allowed_formats.join('|') + ')$', 'i');
+
+                    if (/^image\//i.test(this.files[0].type) && r.test(this.files[0].name))
+                    {
+                        progress.innerHTML = "Image is recognized.";
+                        can_submit = true;
+                        document.getElementById('f_submit').style.display = 'inline';
+                    }
+                    else
+                    {
+                        progress.innerHTML = 'The chosen file is not an image.';
+                        document.getElementById('f_submit').style.display = 'none';
+                        return false;
+                    }
                 }
 
                 if (document.getElementById("f_name").value != last_filename)

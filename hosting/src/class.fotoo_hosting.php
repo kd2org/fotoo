@@ -182,18 +182,6 @@ class Fotoo_Hosting
 
 		$options = array();
 		$options[image::USE_GD_FAST_RESIZE_TRICK] = true;
-		$ext = false;
-
-		if (!preg_match('!\.(\w+)$!i', $file['name'], $match))
-		{
-			$ext = strtolower($match[1]);
-		}
-
-		// Pour les formats exotiques, on essaye Imagick
-		if ($ext != 'jpeg' && $ext != 'png' && $ext != 'jpg' && $ext != 'gif')
-		{
-			$options[image::FORCE_IMAGICK] = true;
-		}
 
 		$img = image::identify($file['tmp_name'], $options);
 
@@ -204,9 +192,9 @@ class Fotoo_Hosting
 			throw new FotooException("Invalid image format.", UPLOAD_ERR_INVALID_IMAGE);
 		}
 
-		if ($img['format'] == 'PNG' || $img['format'] == 'JPEG' || $img['format'] == 'GIF')
+		if ($img['format'] != 'PNG' && $img['format'] != 'JPEG' && $img['format'] != 'GIF')
 		{
-			$options[image::FORCE_IMAGICK] = false;
+			$options[image::FORCE_IMAGICK] = true;
 		}
 
 		$size = filesize($file['tmp_name']);
