@@ -1564,8 +1564,8 @@ class image
             if (!$gd_img)
                 return false;
 
-            $image['width'] = $im[0];
-            $image['height'] = $im[1];
+            $image['width'] = $gd_img[0];
+            $image['height'] = $gd_img[1];
 
             switch ($gd_img[2])
             {
