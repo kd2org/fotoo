@@ -1932,7 +1932,8 @@ class image
             throw new imageLibException("Invalid input format: ".$e->getMessage());
         }
 
-        list($w, $h) = $infos;
+        $w = $infos['width'];
+        $h = $infos['height'];
 
         $dst_x = 0;
         $dst_y = 0;
