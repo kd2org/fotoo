@@ -89,7 +89,7 @@
                 xhr.onreadystatechange = function () {
                     if (xhr.readyState == 4 && xhr.status == 200)
                     {
-                        progress.innerHTML = "Uploaded <b>✔</b>";
+                        progress.innerHTML = "Uploaded <b>&#10003;</b>";
                         img.parentNode.removeChild(img);
 
                         if (index + 1 < document.getElementById('f_files').files.length)
