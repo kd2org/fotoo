@@ -1,5 +1,5 @@
 <?php
-// Fotoo Hosting single-file release version 2.0.1
+// Fotoo Hosting single-file release version 2.0.2
 ?><?php if (isset($_GET["js"])): header("Content-Type: text/javascript"); ?>
 (function () {
     if (!Array.prototype.indexOf)
