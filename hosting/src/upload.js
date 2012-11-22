@@ -108,7 +108,7 @@
 
     window.onload = function ()
     {
-        if (!FileReader)
+        if (!FileReader && !window.URL)
             return false;
 
         if (FileList && XMLHttpRequest)
@@ -418,11 +418,19 @@
 
     function resize($file, $size, $img, $progress, $onload)
     {
+        this._url = null;
+
         function resampled(data)
         {
             var img = ($img.lastChild || $img.appendChild(new Image));
             img.src = data;
             img.className = "preview";
+
+            if (this._url && (window.URL || window.webkitURL).revokeObjectURL)
+            {
+                (window.URL || window.webkitURL).revokeObjectURL(this._url);
+                this._url = null;
+            }
 
             if ($onload)
             {
@@ -462,12 +470,21 @@
 
             can_submit = false;
 
-            var file = new FileReader;
-            file.onload = load;
-            file.onabort = abort;
-            file.onerror = error;
-            file._resize = size;
-            file.readAsDataURL($file);
+            if (!(window.URL || window.webkitURL) && FileReader)
+            {
+                var file = new FileReader;
+                file.onload = load;
+                file.onabort = abort;
+                file.onerror = error;
+                file._resize = size;
+                file.readAsDataURL($file);
+            }
+            else
+            {
+                var url = (window.URL || window.webkitURL).createObjectURL($file);
+                this._url = url;
+                Resample(url, size, null, resampled);
+            }
         }
         else
         {
@@ -550,7 +567,7 @@
                 height // destination height
             );
 
-            onresample(canvas.toDataURL("image/jpeg", 0.70));
+            onresample(canvas.toDataURL("image/jpeg", 0.75));
             context.clearRect(0, 0, canvas.width, canvas.height);
         }
 
