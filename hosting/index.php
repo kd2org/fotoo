@@ -417,6 +417,8 @@
         }
     };
 
+    var canvas = document.createElement("canvas");
+
     function resize($file, $size, $img, $progress, $onload)
     {
         function resampled(data)
@@ -551,7 +553,8 @@
                 height // destination height
             );
 
-            onresample(canvas.toDataURL("image/jpeg"));
+            onresample(canvas.toDataURL("image/jpeg", 0.70));
+            context.clearRect(0, 0, canvas.width, canvas.height);
         }
 
         var context = canvas.getContext("2d"),
@@ -560,7 +563,7 @@
         return Resample;
     }
     (
-        this.document.createElement("canvas")
+        canvas
     ));
 } ());
 <?php exit; endif; ?><?php if (isset($_GET["css"])): header("Content-Type: text/css"); ?>
