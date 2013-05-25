@@ -33,6 +33,8 @@
             Slideshow and embed available for tags
         2.3 Migrate to PDO/SQLite3 as SQLite2 is deleted from PHP 5.4
             New slideshow and embed code with HD/Zoom features
+        2.4 Added pagination on albums, tags and dates to avoid pages with
+            a large number of pictures.
 
     REQUIREMENTS
     ------------
