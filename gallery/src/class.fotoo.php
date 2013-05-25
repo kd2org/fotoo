@@ -487,7 +487,7 @@ class fotooManager
     }
 
     // Returns directories and pictures inside a directory
-    public function getDirectory($path='', $dont_check = false)
+    public function getDirectory($path = '', $dont_check = false, $page = 1, &$total = null)
     {
         $path = self::getValidDirectory($path);
 
@@ -506,30 +506,46 @@ class fotooManager
         $pictures = array();
         $to_update = array();
 
+        // Pagination
+        $begin = ($page - 1) * NB_PICTURES_PER_PAGE;
+        $end = $begin + NB_PICTURES_PER_PAGE;
+        $i = 0; // Current picture number in list
+
         while ($file = $dir->read())
         {
             $file_path = $dir_path . $file;
 
             if ($file[0] == '.' || $file_path == CACHE_DIR)
+            {
                 continue;
+            }
 
             if (is_dir($file_path))
             {
                 $dirs[] = $file;
+                continue;
             }
             elseif (!preg_match('!\.jpe?g$!i', $file))
             {
                 continue;
             }
             // Don't detect updates when directory has already been updated
-            // (used in 'index_all' process only, to avoid server load)
+            // (used in 'index_all' p'rocess only, to avoid server load)
             elseif ($dont_check)
             {
                 continue;
             }
             elseif ($pic = $this->getInfos($file, $path, true))
             {
-                if (is_array($pic)) $pictures[$file] = $pic;
+                if (is_array($pic) && ($i >= $begin) && ($i < $end))
+                {
+                    $pictures[$file] = $pic;
+                    $i++;
+                }
+                elseif (is_array($pic))
+                {
+                    $i++;
+                }
             }
             else
             {
@@ -551,14 +567,31 @@ class fotooManager
             $description = false;
         }
 
+        $total = $i + 1;
+
         return array($dirs, $pictures, $to_update, $description);
     }
 
-    public function getByDate($y=false, $m=false, $d=false)
+    public function countByDate($y, $m = false, $d = false)
+    {
+        $req = 'SELECT COUNT(*) FROM photos WHERE year="'.(int)$y.'"';
+
+        if ($m)
+            $req .= ' AND month="'.(int)$m.'"';
+        if ($d)
+            $req .= 'AND day="'.(int)$d.'"';
+
+        $query = $this->db->query($req . ';');
+        return $query->fetchColumn();
+    }
+
+    public function getByDate($y = false, $m = false, $d = false, $page = 1)
     {
         if ($d)
         {
-            $query = $this->db->prepare('SELECT * FROM photos WHERE year = ? AND month = ? AND day = ? ORDER BY time;');
+            $begin = ($page - 1) * NB_PICTURES_PER_PAGE;
+            $query = $this->db->prepare('SELECT * FROM photos WHERE year = ? AND month = ? AND day = ? 
+                ORDER BY time LIMIT ' . (int) $begin . ', ' . (int) NB_PICTURES_PER_PAGE . ';');
             $query->execute(array((int)$y, (int)$m, (int)$d));
             return $query->fetchAll(PDO::FETCH_ASSOC);
         }
@@ -629,13 +662,24 @@ class fotooManager
         return $tags;
     }
 
-    public function getByTag($tag)
+    public function getByTag($tag, $page = 1)
     {
+        $begin = ($page - 1) * NB_PICTURES_PER_PAGE;
         $query = $this->db->prepare('SELECT photos.* FROM photos
             INNER JOIN tags ON tags.photo = photos.id
-            WHERE tags.name_id = ? ORDER BY photos.time, photos.filename COLLATE NOCASE;');
+            WHERE tags.name_id = ? ORDER BY photos.time, photos.filename COLLATE NOCASE
+            LIMIT ' . (int) $begin . ', ' . (int) NB_PICTURES_PER_PAGE . ';');
         $query->execute(array($this->getTagId($tag)));
         return $query->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function countByTag($tag)
+    {
+        $query = $this->db->prepare('SELECT COUNT(*) FROM photos
+            INNER JOIN tags ON tags.photo = photos.id
+            WHERE tags.name_id = ?;');
+        $query->execute(array($this->getTagId($tag)));
+        return $query->fetchColumn();
     }
 
     public function getNearTags($tag)

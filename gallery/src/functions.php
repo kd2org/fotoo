@@ -73,6 +73,10 @@ function get_url($type, $data = null, $args = null)
     {
         $url = SELF_URL . '?' . $type;
     }
+    elseif ($type == 'page')
+    {
+        return '&p=';
+    }
     else
     {
         throw new Exception('Unknown type '.$type);
@@ -100,6 +104,28 @@ function embed_html($data)
         .   '<iframe src="'.escape($url).'" width="600" height="450" frameborder="0" scrolling="no"></iframe>'
         .   '</object>';
     return $html;
+}
+
+function html_pagination($page, $total, $url)
+{
+    if ($total <= NB_PICTURES_PER_PAGE)
+        return '';
+
+    $nb_pages = ceil($total / NB_PICTURES_PER_PAGE);
+
+    $html = '
+    <ul class="pagination">
+    ';
+
+    for ($p = 1; $p <= $nb_pages; $p++)
+    {
+        $html .= '<li'.($page == $p ? ' class="selected"' : '').'><a href="'.escape($url.$p).'">'.$p.'</a></li>';
+    }
+
+    $html .= '
+    </ul>';
+
+    echo $html;
 }
 
 ?>

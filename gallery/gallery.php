@@ -520,7 +520,7 @@ class fotooManager
     }
 
     // Returns directories and pictures inside a directory
-    public function getDirectory($path='', $dont_check = false)
+    public function getDirectory($path = '', $dont_check = false, $page = 1, &$total = null)
     {
         $path = self::getValidDirectory($path);
 
@@ -539,30 +539,46 @@ class fotooManager
         $pictures = array();
         $to_update = array();
 
+        // Pagination
+        $begin = ($page - 1) * NB_PICTURES_PER_PAGE;
+        $end = $begin + NB_PICTURES_PER_PAGE;
+        $i = 0; // Current picture number in list
+
         while ($file = $dir->read())
         {
             $file_path = $dir_path . $file;
 
             if ($file[0] == '.' || $file_path == CACHE_DIR)
+            {
                 continue;
+            }
 
             if (is_dir($file_path))
             {
                 $dirs[] = $file;
+                continue;
             }
             elseif (!preg_match('!\.jpe?g$!i', $file))
             {
                 continue;
             }
             // Don't detect updates when directory has already been updated
-            // (used in 'index_all' process only, to avoid server load)
+            // (used in 'index_all' p'rocess only, to avoid server load)
             elseif ($dont_check)
             {
                 continue;
             }
             elseif ($pic = $this->getInfos($file, $path, true))
             {
-                if (is_array($pic)) $pictures[$file] = $pic;
+                if (is_array($pic) && ($i >= $begin) && ($i < $end))
+                {
+                    $pictures[$file] = $pic;
+                    $i++;
+                }
+                elseif (is_array($pic))
+                {
+                    $i++;
+                }
             }
             else
             {
@@ -584,14 +600,31 @@ class fotooManager
             $description = false;
         }
 
+        $total = $i + 1;
+
         return array($dirs, $pictures, $to_update, $description);
     }
 
-    public function getByDate($y=false, $m=false, $d=false)
+    public function countByDate($y, $m = false, $d = false)
+    {
+        $req = 'SELECT COUNT(*) FROM photos WHERE year="'.(int)$y.'"';
+
+        if ($m)
+            $req .= ' AND month="'.(int)$m.'"';
+        if ($d)
+            $req .= 'AND day="'.(int)$d.'"';
+
+        $query = $this->db->query($req . ';');
+        return $query->fetchColumn();
+    }
+
+    public function getByDate($y = false, $m = false, $d = false, $page = 1)
     {
         if ($d)
         {
-            $query = $this->db->prepare('SELECT * FROM photos WHERE year = ? AND month = ? AND day = ? ORDER BY time;');
+            $begin = ($page - 1) * NB_PICTURES_PER_PAGE;
+            $query = $this->db->prepare('SELECT * FROM photos WHERE year = ? AND month = ? AND day = ? 
+                ORDER BY time LIMIT ' . (int) $begin . ', ' . (int) NB_PICTURES_PER_PAGE . ';');
             $query->execute(array((int)$y, (int)$m, (int)$d));
             return $query->fetchAll(PDO::FETCH_ASSOC);
         }
@@ -662,13 +695,24 @@ class fotooManager
         return $tags;
     }
 
-    public function getByTag($tag)
+    public function getByTag($tag, $page = 1)
     {
+        $begin = ($page - 1) * NB_PICTURES_PER_PAGE;
         $query = $this->db->prepare('SELECT photos.* FROM photos
             INNER JOIN tags ON tags.photo = photos.id
-            WHERE tags.name_id = ? ORDER BY photos.time, photos.filename COLLATE NOCASE;');
+            WHERE tags.name_id = ? ORDER BY photos.time, photos.filename COLLATE NOCASE
+            LIMIT ' . (int) $begin . ', ' . (int) NB_PICTURES_PER_PAGE . ';');
         $query->execute(array($this->getTagId($tag)));
         return $query->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function countByTag($tag)
+    {
+        $query = $this->db->prepare('SELECT COUNT(*) FROM photos
+            INNER JOIN tags ON tags.photo = photos.id
+            WHERE tags.name_id = ?;');
+        $query->execute(array($this->getTagId($tag)));
+        return $query->fetchColumn();
     }
 
     public function getNearTags($tag)
@@ -958,6 +1002,10 @@ function get_url($type, $data = null, $args = null)
     {
         $url = SELF_URL . '?' . $type;
     }
+    elseif ($type == 'page')
+    {
+        return '&p=';
+    }
     else
     {
         throw new Exception('Unknown type '.$type);
@@ -985,6 +1033,28 @@ function embed_html($data)
         .   '<iframe src="'.escape($url).'" width="600" height="450" frameborder="0" scrolling="no"></iframe>'
         .   '</object>';
     return $html;
+}
+
+function html_pagination($page, $total, $url)
+{
+    if ($total <= NB_PICTURES_PER_PAGE)
+        return '';
+
+    $nb_pages = ceil($total / NB_PICTURES_PER_PAGE);
+
+    $html = '
+    <ul class="pagination">
+    ';
+
+    for ($p = 1; $p <= $nb_pages; $p++)
+    {
+        $html .= '<li'.($page == $p ? ' class="selected"' : '').'><a href="'.escape($url.$p).'">'.$p.'</a></li>';
+    }
+
+    $html .= '
+    </ul>';
+
+    echo $html;
 }
 
 
@@ -1021,6 +1091,7 @@ if (!defined('MAX_IMAGE_SIZE')) define('MAX_IMAGE_SIZE', 2048);
 if (!defined('SMALL_IMAGE_SIZE')) define('SMALL_IMAGE_SIZE', 600);
 if (!defined('GALLERY_TITLE'))  define('GALLERY_TITLE', __('My pictures'));
 if (!defined('ALLOW_EMBED'))    define('ALLOW_EMBED', true);
+if (!defined('NB_PICTURES_PER_PAGE')) define('NB_PICTURES_PER_PAGE', 50);
 
 if (!isset($f) || !($f instanceOf fotooManager))
     $f = new fotooManager;
@@ -1202,7 +1273,7 @@ ul.actions { text-align: right; }
 ul.actions li { display: inline-block; }
 ul.actions li a { border: .1em solid #ccf; border-radius: .5em; padding: .2em .5em; background: #eef; }
 
-ul.pics, ul.dirs { text-align: left; display: inline-block; }
+ul.pics, ul.dirs { text-align: center; display: inline-block; }
 ul.pics li, ul.dirs li { text-align: center; display: inline-block; margin: 0.5em; vertical-align: middle; }
 ul.pics li a { display: inline-block; max-width: 170px; max-height: 170px; overflow: hidden; }
 ul.pics li a img { padding: .1em; border: .1em solid transparent; overflow: hidden; }
@@ -1237,6 +1308,11 @@ ul.dates li.day, ul.dates li.month { clear: left; padding-top: 1em; }
 ul.dates ul { margin-left: 2em; }
 ul.dates h3, ul.dates h2 { display: inline; }
 ul.dates p.more { display: inline; margin-left: 2em; }
+
+.pagination { list-style-type: none; text-align: center; }
+.pagination li { display: inline; margin: 0.5em; }
+.pagination .selected { font-weight: bold; font-size: 1.2em; }
+.pagination a { color: #999; }
 
 a:link { color: #009; }
 a:visited { color: #006; }
@@ -1446,6 +1522,7 @@ elseif (isset($_GET['date']) || isset($_GET['timeline']))
         $title = __('Pictures by date');
 
     $mode = 'date';
+    $page = !empty($_GET['p']) ? (int) $_GET['p'] : 1;
 }
 elseif (isset($_GET['tags']))
 {
@@ -1485,11 +1562,13 @@ elseif (!empty($_GET['tag']))
     $tag = $f->getTagId($_GET['tag']);
     $tag_name = $f->getTagNameFromId($tag);
     $title = __('Pictures in tag %TAG', 'REPLACE', array('%TAG' => $tag_name));
+    $page = !empty($_GET['p']) ? (int) $_GET['p'] : 1;
 }
 else
 {
     $mode = 'dir';
     $title = false;
+    $page = !empty($_GET['p']) ? (int) $_GET['p'] : 1;
 
     if (isset($_GET['cleanUpdate']))
     {
@@ -1497,6 +1576,8 @@ else
         unset($_GET['cleanUpdate']);
         $_SERVER['QUERY_STRING'] = '';
     }
+
+    $_SERVER['QUERY_STRING'] = preg_replace('!&p=\d+!', '', $_SERVER['QUERY_STRING']);
 
     if (!empty($_SERVER['QUERY_STRING']) && preg_match('!^(.*)(?:/?([^/]+)[_.](jpe?g))?$!Ui', urldecode($_SERVER['QUERY_STRING']), $match))
     {
@@ -1574,7 +1655,7 @@ if ($mode == 'date')
         </ul>
     </div>';
 
-    $pics = $f->getByDate($year, $month, $day);
+    $pics = $f->getByDate($year, $month, $day, $page);
 
     if (empty($pics))
         echo '<p class="info">'.__('No picture found.').'</p>';
@@ -1592,6 +1673,8 @@ if ($mode == 'date')
         }
 
         echo "</ul>\n";
+
+        html_pagination($page, $f->countByDate($year, $month, $day), get_url('date', $_GET['date']) . get_url('page'));
     }
     else
     {
@@ -1686,7 +1769,7 @@ elseif ($mode == 'tags')
 }
 elseif ($mode == 'tag')
 {
-    $pics = $f->getByTag($tag);
+    $pics = $f->getByTag($tag, $page);
 
     echo '<h1>'.$title.'</h1>';
     echo '<div id="header">
@@ -1746,6 +1829,8 @@ elseif ($mode == 'tag')
                 <dd class="embed"><input type="text" onclick="this.select();" value="'.escape(embed_html($tag)).'" /></dd>
             </dl>';
         }
+
+        html_pagination($page, $f->countByTag($tag), get_url('tag', $tag) . get_url('page'));
     }
 }
 elseif ($mode == 'pic')
@@ -2169,7 +2254,7 @@ echo '
 else
 {
     $pics = $dirs = $update = $desc = false;
-    $list = $f->getDirectory($selected_dir);
+    $list = $f->getDirectory($selected_dir, false, $page, $total);
 
     echo '
         <h1>'.escape($title).'</h1>
@@ -2234,6 +2319,8 @@ else
         }
 
         echo "</ul>\n";
+
+        html_pagination($page, $total, get_url('album', $selected_dir) . get_url('page'));
     }
 
     if (!empty($update))
