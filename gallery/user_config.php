@@ -44,6 +44,9 @@ define('GALLERY_TITLE', 'My own photo gallery');
 // Allow embedding of your pictures ?
 define('ALLOW_EMBED', true);
 
+// Number of pictures per page in albums, tag list and date list
+define('NB_PICTURES_PER_PAGE', 50);
+
 // Generate a resized copy of images for small view (600x600), disabled by default
 // WARNING GENERATING IMAGES IS REALLY SLOW AND IT MAY KILL YOU WEBSERVER!
 
@@ -104,6 +107,10 @@ function get_custom_url($type, $data = null)
     elseif ($type == 'tags' || $type == 'timeline' || $type == 'feed')
     {
         return BASE_URL . $type;
+    }
+    elseif ($type == 'page')
+    {
+        return '?p=';
     }
 }
 */

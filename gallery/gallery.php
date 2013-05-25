@@ -1577,7 +1577,7 @@ else
         $_SERVER['QUERY_STRING'] = '';
     }
 
-    $_SERVER['QUERY_STRING'] = preg_replace('!&p=\d+!', '', $_SERVER['QUERY_STRING']);
+    $_SERVER['QUERY_STRING'] = preg_replace('![&?]p=\d+!', '', $_SERVER['QUERY_STRING']);
 
     if (!empty($_SERVER['QUERY_STRING']) && preg_match('!^(.*)(?:/?([^/]+)[_.](jpe?g))?$!Ui', urldecode($_SERVER['QUERY_STRING']), $match))
     {
