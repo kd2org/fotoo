@@ -687,7 +687,7 @@ class fotooManager
         $query = $this->db->prepare('SELECT t2.name, COUNT(t2.photo) AS nb FROM tags
             INNER JOIN tags AS t2 ON tags.photo = t2.photo
             WHERE tags.name_id = ? AND t2.name_id != tags.name_id
-            GROUP BY t2.name_id ORDER BY nb DESC;');
+            GROUP BY t2.name_id ORDER BY nb DESC LIMIT 0,50;');
         $query->execute(array($this->getTagId($tag)));
 
         $tags = array();
