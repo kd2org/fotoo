@@ -1,6 +1,6 @@
 <?php
 /**********************************************************************
-Fotoo Gallery v2.4.0
+Fotoo Gallery v2.4.1
 Copyright 2004-2013 BohwaZ - http://dev.kd2.org/
 Licensed under the GNU AGPLv3
 
@@ -16,6 +16,7 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this software. If not, see <http://www.gnu.org/licenses/>.
+
 **********************************************************************/
 
 // This check is useless, if you have PHP < 5 you will get a parse error
@@ -870,6 +871,7 @@ class fotooManager
             {
                 if (file_exists($dest)) @unlink($dest);
                 $im->stripImage();
+                $im->setInterlaceScheme(Imagick::INTERLACE_PLANE); // To get progressive jpeg
                 $im->writeImage($dest);
                 $im->destroy();
                 return true;
@@ -899,6 +901,7 @@ class fotooManager
             {
                 $newImage = imagecreatetruecolor($new_width, $new_height);
                 imagecopyresampled($newImage, $sourceImage, 0, 0, 0, 0, $new_width, $new_height, $width, $height);
+                imageinterlace($newImage, true);
 
                 if (file_exists($dest)) @unlink($dest);
                 if(imagejpeg($newImage, $dest))

@@ -837,6 +837,7 @@ class fotooManager
             {
                 if (file_exists($dest)) @unlink($dest);
                 $im->stripImage();
+                $im->setInterlaceScheme(Imagick::INTERLACE_PLANE); // To get progressive jpeg
                 $im->writeImage($dest);
                 $im->destroy();
                 return true;
@@ -866,6 +867,7 @@ class fotooManager
             {
                 $newImage = imagecreatetruecolor($new_width, $new_height);
                 imagecopyresampled($newImage, $sourceImage, 0, 0, 0, 0, $new_width, $new_height, $width, $height);
+                imageinterlace($newImage, true);
 
                 if (file_exists($dest)) @unlink($dest);
                 if(imagejpeg($newImage, $dest))
