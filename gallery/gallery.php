@@ -959,7 +959,7 @@ class fotooManager
 
 function escape($str)
 {
-    return htmlspecialchars($str, ENT_QUOTES, 'UTF-8');
+    return htmlspecialchars($str, ENT_QUOTES, 'UTF-8', false);
 }
 
 function zero_pad($str, $length = 2)
