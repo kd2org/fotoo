@@ -761,6 +761,31 @@ class fotooManager
         return $text;
     }
 
+    public function formatTitle($text)
+    {
+        $text = $this->formatText($text);
+        
+        if ($pos = stripos('<br', $text))
+        {
+            $text = substr($text, 0, $pos);
+        }
+
+        $text = strip_tags($text);
+        $text = trim($text);
+
+        if (strlen($text) > 100)
+        {
+            $text = substr($text, 0, 100);
+
+            if ($pos = strripos(' ', $text))
+            {
+                $text = substr($text, 0, $pos);
+            }
+        }
+
+        return $text;
+    }
+
     public function formatDetails($details)
     {
         if (empty($details))

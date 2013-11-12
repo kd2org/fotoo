@@ -137,7 +137,7 @@ else
 
     if (!empty($current['comment']))
     {
-        echo '<p id="pic_comment">'.$f->formatText($current['comment']).'</p>';
+        echo '<p id="pic_comment">'.$f->formatTitle($current['comment']).'</p>';
     }
 
     $url = get_url('real_image', $current);

@@ -119,8 +119,15 @@ if (isset($_GET['feed']))
             . '<img src="'.$small_url.'" alt="'.escape($photo['filename']).'" /></a></p>'
             . '<p>'.$f->formatText($photo['comment']).'</p>';
 
-        $title = $photo['path'] ? strtr($photo['path'] . '/' . $photo['filename'], array('/' => ' / ', '_' => ' ')) : $photo['filename'];
-        $title = preg_replace('!\.[a-z]+$!i', '', $title);
+        if (!empty($photo['comment']))
+        {
+            $title = $f->formatTitle($photo['comment']);
+        }
+        else
+        {
+            $title = $photo['path'] ? strtr($photo['path'] . '/' . $photo['filename'], array('/' => ' / ', '_' => ' ')) : $photo['filename'];
+            $title = preg_replace('!\.[a-z]+$!i', '', $title);
+        }
 
         echo '
             <item rdf:about="'.get_url('image', $photo).'">
@@ -320,7 +327,7 @@ if (isset($_GET['index_all']))
 
         echo "<script type=\"text/javascript\">\n"
             .'var update_msg = "'.__('Updating')."\";\n"
-            .'var update_dir = "'.escape($dir)."\";\n"
+            .'var update_dir = "'.str_replace('"', '\\"', $dir)."\";\n"
             .'var update_url = "'.SELF_URL."\";\n"
             ."var need_update = new Array();\n";
 
@@ -488,7 +495,16 @@ else
             {
                 $selected_file = $match[2] . '.' . $match[3];
                 $mode = 'pic';
-                $title = strtr(escape($match[2]), array('_' => ' ', '-' => ' - '));
+                $pic = $f->getInfos($selected_file, $selected_dir);
+
+                if (!empty($pic['comment']))
+                {
+                    $title = $f->formatTitle($pic['comment']);
+                }
+                else
+                {
+                    $title = strtr(escape($match[2]), array('_' => ' ', '-' => ' - '));
+                }
             }
         }
     }
@@ -560,6 +576,8 @@ if ($mode == 'date')
 
     if ($day)
     {
+        html_pagination($page, $f->countByDate($year, $month, $day), get_url('date', $_GET['date']) . get_url('page'));
+
         echo '<ul class="pics">'."\n";
 
         foreach ($pics as &$pic)
@@ -707,6 +725,8 @@ elseif ($mode == 'tag')
     }
     else
     {
+        html_pagination($page, $f->countByTag($tag), get_url('tag', $tag) . get_url('page'));
+
         echo '<ul class="pics">'."\n";
 
         foreach ($pics as &$pic)
@@ -733,8 +753,6 @@ elseif ($mode == 'tag')
 }
 elseif ($mode == 'pic')
 {
-    $pic = $f->getInfos($selected_file, $selected_dir);
-
     if (!is_array($pic))
     {
         echo '<h1>'.__('Picture not found').'</h1>
@@ -941,6 +959,8 @@ else
 
     if (!empty($pics))
     {
+        html_pagination($page, $total, get_url('album', $selected_dir) . get_url('page'));
+        
         echo '<ul class="pics">'."\n";
 
         foreach ($pics as &$pic)
