@@ -980,7 +980,7 @@ else
     {
         echo "<script type=\"text/javascript\">\n"
             .'var update_msg = "'.__('Updating')."\";\n"
-            .'var update_dir = "'.escape($selected_dir)."\";\n"
+            .'var update_dir = "'.str_replace('"', '\\"', $selected_dir)."\";\n"
             .'var update_url = "'.SELF_URL."\";\n"
             ."var need_update = new Array();\n";
 
