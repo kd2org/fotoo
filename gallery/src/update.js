@@ -39,6 +39,7 @@ if (typeof need_update != 'undefined')
         img.alt = update_done + '/' + need_update.length;
         img.width = Math.round(update_done * 5);
         img.height = 1;
+        img.style.borderTop = "2px solid #0000CC";
         img.style.borderBottom = "2px solid #000099";
         img.style.verticalAlign = "middle";
         img.style.margin = "0 10px";

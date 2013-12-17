@@ -22,6 +22,8 @@ $french_strings = array(
         =>  'Par date',
     'By tags'
         =>  'Par mot-cl&eacute;',
+    'Search:'
+        =>  'Rechercher :',
     '%B'
         =>  '%B',
     '%A %d'

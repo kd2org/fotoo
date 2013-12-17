@@ -51,8 +51,8 @@ if (!defined('GALLERY_TITLE'))  define('GALLERY_TITLE', __('My pictures'));
 if (!defined('ALLOW_EMBED'))    define('ALLOW_EMBED', true);
 if (!defined('NB_PICTURES_PER_PAGE')) define('NB_PICTURES_PER_PAGE', 50);
 
-if (!isset($f) || !($f instanceOf fotooManager))
-    $f = new fotooManager;
+if (!isset($f) || !($f instanceOf fotoo))
+    $f = new fotoo;
 
 $mode = false;
 
@@ -170,9 +170,10 @@ h1 { font-size: 2em; text-align: center; margin-bottom: .2em; }
 #header { border-radius: .5em; border: .1em solid #ccc; background: #eee; padding: .5em; margin-bottom: .5em; height: 1.3em; }
 #header .breadcrumbs li:before { content: " > "; }
 #header .menu { float: right; }
-#header ul li { display: inline; }
+#header ul li, #header form { display: inline; }
 #header .menu li:before { content: "| "; }
 #header .menu li:first-child:before { content: ""; }
+#header input { font-size: .9em; padding: 2pt; border: .1em solid #ccc; border-radius: .5em; background: #fff; }
 
 ul.actions { text-align: right; }
 ul.actions li { display: inline-block; }
@@ -190,7 +191,7 @@ dl.pic { width: 65%; float: left; text-align: center; }
 dl.pic dd.orig { margin: .5em 0; }
 dl.metas, dl.details { float: right; width: 30%; border: .1em solid #ccc; background: #eee; padding: .5em; margin-bottom: 1em; border-radius: .5em; }
 dl.metas dt, dl.details dt { font-weight: bold; }
-input { font-size: .7em; padding: 2pt; width: 97%; border: .1em solid #ccc; border-radius: .5em; background: #eee; color: #666; }
+dl.metas input { font-size: .7em; padding: 2pt; width: 97%; border: .1em solid #ccc; border-radius: .5em; background: #eee; color: #666; }
 dl.metas dd { margin: 0.2em 0 1em; }
 dl.details { font-size: 0.9em; }
 dl.details dt, dl.details dd { float: left; }
@@ -371,7 +372,7 @@ if (!empty($_GET['r']))
 // Small image redirect
 if (!empty($_GET['i']) && preg_match('!^(.*)(?:/?([^/]+)[_.](jpe?g))?$!Ui', $_GET['i'], $match))
 {
-    $selected_dir = fotooManager::getValidDirectory($match[1]);
+    $selected_dir = fotoo::getValidDirectory($match[1]);
     $selected_file = $match[2] . '.' . $match[3];
 
     $pic = $f->getInfos($selected_file, $selected_dir);
@@ -434,6 +435,12 @@ elseif (isset($_GET['tags']))
     $title = __('Pictures by tag');
     $mode = 'tags';
 }
+elseif (isset($_GET['search']))
+{
+    $query = $_GET['search'];
+    $title = __('Search:') . ' ' . escape($query);
+    $mode = 'search';
+}
 elseif (isset($_GET['slideshow']) || isset($_GET['embed']))
 {
     $mode = isset($_GET['embed']) ? 'embed' : 'slideshow';
@@ -452,11 +459,11 @@ elseif (isset($_GET['slideshow']) || isset($_GET['embed']))
 
         if (preg_match('!\.jpe?g$!i', $selected_file))
         {
-            $selected_dir = fotooManager::getValidDirectory(dirname($src));
+            $selected_dir = fotoo::getValidDirectory(dirname($src));
         }
         else
         {
-            $selected_dir = fotooManager::getValidDirectory($src);
+            $selected_dir = fotoo::getValidDirectory($src);
             $selected_file = false;
         }
     }
@@ -486,7 +493,7 @@ else
 
     if (!empty($_SERVER['QUERY_STRING']) && preg_match('!^(.*)(?:/?([^/]+)[_.](jpe?g))?$!Ui', urldecode($_SERVER['QUERY_STRING']), $match))
     {
-        $selected_dir = fotooManager::getValidDirectory($match[1]);
+        $selected_dir = fotoo::getValidDirectory($match[1]);
         if ($selected_dir !== false)
         {
             $title = strtr(escape($match[1]), array('/' => ' / ', '_' => ' '));
@@ -519,12 +526,15 @@ if (file_exists(BASE_DIR . '/user_style.css'))
 else
     $css = SELF_URL . '?style.css';
 
-$f->html_tags['tag'] = get_url('tag', 'KEYWORD');
-$f->html_tags['date'] = get_url('date', 'KEYWORD');
+fotoo::$html_tags['tag'] = get_url('tag', 'KEYWORD');
+fotoo::$html_tags['date'] = get_url('date', 'KEYWORD');
 $menu = '<ul class="menu">
     <li><a class="home" href="'.SELF_URL.'">'.__('My Pictures').'</a></li>
     <li><a class="tags" href="'.get_url('tags').'">'.__('By tags').'</a></li>
     <li><a class="date" href="'.get_url('timeline').'">'.__('By date').'</a></li>
+    <li><form method="get" action="'.SELF_URL.'">'.__('Search:').'
+        <input size="12" type="text" value="'.(isset($_GET['search']) ? escape($_GET['search']) : '').'" name="search" /> 
+        <input type="submit" value="&rarr;" /></form></li>
 </ul>';
 
 header('Content-Type: text/html; charset=UTF-8');
@@ -901,6 +911,32 @@ elseif ($mode == 'pic')
 elseif ($mode == 'slideshow' || $mode == 'embed')
 {
     require 'slideshow.php';
+}
+elseif ($mode == 'search')
+{
+    echo '<h1>'.$title.'</h1>';
+    echo '<div id="header">
+        '.$menu.'
+    </div>';
+
+    $results = $f->search($query);
+
+    if (empty($results))
+        echo '<p class="info">'.__('No picture found.').'</p>';
+    else
+    {
+        echo '<ul class="pics">'."\n";
+
+        foreach ($results as &$pic)
+        {
+            echo '  <li>'
+                .'<a class="thumb" href="'.escape(get_url('image', $pic)).'"><img src="'
+                .escape(get_url('cache_thumb', $pic)).'" alt="'.escape($pic['filename']).'" /></a>'
+                ."</li>\n";
+        }
+
+        echo "</ul>\n";
+    }
 }
 else
 {

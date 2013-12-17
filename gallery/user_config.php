@@ -24,7 +24,7 @@
  * (here it's french)
  */
 
-if (!class_exists('fotooManager'))
+if (!class_exists('fotoo'))
     die('Just config');
 
 /**
@@ -63,7 +63,7 @@ define('MAX_IMAGE_SIZE', 2048);
 // Shortcut tags in album and pictures comments
 // eg. if you type wp:Belgium in your comment tag, it will make a link to wikipedia
 // You can add anything you want
-$f->html_tags = array(
+fotoo::$html_tags = array(
     'wp:fr' =>  'http://fr.wikipedia.org/wiki/KEYWORD',
     'wp'    =>  'http://en.wikipedia.org/wiki/KEYWORD',
 );

@@ -34,10 +34,11 @@ error_reporting(E_ALL);
 
 
 
-class fotooManager
+class fotoo
 {
     private $db = false;
-    public $html_tags = array('wp' => 'http://en.wikipedia.org/wiki/KEYWORD');
+    private $search = false;
+    static public $html_tags = array('wp' => 'http://en.wikipedia.org/wiki/KEYWORD');
 
     public function getThumbPath($hash)
     {
@@ -106,6 +107,84 @@ class fotooManager
             $this->initDB();
             exit;
         }
+
+        $this->db->sqliteCreateFunction('normalize_ascii', array($this, 'getTagId'));
+        
+        $query = $this->db->prepare('SELECT 1 FROM sqlite_master WHERE tbl_name = ?;');
+        $query->execute(array('search'));
+        
+        if ($query->fetch(PDO::FETCH_NUM))
+        {
+            $this->search = true;
+        }
+        else
+        {
+            $query = $this->db->prepare('SELECT 1 FROM sqlite_master WHERE tbl_name = ?;');
+            $query->execute(array('no_search'));
+
+            if (!$query->fetch(PDO::FETCH_NUM))
+            {
+                $this->initSearch();
+            }
+        }
+
+        if ($this->search)
+        {
+            $this->db->sqliteCreateFunction('rank', array($this, 'sql_rank'));
+        }
+    }
+
+    public function sql_rank($aMatchInfo)
+    {
+        $iSize = 4; // byte size
+        $iPhrase = (int) 0;                 // Current phrase //
+        $score = (double)0.0;               // Value to return //
+
+        /* Check that the number of arguments passed to this function is correct.
+        ** If not, jump to wrong_number_args. Set aMatchinfo to point to the array
+        ** of unsigned integer values returned by FTS function matchinfo. Set
+        ** nPhrase to contain the number of reportable phrases in the users full-text
+        ** query, and nCol to the number of columns in the table.
+        */
+        $aMatchInfo = (string) func_get_arg(0);
+        $nPhrase = ord(substr($aMatchInfo, 0, $iSize));
+        $nCol = ord(substr($aMatchInfo, $iSize, $iSize));
+
+        if (func_num_args() > (1 + $nCol))
+        {
+            throw new \Exception("Invalid number of arguments : ".$nCol);
+        }
+
+        // Iterate through each phrase in the users query. //
+        for ($iPhrase = 0; $iPhrase < $nPhrase; $iPhrase++)
+        {
+            $iCol = (int) 0; // Current column //
+
+            /* Now iterate through each column in the users query. For each column,
+            ** increment the relevancy score by:
+            **
+            **   (<hit count> / <global hit count>) * <column weight>
+            **
+            ** aPhraseinfo[] points to the start of the data for phrase iPhrase. So
+            ** the hit count and global hit counts for each column are found in
+            ** aPhraseinfo[iCol*3] and aPhraseinfo[iCol*3+1], respectively.
+            */
+            $aPhraseinfo = substr($aMatchInfo, (2 + $iPhrase * $nCol * 3) * $iSize);
+
+            for ($iCol = 0; $iCol < $nCol; $iCol++)
+            {
+                $nHitCount = ord(substr($aPhraseinfo, 3 * $iCol * $iSize, $iSize));
+                $nGlobalHitCount = ord(substr($aPhraseinfo, (3 * $iCol + 1) * $iSize, $iSize));
+                $weight = ($iCol < func_num_args() - 1) ? (double) func_get_arg($iCol + 1) : 0;
+
+                if ($nHitCount > 0 && $nGlobalHitCount != 0)
+                {
+                    $score += ((double)$nHitCount / (double)$nGlobalHitCount) * $weight;
+                }
+            }
+        }
+
+        return $score;
     }
 
     protected function upgradeDBv3()
@@ -178,6 +257,44 @@ class fotooManager
                 PRIMARY KEY (name_id, photo)
             );
         ');
+
+        $this->initSearch();
+    }
+
+    protected function initSearch()
+    {
+        try {
+            $this->db->exec('
+                CREATE VIRTUAL TABLE search USING fts4 (
+                    photo INTEGER PRIMARY KEY REFERENCES photos (id),
+                    text TEXT,
+                    tags TEXT
+                );');
+            $this->search = true;
+        }
+        catch (\Exception $e)
+        {
+            try {
+                $this->db->exec('
+                    CREATE VIRTUAL TABLE search USING fts3 (
+                        photo INTEGER PRIMARY KEY REFERENCES photos (id),
+                        text TEXT,
+                        tags TEXT
+                    );');
+                $this->search = true;
+            }
+            catch (\Exception $e)
+            {
+                // OK no search capability
+                $this->db->exec('CREATE TABLE no_search (no_search);');
+                return false;
+            }
+        }
+
+        $this->db->exec('INSERT INTO search 
+            SELECT id, normalize_ascii(path || filename || \' \' || comment || \' \' || details),
+                (SELECT group_concat(name_id, \' \') FROM tags WHERE photo = id)
+            FROM photos;');
     }
 
     // Returns informations on a photo
@@ -253,6 +370,11 @@ class fotooManager
         $this->db->exec('DELETE FROM photos WHERE id="'.(int)$id.'";');
         $this->db->exec('DELETE FROM tags WHERE photo="'.(int)$id.'";');
 
+        if ($this->search)
+        {
+            $this->db->exec('DELETE FROM search WHERE photo="'.(int)$id.'";');
+        }
+
         $thumb = $this->getThumbPath($hash);
         if (file_exists($thumb))
             unlink($thumb);
@@ -267,6 +389,7 @@ class fotooManager
     // Delete all photos in DB which are deleted in filesystem
     public function cleanDB()
     {
+        $this->db->exec('BEGIN;');
         $query = $this->db->query('SELECT id, hash, path, filename FROM photos ORDER BY id;');
 
         while ($row = $query->fetch(PDO::FETCH_ASSOC))
@@ -279,7 +402,26 @@ class fotooManager
             }
         }
 
+        $this->db->exec('END;');
+
         unset($query);
+    }
+
+    public function search($search)
+    {
+        $search = trim($search);
+
+        if ($search == '')
+        {
+            return array();
+        }
+
+        $query = $this->db->prepare('SELECT photos.*, rank(matchinfo(search), 0, 1.0, 1.0) AS rank 
+            FROM photos INNER JOIN search ON search.photo = photos.id
+            WHERE search MATCH ?
+            ORDER BY rank DESC LIMIT 0,100;');
+        $query->execute(array($this->getTagId($search)));
+        return $query->fetchAll(PDO::FETCH_ASSOC);
     }
 
     public function getNewPhotos($nb=10)
@@ -476,6 +618,8 @@ class fotooManager
             'hash'      =>  $hash,
         );
 
+        $this->db->beginTransaction();
+
         $query = $this->db->prepare('INSERT INTO photos
             (id, filename, path, width, height, size, year, month, day, time, comment, details, hash)
             VALUES (NULL, :filename, :path, :width, :height, :size, :year, :month, :day,
@@ -491,16 +635,23 @@ class fotooManager
 
         if (!empty($tags))
         {
-            $this->db->beginTransaction();
             $query = $this->db->prepare('INSERT OR IGNORE INTO tags (name, name_id, photo) VALUES (?, ?, ?);');
 
             foreach ($tags as $tag)
             {
                 $query->execute(array($tag, $this->getTagId($tag), (int)$pic['id']));
             }
-
-            $this->db->commit();
         }
+
+        if ($this->search)
+        {
+            $this->db->exec('INSERT INTO search SELECT id, 
+                path || \' \' || filename || \' \' || comment || \' \' || details,
+                (SELECT group_concat(name || \' \' || name_id, \' \') FROM tags WHERE photo = id)
+                FROM photos WHERE id = ' . (int)$pic['id']);
+        }
+
+        $this->db->commit();
 
         $pic['tags'] = $tags;
 
@@ -783,7 +934,7 @@ class fotooManager
         $text = preg_replace('#(^|\s)([a-z]+://([^\s\w/]?[\w/])*)(\s|$)#im', '\\1<a href="\\2">\\2</a>\\4', $text);
         $text = str_replace('\http:', 'http:', $text);
 
-        foreach ($this->html_tags as $tag=>$url)
+        foreach (self::$html_tags as $tag=>$url)
         {
             $tag_class = preg_replace('![^a-zA-Z0-9_]!', '_', $tag);
             $text = preg_replace('#(^|\s)'.preg_quote($tag, '#').':([^\s,.]+)#iem',
@@ -1121,8 +1272,8 @@ if (!defined('GALLERY_TITLE'))  define('GALLERY_TITLE', __('My pictures'));
 if (!defined('ALLOW_EMBED'))    define('ALLOW_EMBED', true);
 if (!defined('NB_PICTURES_PER_PAGE')) define('NB_PICTURES_PER_PAGE', 50);
 
-if (!isset($f) || !($f instanceOf fotooManager))
-    $f = new fotooManager;
+if (!isset($f) || !($f instanceOf fotoo))
+    $f = new fotoo;
 
 $mode = false;
 
@@ -1171,6 +1322,7 @@ if (isset($_GET['update_js']))
         img.alt = update_done + '/' + need_update.length;
         img.width = Math.round(update_done * 5);
         img.height = 1;
+        img.style.borderTop = "2px solid #0000CC";
         img.style.borderBottom = "2px solid #000099";
         img.style.verticalAlign = "middle";
         img.style.margin = "0 10px";
@@ -1300,9 +1452,10 @@ h1 { font-size: 2em; text-align: center; margin-bottom: .2em; }
 #header { border-radius: .5em; border: .1em solid #ccc; background: #eee; padding: .5em; margin-bottom: .5em; height: 1.3em; }
 #header .breadcrumbs li:before { content: " > "; }
 #header .menu { float: right; }
-#header ul li { display: inline; }
+#header ul li, #header form { display: inline; }
 #header .menu li:before { content: "| "; }
 #header .menu li:first-child:before { content: ""; }
+#header input { font-size: .9em; padding: 2pt; border: .1em solid #ccc; border-radius: .5em; background: #fff; }
 
 ul.actions { text-align: right; }
 ul.actions li { display: inline-block; }
@@ -1320,7 +1473,7 @@ dl.pic { width: 65%; float: left; text-align: center; }
 dl.pic dd.orig { margin: .5em 0; }
 dl.metas, dl.details { float: right; width: 30%; border: .1em solid #ccc; background: #eee; padding: .5em; margin-bottom: 1em; border-radius: .5em; }
 dl.metas dt, dl.details dt { font-weight: bold; }
-input { font-size: .7em; padding: 2pt; width: 97%; border: .1em solid #ccc; border-radius: .5em; background: #eee; color: #666; }
+dl.metas input { font-size: .7em; padding: 2pt; width: 97%; border: .1em solid #ccc; border-radius: .5em; background: #eee; color: #666; }
 dl.metas dd { margin: 0.2em 0 1em; }
 dl.details { font-size: 0.9em; }
 dl.details dt, dl.details dd { float: left; }
@@ -1501,7 +1654,7 @@ if (!empty($_GET['r']))
 // Small image redirect
 if (!empty($_GET['i']) && preg_match('!^(.*)(?:/?([^/]+)[_.](jpe?g))?$!Ui', $_GET['i'], $match))
 {
-    $selected_dir = fotooManager::getValidDirectory($match[1]);
+    $selected_dir = fotoo::getValidDirectory($match[1]);
     $selected_file = $match[2] . '.' . $match[3];
 
     $pic = $f->getInfos($selected_file, $selected_dir);
@@ -1564,6 +1717,12 @@ elseif (isset($_GET['tags']))
     $title = __('Pictures by tag');
     $mode = 'tags';
 }
+elseif (isset($_GET['search']))
+{
+    $query = $_GET['search'];
+    $title = __('Search:') . ' ' . escape($query);
+    $mode = 'search';
+}
 elseif (isset($_GET['slideshow']) || isset($_GET['embed']))
 {
     $mode = isset($_GET['embed']) ? 'embed' : 'slideshow';
@@ -1582,11 +1741,11 @@ elseif (isset($_GET['slideshow']) || isset($_GET['embed']))
 
         if (preg_match('!\.jpe?g$!i', $selected_file))
         {
-            $selected_dir = fotooManager::getValidDirectory(dirname($src));
+            $selected_dir = fotoo::getValidDirectory(dirname($src));
         }
         else
         {
-            $selected_dir = fotooManager::getValidDirectory($src);
+            $selected_dir = fotoo::getValidDirectory($src);
             $selected_file = false;
         }
     }
@@ -1616,7 +1775,7 @@ else
 
     if (!empty($_SERVER['QUERY_STRING']) && preg_match('!^(.*)(?:/?([^/]+)[_.](jpe?g))?$!Ui', urldecode($_SERVER['QUERY_STRING']), $match))
     {
-        $selected_dir = fotooManager::getValidDirectory($match[1]);
+        $selected_dir = fotoo::getValidDirectory($match[1]);
         if ($selected_dir !== false)
         {
             $title = strtr(escape($match[1]), array('/' => ' / ', '_' => ' '));
@@ -1649,12 +1808,15 @@ if (file_exists(BASE_DIR . '/user_style.css'))
 else
     $css = SELF_URL . '?style.css';
 
-$f->html_tags['tag'] = get_url('tag', 'KEYWORD');
-$f->html_tags['date'] = get_url('date', 'KEYWORD');
+fotoo::$html_tags['tag'] = get_url('tag', 'KEYWORD');
+fotoo::$html_tags['date'] = get_url('date', 'KEYWORD');
 $menu = '<ul class="menu">
     <li><a class="home" href="'.SELF_URL.'">'.__('My Pictures').'</a></li>
     <li><a class="tags" href="'.get_url('tags').'">'.__('By tags').'</a></li>
     <li><a class="date" href="'.get_url('timeline').'">'.__('By date').'</a></li>
+    <li><form method="get" action="'.SELF_URL.'">'.__('Search:').'
+        <input size="12" type="text" value="'.(isset($_GET['search']) ? escape($_GET['search']) : '').'" name="search" /> 
+        <input type="submit" value="&rarr;" /></form></li>
 </ul>';
 
 header('Content-Type: text/html; charset=UTF-8');
@@ -2296,6 +2458,32 @@ echo '
 </html>';
 
 
+}
+elseif ($mode == 'search')
+{
+    echo '<h1>'.$title.'</h1>';
+    echo '<div id="header">
+        '.$menu.'
+    </div>';
+
+    $results = $f->search($query);
+
+    if (empty($results))
+        echo '<p class="info">'.__('No picture found.').'</p>';
+    else
+    {
+        echo '<ul class="pics">'."\n";
+
+        foreach ($results as &$pic)
+        {
+            echo '  <li>'
+                .'<a class="thumb" href="'.escape(get_url('image', $pic)).'"><img src="'
+                .escape(get_url('cache_thumb', $pic)).'" alt="'.escape($pic['filename']).'" /></a>'
+                ."</li>\n";
+        }
+
+        echo "</ul>\n";
+    }
 }
 else
 {

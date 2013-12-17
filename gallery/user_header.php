@@ -2,7 +2,7 @@
 
 // Simple example of user_header.php
 
-if (!class_exists('fotooManager'))
+if (!class_exists('fotoo'))
     die('just header');
 
 $website_url = 'http://bohwaz.net/';
