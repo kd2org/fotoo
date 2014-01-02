@@ -979,7 +979,7 @@ else
 
     if ($desc)
     {
-        echo '<div class="desc">'.$f->formatText($desc).'</div>';
+        echo '<div class="desc">'.htmlspecialchars_decode($f->formatText($desc)).'</div>';
     }
 
     if (!empty($dirs))

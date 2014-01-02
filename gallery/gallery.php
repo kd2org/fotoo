@@ -1,6 +1,6 @@
 <?php
 /**********************************************************************
-Fotoo Gallery v2.4.1
+Fotoo Gallery v2.5.0
 Copyright 2004-2013 BohwaZ - http://dev.kd2.org/
 Licensed under the GNU AGPLv3
 
@@ -2526,7 +2526,7 @@ else
 
     if ($desc)
     {
-        echo '<div class="desc">'.$f->formatText($desc).'</div>';
+        echo '<div class="desc">'.htmlspecialchars_decode($f->formatText($desc)).'</div>';
     }
 
     if (!empty($dirs))
