@@ -1,6 +1,6 @@
 <?php
 /**********************************************************************
-Fotoo Gallery v2.5.0
+Fotoo Gallery v2.5.1
 Copyright 2004-2013 BohwaZ - http://dev.kd2.org/
 Licensed under the GNU AGPLv3
 
@@ -691,11 +691,6 @@ class fotoo
         $pictures = array();
         $to_update = array();
 
-        // Pagination
-        $begin = ($page - 1) * NB_PICTURES_PER_PAGE;
-        $end = $begin + NB_PICTURES_PER_PAGE;
-        $i = 0; // Current picture number in list
-
         while ($file = $dir->read())
         {
             $file_path = $dir_path . $file;
@@ -722,15 +717,7 @@ class fotoo
             }
             elseif ($pic = $this->getInfos($file, $path, true))
             {
-                if (is_array($pic) && ($i >= $begin) && ($i < $end))
-                {
-                    $pictures[$file] = $pic;
-                    $i++;
-                }
-                elseif (is_array($pic))
-                {
-                    $i++;
-                }
+                $pictures[$file] = $pic;
             }
             else
             {
@@ -743,6 +730,12 @@ class fotoo
         sort($dirs);
         ksort($pictures);
 
+        $total = count($pictures);
+
+        // Pagination
+        $begin = ($page - 1) * NB_PICTURES_PER_PAGE;
+        $pictures = array_slice($pictures, $begin, NB_PICTURES_PER_PAGE, true);
+
         if (file_exists($dir_path . 'README'))
         {
             $description = file_get_contents($dir_path . 'README');
@@ -751,8 +744,6 @@ class fotoo
         {
             $description = false;
         }
-
-        $total = $i + 1;
 
         return array($dirs, $pictures, $to_update, $description);
     }
