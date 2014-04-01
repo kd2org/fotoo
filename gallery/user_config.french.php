@@ -13,15 +13,15 @@ $french_strings = array(
     'Pictures by date'
         =>  'Photos par date',
     'Pictures by tag'
-        =>  'Photos par mot-cl&eacute;',
+        =>  'Photos par mot-clé',
     'Pictures in tag %TAG'
-        =>  'Photos pour le mot-cl&eacute; %TAG',
+        =>  'Photos pour le mot-clé %TAG',
     'My Pictures'
         =>  'Mes photos',
     'By date'
         =>  'Par date',
     'By tags'
-        =>  'Par mot-cl&eacute;',
+        =>  'Par mot-clé',
     'Search:'
         =>  'Rechercher :',
     '%B'
@@ -31,40 +31,40 @@ $french_strings = array(
     '(%NB more pictures)'
         =>  '(%NB photos de plus)',
     'Tags'
-        =>  'Mots-cl&eacute;s',
+        =>  'Mots-clés',
     "Other tags related to '%TAG':"
-        =>  "Autres mots-cl&eacute;s en rapport avec '%TAG' :",
+        =>  "Autres mots-clés en rapport avec '%TAG' :",
     'Download image at full size (%W x %H) - %SIZE KB'
-        =>  "T&eacute;l&eacute;charger l'image en grand format (%W x %H) - %SIZE Ko",
+        =>  "Télécharger l'image en grand format (%W x %H) - %SIZE Ko",
     'Comment:'
         =>  'Commentaire :',
     'Tags:'
-        =>  'Mots-cl&eacute;s :',
+        =>  'Mots-clés :',
     'Date:'
         =>  'Date :',
     'Embed:'
-        =>  'Int&eacute;grer dans un site :',
+        =>  'Intégrer dans un site :',
     'Embed as image:'
-        =>  'Int&eacute;grer en image seule :',
+        =>  'Intégrer en image seule :',
     '%A <a href="%1">%d</a> <a href="%2">%B</a> <a href="%3">%Y</a> at %H:%M'
-        =>  '%A <a href="%1">%d</a> <a href="%2">%B</a> <a href="%3">%Y</a> &agrave; %H:%M',
+        =>  '%A <a href="%1">%d</a> <a href="%2">%B</a> <a href="%3">%Y</a> à %H:%M',
     'Updating database, please wait, more pictures will appear in a while...'
-        =>  "Mise &agrave; jour de la base de donn&eacute;es. "
-        .   "Patientez, dans quelques instants d'autres images appara&icirc;tront.",
+        =>  "Mise à jour de la base de données. "
+        .   "Patientez, dans quelques instants d'autres images apparaîtront.",
     'Updating'
-        =>  'Mise &agrave; jour',
+        =>  'Mise à jour',
     'Update done.'
-        =>  'Mise &agrave; jour termin&eacute;e.',
+        =>  'Mise à jour terminée.',
     'Picture not found'
-        =>  'Photo non trouv&eacute;e',
+        =>  'Photo non trouvée',
     'Back to homepage'
-        =>  "Retour &agrave; la page d'accueil",
+        =>  "Retour à la page d'accueil",
     'No picture found.'
-        =>  "Aucune image n'a &eacute;t&eacute; trouv&eacute;e.",
+        =>  "Aucune image n'a été trouvée.",
     'No tag found.'
-        =>  "Aucun mot-cl&eacute; n'a &eacute;t&eacute; trouv&eacute;.",
+        =>  "Aucun mot-clé n'a été trouvé.",
     'Previous'
-        =>  "Photo pr&eacute;c&eacute;dente",
+        =>  "Photo précédente",
     'Next'
         =>  "Photo suivante",
     'Slideshow'
@@ -75,30 +75,24 @@ $french_strings = array(
         =>  'Reprendre',
     'Back'
         =>  'Retour',
-    'Photo details'
-        =>  'D&eacute;tails de la photo',
-    'Camera maker:'
-        =>  'Fabricant de l\'appareil :',
-    'Camera model:'
-        =>  'Mod&egrave;le de l\'appareil :',
-    'Exposure:'
-        =>  'Exposition :',
+    'Camera:'
+        =>  'Appareil photo :',
+    'Exposure time:'
+        =>  'Temps de pose :',
     'Aperture:'
         =>  'Ouverture :',
     'ISO speed:'
-        =>  'Sensibilit&eacute; ISO :',
+        =>  'Sensibilité ISO :',
     'Flash:'
         =>  'Flash :',
     'On'
-        =>  'Activ&eacute;',
+        =>  'Activé',
     'Off'
-        =>  'D&eacute;sactiv&eacute;',
+        =>  'Désactivé',
     'Focal length:'
         =>  'Longueur focale :',
     'Original resolution:'
-        =>  'R&eacute;solution originale :',
-    '%EXPOSURE seconds'
-        =>  '%EXPOSURE secondes',
+        =>  'Résolution originale :',
 );
 
 // Days of the week translations
@@ -115,17 +109,17 @@ $french_days = array(
 // Months of the year translations
 $french_months = array(
     'January'   =>  'janvier',
-    'February'  =>  'f&eacute;vrier',
+    'February'  =>  'février',
     'March'     =>  'mars',
     'April'     =>  'avril',
     'May'       =>  'mai',
     'June'      =>  'juin',
     'July'      =>  'juillet',
-    'August'    =>  'ao&ucirc;t',
+    'August'    =>  'août',
     'September' =>  'septembre',
     'October'   =>  'octobre',
     'November'  =>  'novembre',
-    'December'  =>  'd&eacute;cembre',
+    'December'  =>  'décembre',
 );
 
 function __($str, $mode=false, $datas=false)
