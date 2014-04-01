@@ -874,10 +874,10 @@ elseif ($mode == 'pic')
     echo '
     </dl>';
 
-    if (!empty($pic['details']))
+    $details = $f->formatDetails($pic);
+    
+    if (!empty($details))
     {
-        $details = $f->formatDetails($pic['details']);
-
         echo '
         <dl class="details">';
 

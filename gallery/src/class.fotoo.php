@@ -71,11 +71,13 @@ class fotoo
         {
             header('Location: '.SELF_URL.'?index_all');
             $this->initDB();
+            $this->initSearch();
             exit;
         }
 
         $this->db->sqliteCreateFunction('normalize_ascii', array($this, 'getTagId'));
         
+        // Do we need to init search?
         $query = $this->db->prepare('SELECT 1 FROM sqlite_master WHERE tbl_name = ?;');
         $query->execute(array('search'));
         
@@ -97,6 +99,15 @@ class fotoo
         if ($this->search)
         {
             $this->db->sqliteCreateFunction('rank', array($this, 'sql_rank'));
+        }
+
+        $query = $this->db->prepare('SELECT 1 FROM sqlite_master 
+            WHERE tbl_name = \'photos\' AND type = \'table\' AND sql LIKE \'%camera TEXT%\';');
+        $query->execute();
+        
+        if (!$query->fetch(PDO::FETCH_NUM))
+        {
+            $this->upgradeDbDetails();
         }
     }
 
@@ -156,6 +167,7 @@ class fotoo
     protected function upgradeDBv3()
     {
         $this->initDB();
+        $this->initSearch();
 
         if (class_exists('SQLiteDatabase'))
         {
@@ -193,10 +205,127 @@ class fotoo
         return true;
     }
 
+    protected function upgradeDbDetails()
+    {
+        $this->db->exec('BEGIN;');
+        $this->db->exec('ALTER TABLE photos RENAME TO photos_old;');
+        $this->initDB();
+        $this->db->exec('INSERT INTO photos
+            (id, filename, path, width, height, size, year, month, day, time, comment, hash)
+            SELECT id, filename, path, width, height, size, year, month, day, time, comment, hash
+            FROM photos_old;');
+
+        $res = $this->db->query('SELECT id, details FROM photos_old;');
+
+        while ($row = $res->fetch(PDO::FETCH_ASSOC))
+        {
+            $details = json_decode($row['details'], true);
+
+            if (empty($details))
+                continue;
+
+            $data = array(
+                'camera' => array()
+            );
+
+            if (!empty($details['maker']))
+                $data['camera'][] = ucfirst(strtolower($details['maker']));
+            
+            if (!empty($details['model']))
+                $data['camera'][] = $details['model'];
+
+            if (isset($details['flash']))
+                $data['flash'] = (int)$details['flash'];
+
+            if (!empty($details['resolution']))
+            {
+                $details['resolution'] = explode(' x ', $details['resolution']);
+                $data['orig_width'] = $details['resolution'][0];
+                $data['orig_height'] = $details['resolution'][1];
+            }
+
+            if (!empty($details['exposure']))
+            {
+                $data['exposure'] = $this->_normalizeExposureTime($details['exposure']);
+            }
+
+            foreach (array('iso', 'fnumber', 'focal') as $key)
+            {
+                if (isset($details[$key]))
+                    $data[$key] = $details[$key];
+            }
+
+            if (empty($data['camera']))
+                unset($data['camera']);
+            else
+                $data['camera'] = implode(' ', $data['camera']);
+
+            if (empty($data))
+                continue;
+
+            $query = 'UPDATE photos SET ';
+
+            foreach ($data as $key=>$value)
+            {
+                $query .= $key . ' = :' . $key . ', ';
+            }
+
+            $query = substr($query, 0, -2) . ' WHERE id = :id';
+            $data['id'] = (int)$row['id'];
+
+            $query = $this->db->prepare($query);
+            $query->execute($data);
+        }
+
+        $this->db->exec('DROP TABLE IF EXISTS photos_old;
+            CREATE UNIQUE INDEX IF NOT EXISTS hash ON photos (hash);
+            CREATE INDEX IF NOT EXISTS file ON photos (filename, path);
+            CREATE INDEX IF NOT EXISTS date ON photos (year, month, day);');
+        $this->db->exec('END;');
+
+        return true;
+    }
+
+    protected function _normalizeExposureTime($time)
+    {
+        if (preg_match('!^([0-9.]+)/([0-9.]+)$!', $time, $match)
+            && (float)$match[1] > 0 && (float)$match[2] > 0)
+        {
+            $time = (float)$match[1] / (float)$match[2];
+        }
+
+        if ($time >= 1)
+            return $time;
+
+        if (!is_numeric($time))
+            return $time;
+
+        $fractions = array(1.3, 1.6, 2, 2.5, 3.2, 4, 5, 6, 8,
+            10, 13, 15, 20, 25, 30, 40, 50, 60, 80, 100, 125, 160, 200,
+            250, 320, 400, 500, 640, 800, 1000, 1300, 1600, 2000, 2500,
+            3200, 4000, 8000);
+
+        foreach ($fractions as $f)
+        {
+            if ((float)$time === (float)(1/$f))
+                return '1/' . $f;
+        }
+
+        $time = (float) round($time, 3);
+
+        foreach ($fractions as $f)
+        {
+            if ($time === (float)round(1/$f, 3))
+                return '1/' . $f;
+        }
+
+        return $f;
+    }
+
     protected function initDB()
     {
         $this->db->exec('
-            CREATE TABLE photos (
+            CREATE TABLE IF NOT EXISTS photos (
                 id INTEGER PRIMARY KEY,
                 filename TEXT,
                 path TEXT,
@@ -208,30 +337,35 @@ class fotoo
                 day INTEGER,
                 time INTEGER,
                 comment TEXT,
-                details TEXT,
-                hash TEXT
+                hash TEXT,
+                camera TEXT,
+                iso INTEGER,
+                fnumber REAL,
+                focal REAL,
+                flash INTEGER,
+                exposure REAL,
+                orig_width INTEGER,
+                orig_height INTEGER
             );
 
-            CREATE UNIQUE INDEX hash ON photos (hash);
-            CREATE INDEX file ON photos (filename, path);
-            CREATE INDEX date ON photos (year, month, day);
+            CREATE UNIQUE INDEX IF NOT EXISTS hash ON photos (hash);
+            CREATE INDEX IF NOT EXISTS file ON photos (filename, path);
+            CREATE INDEX IF NOT EXISTS date ON photos (year, month, day);
 
-            CREATE TABLE tags (
+            CREATE TABLE IF NOT EXISTS tags (
                 name TEXT,
                 name_id TEXT,
-                photo INTEGER,
+                photo INTEGER REFERENCES photos(id),
                 PRIMARY KEY (name_id, photo)
             );
         ');
-
-        $this->initSearch();
     }
 
     protected function initSearch()
     {
         try {
             $this->db->exec('
-                CREATE VIRTUAL TABLE search USING fts4 (
+                CREATE VIRTUAL TABLE IF NOT EXISTS search USING fts4 (
                     photo INTEGER PRIMARY KEY REFERENCES photos (id),
                     text TEXT,
                     tags TEXT
@@ -242,7 +376,7 @@ class fotoo
         {
             try {
                 $this->db->exec('
-                    CREATE VIRTUAL TABLE search USING fts3 (
+                    CREATE VIRTUAL TABLE IF NOT EXISTS search USING fts3 (
                         photo INTEGER PRIMARY KEY REFERENCES photos (id),
                         text TEXT,
                         tags TEXT
@@ -252,13 +386,13 @@ class fotoo
             catch (\Exception $e)
             {
                 // OK no search capability
-                $this->db->exec('CREATE TABLE no_search (no_search);');
+                $this->db->exec('CREATE TABLE IF NOT EXISTS no_search (no_search);');
                 return false;
             }
         }
 
         $this->db->exec('INSERT INTO search 
-            SELECT id, normalize_ascii(path || filename || \' \' || comment || \' \' || details),
+            SELECT id, normalize_ascii(path || filename || \' \' || comment || \' \' || camera),
                 (SELECT group_concat(name_id, \' \') FROM tags WHERE photo = id)
             FROM photos;');
     }
@@ -432,10 +566,29 @@ class fotoo
 
         $width = $size[0];
         $height = $size[1];
-        $comment = '';
         $tags = array();
         $date = false;
-        $details = array();
+        $pic = array(
+            'filename'  =>  $filename,
+            'path'      =>  $path,
+            'width'     =>  (int)$width,
+            'height'    =>  (int)$height,
+            'size'      =>  (int)$file_size,
+            'year'      =>  null,
+            'month'     =>  null,
+            'day'       =>  null,
+            'time'      =>  null,
+            'hash'      =>  $hash,
+            'comment'   =>  null,
+            'camera'    =>  array(),
+            'iso'       =>  null,
+            'fnumber'   =>  null,
+            'focal'     =>  null,
+            'flash'     =>  null,
+            'exposure'  =>  null,
+            'orig_width'=>  null,
+            'orig_height'=> null,
+        );
 
         // IPTC contains tags
         if (!empty($infos['APP13']))
@@ -470,8 +623,8 @@ class fotoo
 
             if (!empty($exif['COMMENT']))
             {
-                $comment = implode("\n", $exif['COMMENT']);
-                $comment = trim($comment);
+                $pic['comment'] = implode("\n", $exif['COMMENT']);
+                $pic['comment'] = trim($pic['comment']);
             }
 
             if (!empty($exif['THUMBNAIL']['THUMBNAIL']))
@@ -481,64 +634,60 @@ class fotoo
 
             if (!empty($exif['IFD0']['Make']))
             {
-                $details['maker'] = trim($exif['IFD0']['Make']);
+                $pic['camera'][] = ucfirst(strtolower(trim($exif['IFD0']['Make'])));
             }
 
             if (!empty($exif['IFD0']['Model']))
             {
-                if (!empty($details['maker']))
+                if (!empty($exif['IFD0']['Make']))
                 {
-                    $exif['IFD0']['Model'] = str_replace($details['maker'], '', $exif['IFD0']['Model']);
+                    $exif['IFD0']['Model'] = str_ireplace($exif['IFD0']['Make'], '', $exif['IFD0']['Model']);
                 }
 
-                $details['model'] = trim($exif['IFD0']['Model']);
+                if (trim($exif['IFD0']['Model']) !== '')
+                {
+                    $pic['camera'][] = trim($exif['IFD0']['Model']);
+                }
             }
 
             if (!empty($exif['EXIF']['ExposureTime']))
             {
-                $details['exposure'] = $exif['EXIF']['ExposureTime'];
-
-                // To display a human readable number
-                if (preg_match('!^([0-9.]+)/([0-9.]+)$!', $details['exposure'], $match)
-                    && (float)$match[1] > 0 && (float)$match[2] > 0)
-                {
-                    $result = round((float)$match[1] / (float)$match[2], 3);
-                    $details['exposure'] = $result;
-                }
+                $pic['exposure'] = $this->_normalizeExposureTime($exif['EXIF']['ExposureTime']);
             }
 
             if (!empty($exif['EXIF']['FNumber']))
             {
-                $details['fnumber'] = $exif['EXIF']['FNumber'];
+                $pic['fnumber'] = $exif['EXIF']['FNumber'];
 
-                if (preg_match('!^([0-9.]+)/([0-9.]+)$!', $details['fnumber'], $match))
+                if (preg_match('!^([0-9.]+)/([0-9.]+)$!', $pic['fnumber'], $match))
                 {
-                    $details['fnumber'] = round($match[1] / $match[2], 1);
+                    $pic['fnumber'] = round($match[1] / $match[2], 1);
                 }
             }
 
             if (!empty($exif['EXIF']['ISOSpeedRatings']))
             {
-                $details['iso'] = $exif['EXIF']['ISOSpeedRatings'];
+                $pic['iso'] = $exif['EXIF']['ISOSpeedRatings'];
             }
 
             if (!empty($exif['EXIF']['Flash']))
             {
-                $details['flash'] = ($exif['EXIF']['Flash'] & 0x01) ? true : false;
+                $pic['flash'] = ($exif['EXIF']['Flash'] & 0x01) ? true : false;
             }
 
             if (!empty($exif['EXIF']['ExifImageWidth']) && !empty($exif['EXIF']['ExifImageLength']))
             {
-                $details['resolution'] = (int)$exif['EXIF']['ExifImageWidth'] . ' x ' . $exif['EXIF']['ExifImageLength'];
+                $pic['orig_width'] = (int)$exif['EXIF']['ExifImageWidth'];
+                $pic['orig_height'] = (int)$exif['EXIF']['ExifImageLength'];
             }
 
             if (!empty($exif['EXIF']['FocalLength']))
             {
-                $details['focal'] = $exif['EXIF']['FocalLength'];
+                $pic['focal'] = $exif['EXIF']['FocalLength'];
 
-                if (preg_match('!^([0-9.]+)/([0-9.]+)$!', $details['focal'], $match))
+                if (preg_match('!^([0-9.]+)/([0-9.]+)$!', $pic['focal'], $match))
                 {
-                    $details['focal'] = round($match[1] / $match[2], 1);
+                    $pic['focal'] = round($match[1] / $match[2], 1);
                 }
             }
         }
@@ -564,32 +713,17 @@ class fotoo
             $this->resizeImage($file, $this->getSmallPath($hash), $width, $height, SMALL_IMAGE_SIZE);
         }
 
-        if (!empty($details))
-            $details = json_encode($details);
-        else
-            $details = '';
-
-        $pic = array(
-            'filename'  =>  $filename,
-            'path'      =>  $path,
-            'width'     =>  (int)$width,
-            'height'    =>  (int)$height,
-            'size'      =>  (int)$file_size,
-            'year'      =>  date('Y', $date),
-            'month'     =>  date('m', $date),
-            'day'       =>  date('d', $date),
-            'time'      =>  (int) $date,
-            'comment'   =>  $comment,
-            'details'   =>  $details,
-            'hash'      =>  $hash,
-        );
+        $pic['year'] = date('Y', $date);
+        $pic['month'] = date('m', $date);
+        $pic['day'] = date('d', $date);
+        $pic['time'] = (int) $date;
+        $pic['camera'] = !empty($camera) ? implode(' ', $camera) : null;
 
         $this->db->beginTransaction();
 
-        $query = $this->db->prepare('INSERT INTO photos
-            (id, filename, path, width, height, size, year, month, day, time, comment, details, hash)
-            VALUES (NULL, :filename, :path, :width, :height, :size, :year, :month, :day,
-            :time, :comment, :details, :hash);');
+        $keys = array_keys($pic);
+        $query = $this->db->prepare('INSERT INTO photos ('.implode(', ', $keys).')
+            VALUES (:'.implode(', :', $keys).');');
         $query->execute($pic);
 
         $pic['id'] = $this->db->lastInsertId();
@@ -612,7 +746,7 @@ class fotoo
         if ($this->search)
         {
             $this->db->exec('INSERT INTO search SELECT id, 
-                path || \' \' || filename || \' \' || comment || \' \' || details,
+                path || \' \' || filename || \' \' || comment || \' \' || camera,
                 (SELECT group_concat(name || \' \' || name_id, \' \') FROM tags WHERE photo = id)
                 FROM photos WHERE id = ' . (int)$pic['id']);
         }
@@ -928,39 +1062,30 @@ class fotoo
         return $text;
     }
 
-    public function formatDetails($details)
+    public function formatDetails($pic)
     {
-        if (empty($details))
-            return '';
-
-        if (!is_array($details))
-            $details = json_decode($details, true);
-
         $out = array();
 
-        if (isset($details['maker']))
-            $out[__('Camera maker:')] = $details['maker'];
+        if ($pic['camera'])
+            $out[__('Camera:')] = $pic['camera'];
 
-        if (isset($details['model']))
-            $out[__('Camera model:')] = $details['model'];
+        if (!is_null($pic['exposure']))
+            $out[__('Exposure time:')] = $pic['exposure'];
 
-        if (isset($details['exposure']))
-            $out[__('Exposure:')] = __('%EXPOSURE seconds', 'REPLACE', array('%EXPOSURE' => $details['exposure']));
+        if (!is_null($pic['fnumber']))
+            $out[__('Aperture:')] = '<i>f</i>/' . $pic['fnumber'];
 
-        if (isset($details['fnumber']))
-            $out[__('Aperture:')] = 'f' . $details['fnumber'];
+        if (!is_null($pic['iso']))
+            $out[__('ISO speed:')] = $pic['iso'];
 
-        if (isset($details['iso']))
-            $out[__('ISO speed:')] = $details['iso'];
+        if (!is_null($pic['flash']))
+            $out[__('Flash:')] = $pic['flash'] ? __('On') : __('Off');
 
-        if (isset($details['flash']))
-            $out[__('Flash:')] = $details['flash'] ? __('On') : __('Off');
+        if (!is_null($pic['focal']))
+            $out[__('Focal length:')] = $pic['focal'] . ' mm';
 
-        if (isset($details['focal']))
-            $out[__('Focal length:')] = $details['focal'] . ' mm';
-
-        if (isset($details['resolution']))
-            $out[__('Original resolution:')] = $details['resolution'];
+        if (!is_null($pic['orig_width']) && !is_null($pic['orig_height']))
+            $out[__('Original resolution:')] = $pic['orig_width'] . ' x ' . $pic['orig_height'];
 
         return $out;
     }
