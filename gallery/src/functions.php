@@ -69,7 +69,7 @@ function get_url($type, $data = null, $args = null)
     {
         $url = SELF_URL . '?date=' . rawurlencode($data);
     }
-    elseif ($type == 'tags' || $type == 'timeline' || $type == 'feed')
+    elseif ($type == 'tags' || $type == 'timeline' || $type == 'feed' || $type == 'stats')
     {
         $url = SELF_URL . '?' . $type;
     }
@@ -104,6 +104,11 @@ function embed_html($data)
         .   '<iframe src="'.escape($url).'" width="600" height="450" frameborder="0" scrolling="no"></iframe>'
         .   '</object>';
     return $html;
+}
+
+function embed_bbcode($pic)
+{
+    return '[url=' . get_url('image', $pic) . '][img]' . get_url('embed_img', $pic) . '[/img][/url]';
 }
 
 function html_pagination($page, $total, $url)

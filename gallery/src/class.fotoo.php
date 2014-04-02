@@ -244,9 +244,9 @@ class fotoo
                 $data['orig_height'] = $details['resolution'][1];
             }
 
-            if (!empty($details['exposure']))
+            if (!empty($details['exposure']) && is_numeric($details['exposure']))
             {
-                $data['exposure'] = $this->_normalizeExposureTime($details['exposure']);
+                $data['exposure'] = $details['exposure'];
             }
 
             foreach (array('iso', 'fnumber', 'focal') as $key)
@@ -286,16 +286,10 @@ class fotoo
         return true;
     }
 
-    protected function _normalizeExposureTime($time)
+    public function normalizeExposureTime($time)
     {
-        if (preg_match('!^([0-9.]+)/([0-9.]+)$!', $time, $match)
-            && (float)$match[1] > 0 && (float)$match[2] > 0)
-        {
-            $time = (float)$match[1] / (float)$match[2];
-        }
-
         if ($time >= 1)
-            return $time;
+            return round($time, 2);
 
         if (!is_numeric($time))
             return $time;
@@ -305,21 +299,94 @@ class fotoo
             250, 320, 400, 500, 640, 800, 1000, 1300, 1600, 2000, 2500,
             3200, 4000, 8000);
 
-        foreach ($fractions as $f)
+        reset($fractions);
+        $f = 1;
+
+        while ($f)
         {
-            if ((float)$time === (float)(1/$f))
+            $n = next($fractions);
+            
+            if ($time >= (1/$n) && $time <= (1/$f))
                 return '1/' . $f;
+
+            $f = $n;
         }
 
-        $time = (float) round($time, 3);
+        return round($f, 2);
+    }
 
-        foreach ($fractions as $f)
+    // Inspired by jhead code
+    public function normalizeFocalLength($exif)
+    {
+        if (!empty($exif['FocalLengthIn35mmFilm']))
         {
-            if ($time === (float)round(1/$f, 3))
-                return '1/' . $f;
+            if (preg_match('^(\d+)/(\d+)$', $exif['FocalLengthIn35mmFilm'], $match)
+                && (int)$match[1] && (int)$match[2])
+            {
+                return round((int)$match[1] / (int)$match[2], 1);
+            }
+            elseif (is_numeric($exif['FocalLengthIn35mmFilm']))
+            {
+                return round($exif['FocalLengthIn35mmFilm'], 1);
+            }
         }
 
-        return $f;
+        if (empty($exif['FocalLength']))
+        {
+            return null;
+        }
+
+        $width = $height = $res = $unit = null;
+
+        if (!empty($exif['ExifImageWidth']))
+            $width = (int)$exif['ExifImageWidth'];
+        
+        if (!empty($exif['ExifImageLength']))
+            $height = (int)$exif['ExifImageLength'];
+
+        if (!empty($exif['FocalPlaneXResolution']))
+        {
+            if (preg_match('^(\d+)/(\d+)$', $exif['FocalPlaneXResolution'], $match)
+                && (int)$match[1] && (int)$match[2])
+            {
+                $res = (int)$match[1] / (int)$match[2];
+            }
+            elseif (is_numeric($exif['FocalPlaneXResolution']))
+            {
+                $res = (float) $exif['FocalPlaneXResolution'];
+            }
+        }
+
+        if (!empty($exif['FocalPlaneResolutionUnit']))
+        {
+            switch ((int)$exif['FocalPlaneResolutionUnit'])
+            {
+                case 1: $unit = 25.4; break; // inch
+                case 2: $unit = 25.4; break; // supposed to be meters but actually inches
+                case 3: $unit = 10;   break;  // centimeter
+                case 4: $unit = 1;    break;  // millimeter
+                case 5: $unit = .001; break;  // micrometer
+            }
+        }
+
+        if ($width && $height && $res && $unit)
+        {
+            $size = max($width, $height);
+            $ccd_width = (float)($size * $unit / $res);
+
+            return round($focal / $ccd_width * 36 + 0.5, 1);
+        }
+
+        if (preg_match('!^([0-9.]+)/([0-9.]+)$!', $exif['FocalLength'], $match)
+            && (int)$match[1] && (int)$match[2])
+        {
+            return round($match[1] / $match[2], 1);
+        }
+
+        if (is_numeric($exif['FocalLength']))
+            return round($exif['FocalLength'], 1);
+
+        return null;
     }
 
     protected function initDB()
@@ -652,7 +719,18 @@ class fotoo
 
             if (!empty($exif['EXIF']['ExposureTime']))
             {
-                $pic['exposure'] = $this->_normalizeExposureTime($exif['EXIF']['ExposureTime']);
+                $pic['exposure'] = $exif['EXIF']['ExposureTime'];
+
+                if (preg_match('!^([0-9.]+)/([0-9.]+)$!', $time, $match)
+                    && (float)$match[1] > 0 && (float)$match[2] > 0)
+                {
+                    $pic['exposure'] = (float)$match[1] / (float)$match[2];
+                }
+
+                if (!is_numeric($pic['exposure']))
+                {
+                    $pic['exposure'] = null;
+                }
             }
 
             if (!empty($exif['EXIF']['FNumber']))
@@ -683,12 +761,7 @@ class fotoo
 
             if (!empty($exif['EXIF']['FocalLength']))
             {
-                $pic['focal'] = $exif['EXIF']['FocalLength'];
-
-                if (preg_match('!^([0-9.]+)/([0-9.]+)$!', $pic['focal'], $match))
-                {
-                    $pic['focal'] = round($match[1] / $match[2], 1);
-                }
+                $pic['focal'] = $this->normalizeFocalLength($exif['EXIF']);
             }
         }
 
@@ -1073,7 +1146,7 @@ class fotoo
             $out[__('Exposure time:')] = $pic['exposure'];
 
         if (!is_null($pic['fnumber']))
-            $out[__('Aperture:')] = '<i>f</i>/' . $pic['fnumber'];
+            $out[__('Aperture:')] = '<i>f</i>/' . $this->normalizeExposureTime($pic['fnumber']);
 
         if (!is_null($pic['iso']))
             $out[__('ISO speed:')] = $pic['iso'];
@@ -1185,6 +1258,43 @@ class fotoo
 
         return array($width, $height);
     }
+
+    public function getStats()
+    {
+        $out = array();
+        $query = $this->db->query('SELECT 
+            year, month, COUNT(*) AS nb, ROUND(AVG(size)) AS size,
+            ROUND(AVG(focal)) AS focal, ROUND(AVG(fnumber)) AS fnumber,
+            (CASE WHEN orig_width IS NOT NULL THEN ROUND(AVG(orig_width)) ELSE ROUND(AVG(width)) END) AS width,
+            (CASE WHEN orig_height IS NOT NULL THEN ROUND(AVG(orig_height)) ELSE ROUND(AVG(height)) END) AS height
+            FROM photos GROUP BY year, month ORDER BY year, month;');
+
+        while ($row = $query->fetch(PDO::FETCH_ASSOC))
+        {
+            $out[$row['year'] . '-' . (int)$row['month']] = $row;
+        }
+
+        return $out;
+    }
+
+    public function getCameraStats()
+    {
+        $out = array();
+        $query = $this->db->query('SELECT 
+            year, month, camera, COUNT(*) AS nb
+            FROM photos GROUP BY year, month, camera ORDER BY year, month, nb DESC;');
+
+        while ($row = $query->fetch(PDO::FETCH_ASSOC))
+        {
+            if (!isset($out[$row['year'] . '-' . (int)$row['month']]))
+                $out[$row['year'] . '-' . (int)$row['month']] = array();
+            
+            $out[$row['year'] . '-' . (int)$row['month']][$row['camera']] = $row;
+        }
+
+        return $out;
+    }
+
 }
 
 ?>

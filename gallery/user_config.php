@@ -104,7 +104,7 @@ function get_custom_url($type, $data = null)
     {
         return BASE_URL . 'date/' . $data;
     }
-    elseif ($type == 'tags' || $type == 'timeline' || $type == 'feed')
+    elseif ($type == 'tags' || $type == 'timeline' || $type == 'feed' || $type == 'stats')
     {
         return BASE_URL . $type;
     }

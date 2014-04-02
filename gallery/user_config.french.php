@@ -42,10 +42,10 @@ $french_strings = array(
         =>  'Mots-clés :',
     'Date:'
         =>  'Date :',
-    'Embed:'
-        =>  'Intégrer dans un site :',
-    'Embed as image:'
-        =>  'Intégrer en image seule :',
+    'Share or embed:'
+        =>  'Partager ou intégrer sur un site :',
+    'Image only'
+        =>  'Image seule',
     '%A <a href="%1">%d</a> <a href="%2">%B</a> <a href="%3">%Y</a> at %H:%M'
         =>  '%A <a href="%1">%d</a> <a href="%2">%B</a> <a href="%3">%Y</a> à %H:%M',
     'Updating database, please wait, more pictures will appear in a while...'
@@ -93,6 +93,8 @@ $french_strings = array(
         =>  'Longueur focale :',
     'Original resolution:'
         =>  'Résolution originale :',
+    'Statistics':
+        =>  'Statistiques',
 );
 
 // Days of the week translations

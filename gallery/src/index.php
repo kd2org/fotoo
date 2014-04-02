@@ -191,7 +191,8 @@ dl.pic { width: 65%; float: left; text-align: center; }
 dl.pic dd.orig { margin: .5em 0; }
 dl.metas, dl.details { float: right; width: 30%; border: .1em solid #ccc; background: #eee; padding: .5em; margin-bottom: 1em; border-radius: .5em; }
 dl.metas dt, dl.details dt { font-weight: bold; }
-dl.metas input { font-size: .7em; padding: 2pt; width: 97%; border: .1em solid #ccc; border-radius: .5em; background: #eee; color: #666; }
+dl.metas select, dl.metas input { font-size: 8pt; padding: 2pt; border: .1em solid #ccc; border-radius: .5em; background: #fff; color: #000; }
+dl.metas input { width: 60%; cursor: pointer; }
 dl.metas dd { margin: 0.2em 0 1em; }
 dl.details { font-size: 0.9em; }
 dl.details dt, dl.details dd { float: left; }
@@ -219,6 +220,23 @@ ul.dates p.more { display: inline; margin-left: 2em; }
 .pagination li { display: inline; margin: 0.5em; }
 .pagination .selected { font-weight: bold; font-size: 1.2em; }
 .pagination a { color: #999; }
+
+.stats { width: 100%; border-collapse: collapse; }
+.stats th, .stats td { text-align: center; padding: .3em; vertical-align: middle; }
+.stats i, .stats b { font-weight: normal; font-style: normal; }
+.stats b { display: inline-block; background: #ccc; padding: .2em; font-size: 8pt; }
+.stats tbody .nb { text-align: right; }
+.stats tbody .nb b { background: #333; color: #fff; font-size: 12pt; font-weight: bold; }
+.stats tbody .cameras { text-align: left; }
+.stats tbody .cameras > i { display: block; font-size: 8pt; width: 100%; position: relative; margin-bottom: .2em; }
+.stats tbody .cameras > i:nth-child(even) i { background: #999; }
+.stats tbody .cameras > i i { display: inline-block; background: #ccc; position: absolute; height: 100%; z-index: -1; }
+.stats .fnumber b { border-radius: 50%; border: .2em solid #666; }
+.stats .focal { font-size: 8pt; }
+.stats .focal b { border: .2em solid #666; border-top: none; border-bottom: none; height: 8px;}
+.stats .resolution b { border: .1em solid #999; }
+.stats .size b { border-radius: 50%; }
+.stats thead { background: #eee; }
 
 a:link { color: #009; }
 a:visited { color: #006; }
@@ -430,6 +448,11 @@ elseif (isset($_GET['date']) || isset($_GET['timeline']))
     $mode = 'date';
     $page = !empty($_GET['p']) ? (int) $_GET['p'] : 1;
 }
+elseif (isset($_GET['stats']))
+{
+    $title = __('Statistics');
+    $mode = 'stats';
+}
 elseif (isset($_GET['tags']))
 {
     $title = __('Pictures by tag');
@@ -532,6 +555,7 @@ $menu = '<ul class="menu">
     <li><a class="home" href="'.SELF_URL.'">'.__('My Pictures').'</a></li>
     <li><a class="tags" href="'.get_url('tags').'">'.__('By tags').'</a></li>
     <li><a class="date" href="'.get_url('timeline').'">'.__('By date').'</a></li>
+    <li><a class="date" href="'.get_url('stats').'">'.__('Statistics').'</a></li>
     <li><form method="get" action="'.SELF_URL.'">'.__('Search:').'
         <input size="12" type="text" value="'.(isset($_GET['search']) ? escape($_GET['search']) : '').'" name="search" /> 
         <input type="submit" value="&rarr;" /></form></li>
@@ -660,6 +684,116 @@ if ($mode == 'date')
         }
 
         echo '</ul></li></ul>';
+    }
+}
+elseif ($mode == 'stats')
+{
+    echo '<h1>'.$title.'</h1>';
+    echo '<div id="header">
+        '.$menu.'
+    </div>';
+
+    $stats = $f->getStats();
+
+    if (empty($stats))
+        echo '<p class="info">'.__('No statistics available.').'</p>';
+    else
+    {
+        $cameras = $f->getCameraStats();
+
+        echo '<table class="stats">
+        <thead>
+            <tr>
+                <th>'.__('Month').'</th>
+                <td>'.__('Number of pictures').'</td>
+                <td>'.__('Pictures taken by camera').'</td>
+                <td>'.__('File size').'</td>
+                <td>'.__('Resolution').'</td>
+                <td>'.__('Focal length').'</td>
+                <td>'.__('Aperture').'</td>
+            </tr>
+        </thead>
+        <tbody>';
+
+        $scale = array(
+            'nb' => 0,
+            'size' => 0,
+            'resolution' => 0,
+            'focal' => 0,
+            'fnumber' => 32,
+        );
+
+        foreach ($stats as $ym => $row)
+        {
+            $scale['nb'] = max($scale['nb'], $row['nb']);
+            $scale['size'] = max($scale['size'], $row['size']);
+            $scale['focal'] = max($scale['focal'], $row['focal']);
+
+            if ($row['fnumber'] > 0.7)
+                $scale['fnumber'] = min($scale['fnumber'], $row['fnumber']);
+
+            $row['resolution'] = $row['width'] * $row['height'];
+            $scale['resolution'] = max($scale['resolution'], $row['resolution']);
+        }
+
+        foreach ($stats as $ym=>$row)
+        {
+            echo '<tr>
+                <th><a href="'
+                . get_url('date', $row['year'].'/'.zero_pad($row['month'], 2)) . '">'
+                . __('%B %Y', 'TIME', strtotime($row['year'] . '-' . zero_pad($row['month'], 2) . '-01')) . '</a></th>
+                <td class="nb">';
+
+            if ($row['nb'])
+            {
+                $s = max(10, round($row['nb'] / $scale['nb'] * 100));
+                echo '<b style="width: ' . $s . '%">' . $row['nb'] . '</b>';
+            }
+            
+            echo '</td><td class="cameras">';
+
+            foreach ($cameras[$ym] as $c_row)
+            {
+                echo '<i><i style="width: ' . round($c_row['nb'] / $row['nb'] * 100) . '%"></i>' . escape($c_row['camera'] ?: '?') . '</i>';
+            }
+
+            echo '</td><td class="size">';
+
+            if ($row['size'])
+                echo '<b style="width: ' . (round($row['size'] / $scale['size'] * 100)+20) . 'px">' . round($row['size'] / 1000) . '&nbsp;KB</b>';
+
+            echo '</td><td class="resolution">';
+
+            if ($row['width'] && $row['height'])
+            {
+                $res = ($row['width'] * $row['height']);
+                $s = max(50, round($res / $scale['resolution'] * 100));
+                echo '<b style="width: ' . $s . 'px; height: ' . round($s*0.7) . 'px; line-height: ' . round($s*0.7) . 'px">' . round($res/1000/1000) . '&nbsp;MP</b>';
+            }
+
+            echo '</td><td class="focal">';
+
+            if ($row['focal'])
+            {
+                $s = round($row['focal'] / $scale['focal'] * 100);
+                echo '<b style="width: ' . $s . '%"></b><br />' . (int)$row['focal'] . '&nbsp;mm';
+            }
+
+            echo '</td><td class="fnumber">';
+
+            if ($row['fnumber'] > 0)
+            {
+                $s = round($scale['fnumber'] / $row['fnumber'] * 100);
+                $b = (100 - $s)/2;
+                echo '<b style="width: ' . $s . 'px; height: ' . $s . 'px; line-height: ' . $s . 'px; border-width: ' . $b . 'px"><em>f</em>/' . $row['fnumber'] . '</b>';
+            }
+
+            echo '</td>
+            </tr>';
+        }
+
+        echo '</tbody>
+        </table>';
     }
 }
 elseif ($mode == 'tags')
@@ -865,10 +999,18 @@ elseif ($mode == 'pic')
     if (ALLOW_EMBED)
     {
         echo '
-        <dt class="embed">'.__('Embed:').'</dt>
-        <dd class="embed"><input type="text" onclick="this.select();" value="'.escape(embed_html($pic)).'" /></dd>
-        <dt class="embed">'.__('Embed as image:').'</dt>
-        <dd class="embed"><input type="text" onclick="this.select();" value="'.escape(get_url('embed_img', $pic)).'" /></dd>';
+        <dt class="embed">'.__('Share or embed:').'</dt>
+        <dd class="embed">
+            <input type="hidden" id="embed_code_object" value="'.escape(embed_html($pic)).'" />
+            <input type="hidden" id="embed_code_img" value="'.escape(get_url('embed_img', $pic)).'" />
+            <input type="hidden" id="embed_code_bbcode" value="'.escape(embed_bbcode($pic)).'" />
+            <select onchange="document.getElementById(\'embed_code\').value = document.getElementById(\'embed_code_\'+this.value).value">
+                <option value="img">'.__('Image only').'</option>
+                <option value="object">'.__('Slideshow').'</option>
+                <option value="bbcode">BBcode</option>
+            </select>
+            <input type="text" id="embed_code" onclick="this.select();" value="'.escape(get_url('embed_img', $pic)).'" />
+        </dd>';
     }
 
     echo '
