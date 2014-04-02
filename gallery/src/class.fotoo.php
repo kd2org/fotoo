@@ -784,6 +784,8 @@ class fotoo
             }
         }
 
+        unset($thumb);
+
         if (GEN_SMALL == 1 && $can_resize && !file_exists($this->getSmallPath($hash)))
         {
             $this->resizeImage($file, $this->getSmallPath($hash), $width, $height, SMALL_IMAGE_SIZE);
