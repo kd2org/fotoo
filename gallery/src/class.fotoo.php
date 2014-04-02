@@ -772,16 +772,19 @@ class fotoo
 
         $can_resize = ($width <= MAX_IMAGE_SIZE && $height <= MAX_IMAGE_SIZE);
 
-        if (isset($thumb))
+        if (!file_exists($this->getThumbPath($hash)))
         {
-            file_put_contents($this->getThumbPath($hash), $thumb);
-        }
-        elseif ($can_resize)
-        {
-            $this->resizeImage($file, $this->getThumbPath($hash), $width, $height, 160);
+            if (isset($thumb))
+            {
+                file_put_contents($this->getThumbPath($hash), $thumb);
+            }
+            elseif ($can_resize)
+            {
+                $this->resizeImage($file, $this->getThumbPath($hash), $width, $height, 160);
+            }
         }
 
-        if (GEN_SMALL == 1 && $can_resize)
+        if (GEN_SMALL == 1 && $can_resize && !file_exists($this->getSmallPath($hash)))
         {
             $this->resizeImage($file, $this->getSmallPath($hash), $width, $height, SMALL_IMAGE_SIZE);
         }
