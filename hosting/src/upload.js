@@ -378,7 +378,7 @@
 
                     resize(
                         file.files[0],
-                        config.max_width, // thumb size
+                        -config.max_width, // thumb size
                         div_img, // thumb resized
                         progress,
                         function () {
@@ -526,7 +526,19 @@
                 onresample = img._onresample
             ;
 
-            if (height == null)
+            if (height == null && width < 0)
+            {
+                var max_mp = Math.abs(width) * Math.abs(width);
+                var img_mp = img.width * img.height;
+
+                if (img_mp > max_mp)
+                {
+                    var ratio = img_mp / max_mp;
+                    height = round(img.height / ratio);
+                    width = round(img.width / ratio);
+                }
+            }
+            else if (height == null)
             {
                 if (img.width > img.height)
                 {

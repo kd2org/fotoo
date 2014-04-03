@@ -212,11 +212,26 @@ class Fotoo_Hosting
 		if (trim($name) && !empty($name))
 			$dest .= '.' . $name;
 
-		$width = ($img['width'] > $this->config->max_width) ? $this->config->max_width : $img['width'];
-		$height = ($img['height'] > $this->config->max_width) ? $this->config->max_width : $img['height'];
+		$max_mp = $this->config->max_width * $this->config->max_width;
+		$img_mp = $img['width'] * $img['height'];
+
+		if ($img_mp > $max_mp)
+		{
+			$ratio = $imp_mp / $max_mp;
+			$width = round($img['width'] / $ratio);
+			$height = round($img['height'] / $ratio);
+			$resize = true;
+		}
+		else
+		{
+			$width = $img['width'];
+			$height = $img['height'];
+			$resize = false;
+		}
 
 		// If JPEG or big PNG/GIF, then resize (always resize JPEG to reduce file size)
-		if ($img['format'] == 'JPEG' || (($img['format'] == 'GIF' || $img['format'] == 'PNG') && $file['size'] > (1024 * 1024)))
+		if ($resize || ($img['format'] == 'JPEG' && empty($file['content']))
+			|| (($img['format'] == 'GIF' || $img['format'] == 'PNG') && $file['size'] > (1024 * 1024)))
 		{
 			$res = image::resize(
 				$file['tmp_name'],
