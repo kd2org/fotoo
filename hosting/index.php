@@ -30,6 +30,7 @@
     var last_filename = '';
     var loading_gif = 'data:image/gif;base64,R0lGODlhEAAQAPIAAP%2F%2F%2FwAAAMLCwkJCQgAAAGJiYoKCgpKSkiH%2BGkNyZWF0ZWQgd2l0aCBhamF4bG9hZC5pbmZvACH5BAAKAAAAIf8LTkVUU0NBUEUyLjADAQAAACwAAAAAEAAQAAADMwi63P4wyklrE2MIOggZnAdOmGYJRbExwroUmcG2LmDEwnHQLVsYOd2mBzkYDAdKa%2BdIAAAh%2BQQACgABACwAAAAAEAAQAAADNAi63P5OjCEgG4QMu7DmikRxQlFUYDEZIGBMRVsaqHwctXXf7WEYB4Ag1xjihkMZsiUkKhIAIfkEAAoAAgAsAAAAABAAEAAAAzYIujIjK8pByJDMlFYvBoVjHA70GU7xSUJhmKtwHPAKzLO9HMaoKwJZ7Rf8AYPDDzKpZBqfvwQAIfkEAAoAAwAsAAAAABAAEAAAAzMIumIlK8oyhpHsnFZfhYumCYUhDAQxRIdhHBGqRoKw0R8DYlJd8z0fMDgsGo%2FIpHI5TAAAIfkEAAoABAAsAAAAABAAEAAAAzIIunInK0rnZBTwGPNMgQwmdsNgXGJUlIWEuR5oWUIpz8pAEAMe6TwfwyYsGo%2FIpFKSAAAh%2BQQACgAFACwAAAAAEAAQAAADMwi6IMKQORfjdOe82p4wGccc4CEuQradylesojEMBgsUc2G7sDX3lQGBMLAJibufbSlKAAAh%2BQQACgAGACwAAAAAEAAQAAADMgi63P7wCRHZnFVdmgHu2nFwlWCI3WGc3TSWhUFGxTAUkGCbtgENBMJAEJsxgMLWzpEAACH5BAAKAAcALAAAAAAQABAAAAMyCLrc%2FjDKSatlQtScKdceCAjDII7HcQ4EMTCpyrCuUBjCYRgHVtqlAiB1YhiCnlsRkAAAOwAAAAAAAAAAAA%3D%3D';
     var album_id = null;
+    var album_check = null;
     var xhr = new XMLHttpRequest;
 
     function cleanFileName(filename)
@@ -68,7 +69,7 @@
 
         resize(
             file,
-            config.max_width,
+            -config.max_width,
             resized_img,
             progress,
             function()
@@ -98,7 +99,7 @@
                         }
                         else
                         {
-                            location.href = config.album_page_url + album_id;
+                            location.href = config.album_page_url + album_id + (config.album_page_url.indexOf('?') ? '&c=' : '?c=') + album_check;
                         }
                     }
                 };
@@ -265,7 +266,9 @@
                 xhr.onreadystatechange = function () {
                     if (xhr.readyState == 4 && xhr.status == 200)
                     {
-                        album_id = xhr.responseText;
+                        var txt = xhr.responseText.split('/');
+                        album_id = txt[0];
+                        album_check = txt[1];
                         uploadPicture(0, 0);
                     }
                 };
@@ -381,7 +384,7 @@
 
                     resize(
                         file.files[0],
-                        config.max_width, // thumb size
+                        -config.max_width, // thumb size
                         div_img, // thumb resized
                         progress,
                         function () {
@@ -529,7 +532,24 @@
                 onresample = img._onresample
             ;
 
-            if (height == null)
+            if (height == null && width < 0)
+            {
+                var max_mp = Math.abs(width) * Math.abs(width);
+                var img_mp = img.width * img.height;
+
+                if (img_mp > max_mp)
+                {
+                    var ratio = img_mp / max_mp;
+                    height = round(img.height / ratio);
+                    width = round(img.width / ratio);
+                }
+                else
+                {
+                    width = img.width;
+                    height = img.height;
+                }
+            }
+            else if (height == null)
             {
                 if (img.width > img.height)
                 {
@@ -550,6 +570,9 @@
                     width = img.width, height = img.height;
                 }
             }
+
+            width = Math.abs(width);
+            height = Math.abs(height);
 
             delete img._onresample;
             delete img._width;
@@ -729,18 +752,56 @@ fieldset {
 	margin: 1em 0;
 }
 
+.picture footer.context {
+	background: rgb(220, 220, 220);
+	background: rgba(255, 255, 255, 0.25);
+	border-radius: .5em;
+	padding: 1em;
+	max-width: 650px;
+	margin: 1em auto;
+}
+
+.picture footer.context img {
+	max-width: 200px;
+	max-height: 150px;
+}
+
+.picture footer.context figure {
+	position: relative;
+	width: 200px;
+	height: 180px;
+	margin: 0;
+}
+
+.picture footer.context figure b {
+	font-size: 100px;
+	line-height: 150px;
+	width: 200px;
+	height: 150px;
+	position: absolute;
+	display: block;
+	top: 0;
+	left: 0;
+	color: rgb(255, 255, 255);
+	color: rgba(255, 255, 255, 0.5);
+	text-shadow: 0px 0px 10px #000;
+}
+
 .examples dt {
 	margin: .5em 0;
 	font-weight: bold;
 }
 
-.examples input {
+.examples input, .admin input, .examples textarea {
 	text-align: center;
-	background: rgb(213, 214, 182);
+	background: rgba(213, 214, 182, 0.5);
 	border: 1px solid #fff;
 	border-radius: .5em;
 	font-family: Courier New, Courier, mono;
 	max-width: 50em;
+	width: 100%;
+	font-size: 10pt;
+	padding: .2em;
 }
 
 figure {
@@ -992,9 +1053,11 @@ class Fotoo_Hosting
 
 	public function upload($file, $name = '', $private = false, $album = null)
 	{
-		if (isset($file['content']))
+		$client_resize = false;
+
+		if (isset($file['content']) && $this->_processEncodedUpload($file))
 		{
-			$this->_processEncodedUpload($file);
+			$client_resize = true;
 		}
 
 		if (!isset($file['error']))
@@ -1052,11 +1115,26 @@ class Fotoo_Hosting
 		if (trim($name) && !empty($name))
 			$dest .= '.' . $name;
 
-		$width = ($img['width'] > $this->config->max_width) ? $this->config->max_width : $img['width'];
-		$height = ($img['height'] > $this->config->max_width) ? $this->config->max_width : $img['height'];
+		$max_mp = $this->config->max_width * $this->config->max_width;
+		$img_mp = $img['width'] * $img['height'];
+
+		if ($img_mp > $max_mp)
+		{
+			$ratio = $imp_mp / $max_mp;
+			$width = round($img['width'] / $ratio);
+			$height = round($img['height'] / $ratio);
+			$resize = true;
+		}
+		else
+		{
+			$width = $img['width'];
+			$height = $img['height'];
+			$resize = false;
+		}
 
 		// If JPEG or big PNG/GIF, then resize (always resize JPEG to reduce file size)
-		if ($img['format'] == 'JPEG' || (($img['format'] == 'GIF' || $img['format'] == 'PNG') && $file['size'] > (1024 * 1024)))
+		if ($resize || ($img['format'] == 'JPEG' && !$client_resize)
+			|| (($img['format'] == 'GIF' || $img['format'] == 'PNG') && $file['size'] > (1024 * 1024)))
 		{
 			$res = image::resize(
 				$file['tmp_name'],
@@ -1077,6 +1155,10 @@ class Fotoo_Hosting
 			{
 				list($width, $height) = $res;
 			}
+		}
+		elseif ($client_resize)
+		{
+			rename($file['tmp_name'], $dest . $ext);
 		}
 		else
 		{
@@ -1158,8 +1240,11 @@ class Fotoo_Hosting
 		return $res;
 	}
 
-	public function remove($hash)
+	public function remove($hash, $id = null)
 	{
+		if (!$this->logged() && !$this->checkRemoveId($hash, $id))
+			return false;
+
 		$img = $this->get($hash);
 
 		$file = $this->_getPath($img);
@@ -1186,6 +1271,16 @@ class Fotoo_Hosting
 		return $out;
 	}
 
+	public function makeRemoveId($hash)
+	{
+		return sha1($this->config->storage_path . $hash);
+	}
+
+	public function checkRemoveId($hash, $id)
+	{
+		return sha1($this->config->storage_path . $hash) === $id;
+	}
+
 	public function countList()
 	{
 		$where = $this->logged() ? '' : 'AND private != 1';
@@ -1207,6 +1302,21 @@ class Fotoo_Hosting
 		}
 
 		return $out;
+	}
+
+	public function getAlbumPrevNext($album, $current, $order = -1)
+	{
+		$st = $this->db->prepare('SELECT * FROM pictures WHERE album = :album
+			AND date '.($order > 0 ? '>' : '<').' (SELECT date FROM pictures WHERE hash = :img)
+			ORDER BY date '.($order > 0 ? 'ASC': 'DESC').' LIMIT 1;');
+		$st->bindValue(':album', $album);
+		$st->bindValue(':img', $current);
+		$res = $st->execute();
+
+		if ($res)
+			return $res->fetchArray(SQLITE3_ASSOC);
+
+		return false;
 	}
 
 	public function getAlbumExtract($hash)
@@ -1253,8 +1363,11 @@ class Fotoo_Hosting
 		return $this->db->querySingle('SELECT COUNT(*) FROM pictures WHERE album = \''.$this->db->escapeString($hash).'\';');
 	}
 
-	public function removeAlbum($hash)
+	public function removeAlbum($hash, $id = null)
 	{
+		if (!$this->logged() && !$this->checkRemoveId($hash, $id))
+			return false;
+
 		$res = $this->db->query('SELECT * FROM pictures WHERE album = \''.$this->db->escapeString($hash).'\';');
 
 		while ($row = $res->fetchArray(SQLITE3_ASSOC))
@@ -1280,12 +1393,20 @@ class Fotoo_Hosting
 			. '.' . strtolower($img['format']);
 	}
 
-	public function getUrl($img)
+	public function getUrl($img, $append_id = false)
 	{
-		return $this->config->image_page_url
+		$url = $this->config->image_page_url
 			. $img['hash']
 			. ($img['filename'] ? '.' . $img['filename'] : '')
 			. '.' . strtolower($img['format']);
+
+		if ($append_id)
+		{
+			$id = $this->makeRemoveId($img['hash']);
+			$url .= (strpos($url, '?') !== false) ? '&c=' . $id : '?c=' . $id;
+		}
+
+		return $url;
 	}
 
 	public function getImageUrl($img)
@@ -1504,80 +1625,63 @@ class image
         return true;
     }
 
-    static public function identify($src_file, $options=array())
+    static public function identify($src_file)
     {
         if (empty($src_file))
             throw new imageLibException('No source file argument passed');
 
         $hash = sha1($src_file);
 
-        if (!is_null($options))
-        {
-            self::parseOptions($options);
-        }
-
-        $lib = self::option(self::IMAGE_LIB);
-
-        if (!$lib)
-        {
-            if (self::canUseImlib())
-                $lib = self::IMLIB;
-            elseif (self::canUseImagick())
-                $lib = self::IMAGICK;
-            elseif (self::canUseGD())
-                $lib = self::GD;
-        }
-
-        if (empty($lib))
-        {
-            throw new imageLibException('No usable image library found');
-        }
-
         if (array_key_exists($hash, self::$cache))
         {
             return self::$cache[$hash];
         }
 
-        $image = array(
-            'width'     =>  false,
-            'height'    =>  false,
-            'format'    =>  false,
-        );
+        $image = false;
 
-        if ($lib == self::IMLIB)
+        if (self::canUseImlib())
         {
             $im = @imlib_load_image($src_file);
 
-            if (!$im)
-                return false;
+            if ($im)
+            {
+                $image = array(
+                    'format'    =>  strtoupper(imlib_image_format($im)),
+                    'width'     =>  imlib_image_get_width($im),
+                    'height'    =>  imlib_image_get_height($im),
+                );
 
-            $image['format'] = strtoupper(imlib_image_format($im));
-            $image['width'] = imlib_image_get_width($im);
-            $image['height'] = imlib_image_get_height($im);
+                imlib_free_image($im);
+            }
 
-            imlib_free_image($im);
+            unset($im);
         }
-        elseif ($lib == self::IMAGICK)
+
+        if (!$image && self::canUseImagick())
         {
             try {
                 $im = new Imagick($src_file);
+
+                if ($im)
+                {
+                    $image = array(
+                        'width'     =>  $im->getImageWidth(),
+                        'height'    =>  $im->getImageHeight(),
+                        'format'    =>  strtoupper($im->getImageFormat()),
+                    );
+
+                    $im->destroy();
+                }
+
+                unset($im);
             }
             catch (ImagickException $e)
             {
-                return false;
             }
 
-            if (!$im)
-                return false;
-
-            $image['width'] = $im->getImageWidth();
-            $image['height'] = $im->getImageHeight();
-            $image['format'] = strtoupper($im->getImageFormat());
-
-            $im->destroy();
-            unset($im);
         }
-        elseif ($lib == self::GD)
+
+        if (!$image && self::canUseGD())
         {
             $gd_img = getimagesize($src_file);
 
@@ -2421,34 +2525,35 @@ if (!is_bool($config->allow_upload) && is_callable($config->allow_upload))
 
 $fh = new Fotoo_Hosting($config);
 
-if ($fh->logged())
+if (!empty($_GET['delete']))
 {
-    if (!empty($_GET['delete']))
-    {
-        if ($fh->remove($_GET['delete']))
-        {
-            header('Location: '.$config->base_url.'?list');
-        }
-        else
-        {
-            echo "Can't delete picture";
-        }
+    $id = !empty($_GET['c']) ? trim($_GET['c']) : false;
 
-        exit;
-    }
-    elseif (!empty($_GET['deleteAlbum']))
+    if ($fh->remove($_GET['delete'], $id))
     {
-        if ($fh->removeAlbum($_GET['deleteAlbum']))
-        {
-            header('Location: ' . $config->base_url . '?albums');
-        }
-        else
-        {
-            echo "Can't delete album";
-        }
-
-        exit;
+        header('Location: '.$config->base_url.'?list');
     }
+    else
+    {
+        echo "Can't delete picture";
+    }
+
+    exit;
+}
+elseif (!empty($_GET['deleteAlbum']))
+{
+    $id = !empty($_GET['c']) ? trim($_GET['c']) : false;
+
+    if ($fh->removeAlbum($_GET['deleteAlbum'], $id))
+    {
+        header('Location: ' . $config->base_url . '?albums');
+    }
+    else
+    {
+        echo "Can't delete album";
+    }
+
+    exit;
 }
 
 if (isset($_POST['album_create']))
@@ -2456,7 +2561,7 @@ if (isset($_POST['album_create']))
     if (!empty($_POST['title']))
     {
         $id = $fh->createAlbum($_POST['title'], empty($_POST['private']) ? false : true);
-        echo "$id";
+        echo "$id/" . $fh->makeRemoveId($id);
         exit;
     }
 
@@ -2517,16 +2622,9 @@ if (isset($_GET['upload']))
     else
     {
         $img = $fh->get($res);
-        $url = $fh->getUrl($img);
+        $url = $fh->getUrl($img, true);
 
-        if (isset($_GET['from_flash']))
-        {
-            echo "OK\n" . $url;
-        }
-        else
-        {
-            header('Location: ' . $url);
-        }
+        header('Location: ' . $url);
 
         exit;
     }
@@ -2709,6 +2807,14 @@ elseif (!empty($_GET['a']))
     $list = $fh->getAlbumPictures($album['hash'], $page);
     $max = $fh->countAlbumPictures($album['hash']);
 
+    $bbcode = '[b][url=' . $config->album_page_url . $album['hash'] . ']' . $album['title'] . "[/url][/b]\n";
+
+    foreach ($list as $img)
+    {
+        $label = $img['filename'] ? escape(preg_replace('![_-]!', ' ', $img['filename'])) : 'View image';
+        $bbcode .= '[url='.$fh->getUrl($img).'][img='.$label.']'.$fh->getImageThumbUrl($img)."[/img][/url] ";
+    }
+
     $html = '
         <article class="browse">
             <h2>'.escape($title).'</h2>
@@ -2719,6 +2825,8 @@ elseif (!empty($_GET['a']))
             <aside class="examples">
                 <dt>Share this album using this URL:</dt>
                 <dd><input type="text" onclick="this.select();" value="'.escape($config->album_page_url . $album['hash']).'" /></dd>
+                <dt>All pictures for a forum (BBCode):</dt>
+                <dd><textarea cols="70" rows="1" onclick="this.select();">'.escape($bbcode).'</textarea></dd>
             </aside>';
 
     if ($fh->logged())
@@ -2726,6 +2834,21 @@ elseif (!empty($_GET['a']))
         $html .= '
         <p class="admin">
             <a href="?deleteAlbum='.rawurlencode($album['hash']).'" onclick="return confirm(\'Really?\');">Delete album</a>
+        </p>';
+    }
+    elseif (!empty($_GET['c']))
+    {
+        $url = $config->album_page_url . $album['hash'] 
+            . (strpos($config->album_page_url, '?') !== false ? '&c=' : '?c=') 
+            . $fh->makeRemoveId($album['hash']);
+
+        $html .= '
+        <p class="admin">
+            <a href="?deleteAlbum='.rawurlencode($album['hash']).'&amp;c='.rawurldecode($_GET['c']).'" onclick="return confirm(\'Really?\');">Delete album</a>
+        </p>
+        <p class="admin">
+            Keep this URL in your favorites to be able to delete this album later:<br />
+            <input type="text" onclick="this.select();" value="'.escape($url).'" />
         </p>';
     }
 
@@ -2827,11 +2950,75 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
             </p>
         </footer>';
 
+    if (!empty($img['album']))
+    {
+        $prev = $fh->getAlbumPrevNext($img['album'], $img['hash'], -1);
+        $next = $fh->getAlbumPrevNext($img['album'], $img['hash'], 1);
+        $album = $fh->getAlbum($img['album']);
+
+        $html .= '
+        <footer class="context">';
+
+        if ($prev)
+        {
+            $thumb_url = $fh->getImageThumbUrl($prev);
+            $url = $fh->getUrl($prev);
+            $label = $prev['filename'] ? escape(preg_replace('![_-]!', ' ', $prev['filename'])) : 'View image';
+
+            $html .= '
+            <figure class="prev">
+                <a href="'.$url.'"><b>&larr;</b><img src="'.$thumb_url.'" alt="'.$label.'" /></a>
+                <figcaption><a href="'.$url.'">'.$label.'</a></figcaption>
+            </figure>';
+        }
+        else
+        {
+            $html .= '<figure class="prev"><b>…</b></figure>';
+        }
+
+        $html .= '
+            <figure>
+                <h3>Album:</h3>
+                <h2><a href="' . $config->album_page_url . $album['hash'] . '"> ' . escape($album['title']) .'</a></h2></figure
+            </figure>';
+
+        if ($next)
+        {
+            $thumb_url = $fh->getImageThumbUrl($next);
+            $url = $fh->getUrl($next);
+            $label = $next['filename'] ? escape(preg_replace('![_-]!', ' ', $next['filename'])) : 'View image';
+
+            $html .= '
+            <figure class="prev">
+                <a href="'.$url.'"><img src="'.$thumb_url.'" alt="'.$label.'" /><b>&rarr;</b></a>
+                <figcaption><a href="'.$url.'">'.$label.'</a></figcaption>
+            </figure>';
+        }
+        else
+        {
+            $html .= '<figure class="next"><b>…</b></figure>';
+        }
+
+        $html .= '
+            </footer>';
+    }
+
     if ($fh->logged())
     {
         $html .= '
         <p class="admin">
-            <a href="?delete='.rawurlencode($img['hash']).'" onclick="return confirm(\'Really?\');">Delete image</a>
+            <a href="?delete='.rawurlencode($img['hash']).'" onclick="return confirm(\'Really?\');">Delete picture</a>
+        </p>';
+    }
+    elseif (!empty($_GET['c']))
+    {
+        $html .= '
+        <p class="admin">
+            <a href="?delete='.rawurlencode($img['hash']).'&amp;c='.rawurldecode($_GET['c']).'" onclick="return confirm(\'Really?\');">Delete picture</a>
+        </p>
+        <p class="admin">
+            Keep this URL in your favorites to be able to delete this picture later:<br />
+            <input type="text" onclick="this.select();" value="'.$fh->getUrl($img, true).'" />
         </p>';
     }
 

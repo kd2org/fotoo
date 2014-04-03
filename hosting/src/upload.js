@@ -27,6 +27,7 @@
     var last_filename = '';
     var loading_gif = 'data:image/gif;base64,R0lGODlhEAAQAPIAAP%2F%2F%2FwAAAMLCwkJCQgAAAGJiYoKCgpKSkiH%2BGkNyZWF0ZWQgd2l0aCBhamF4bG9hZC5pbmZvACH5BAAKAAAAIf8LTkVUU0NBUEUyLjADAQAAACwAAAAAEAAQAAADMwi63P4wyklrE2MIOggZnAdOmGYJRbExwroUmcG2LmDEwnHQLVsYOd2mBzkYDAdKa%2BdIAAAh%2BQQACgABACwAAAAAEAAQAAADNAi63P5OjCEgG4QMu7DmikRxQlFUYDEZIGBMRVsaqHwctXXf7WEYB4Ag1xjihkMZsiUkKhIAIfkEAAoAAgAsAAAAABAAEAAAAzYIujIjK8pByJDMlFYvBoVjHA70GU7xSUJhmKtwHPAKzLO9HMaoKwJZ7Rf8AYPDDzKpZBqfvwQAIfkEAAoAAwAsAAAAABAAEAAAAzMIumIlK8oyhpHsnFZfhYumCYUhDAQxRIdhHBGqRoKw0R8DYlJd8z0fMDgsGo%2FIpHI5TAAAIfkEAAoABAAsAAAAABAAEAAAAzIIunInK0rnZBTwGPNMgQwmdsNgXGJUlIWEuR5oWUIpz8pAEAMe6TwfwyYsGo%2FIpFKSAAAh%2BQQACgAFACwAAAAAEAAQAAADMwi6IMKQORfjdOe82p4wGccc4CEuQradylesojEMBgsUc2G7sDX3lQGBMLAJibufbSlKAAAh%2BQQACgAGACwAAAAAEAAQAAADMgi63P7wCRHZnFVdmgHu2nFwlWCI3WGc3TSWhUFGxTAUkGCbtgENBMJAEJsxgMLWzpEAACH5BAAKAAcALAAAAAAQABAAAAMyCLrc%2FjDKSatlQtScKdceCAjDII7HcQ4EMTCpyrCuUBjCYRgHVtqlAiB1YhiCnlsRkAAAOwAAAAAAAAAAAA%3D%3D';
     var album_id = null;
+    var album_check = null;
     var xhr = new XMLHttpRequest;
 
     function cleanFileName(filename)
@@ -65,7 +66,7 @@
 
         resize(
             file,
-            config.max_width,
+            -config.max_width,
             resized_img,
             progress,
             function()
@@ -95,7 +96,7 @@
                         }
                         else
                         {
-                            location.href = config.album_page_url + album_id;
+                            location.href = config.album_page_url + album_id + (config.album_page_url.indexOf('?') ? '&c=' : '?c=') + album_check;
                         }
                     }
                 };
@@ -262,7 +263,9 @@
                 xhr.onreadystatechange = function () {
                     if (xhr.readyState == 4 && xhr.status == 200)
                     {
-                        album_id = xhr.responseText;
+                        var txt = xhr.responseText.split('/');
+                        album_id = txt[0];
+                        album_check = txt[1];
                         uploadPicture(0, 0);
                     }
                 };
@@ -537,6 +540,11 @@
                     height = round(img.height / ratio);
                     width = round(img.width / ratio);
                 }
+                else
+                {
+                    width = img.width;
+                    height = img.height;
+                }
             }
             else if (height == null)
             {
@@ -559,6 +567,9 @@
                     width = img.width, height = img.height;
                 }
             }
+
+            width = Math.abs(width);
+            height = Math.abs(height);
 
             delete img._onresample;
             delete img._width;

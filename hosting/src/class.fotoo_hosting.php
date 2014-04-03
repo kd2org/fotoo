@@ -152,9 +152,11 @@ class Fotoo_Hosting
 
 	public function upload($file, $name = '', $private = false, $album = null)
 	{
-		if (isset($file['content']))
+		$client_resize = false;
+
+		if (isset($file['content']) && $this->_processEncodedUpload($file))
 		{
-			$this->_processEncodedUpload($file);
+			$client_resize = true;
 		}
 
 		if (!isset($file['error']))
@@ -230,7 +232,7 @@ class Fotoo_Hosting
 		}
 
 		// If JPEG or big PNG/GIF, then resize (always resize JPEG to reduce file size)
-		if ($resize || ($img['format'] == 'JPEG' && empty($file['content']))
+		if ($resize || ($img['format'] == 'JPEG' && !$client_resize)
 			|| (($img['format'] == 'GIF' || $img['format'] == 'PNG') && $file['size'] > (1024 * 1024)))
 		{
 			$res = image::resize(
@@ -252,6 +254,10 @@ class Fotoo_Hosting
 			{
 				list($width, $height) = $res;
 			}
+		}
+		elseif ($client_resize)
+		{
+			rename($file['tmp_name'], $dest . $ext);
 		}
 		else
 		{
@@ -333,8 +339,11 @@ class Fotoo_Hosting
 		return $res;
 	}
 
-	public function remove($hash)
+	public function remove($hash, $id = null)
 	{
+		if (!$this->logged() && !$this->checkRemoveId($hash, $id))
+			return false;
+
 		$img = $this->get($hash);
 
 		$file = $this->_getPath($img);
@@ -361,6 +370,16 @@ class Fotoo_Hosting
 		return $out;
 	}
 
+	public function makeRemoveId($hash)
+	{
+		return sha1($this->config->storage_path . $hash);
+	}
+
+	public function checkRemoveId($hash, $id)
+	{
+		return sha1($this->config->storage_path . $hash) === $id;
+	}
+
 	public function countList()
 	{
 		$where = $this->logged() ? '' : 'AND private != 1';
@@ -382,6 +401,21 @@ class Fotoo_Hosting
 		}
 
 		return $out;
+	}
+
+	public function getAlbumPrevNext($album, $current, $order = -1)
+	{
+		$st = $this->db->prepare('SELECT * FROM pictures WHERE album = :album
+			AND date '.($order > 0 ? '>' : '<').' (SELECT date FROM pictures WHERE hash = :img)
+			ORDER BY date '.($order > 0 ? 'ASC': 'DESC').' LIMIT 1;');
+		$st->bindValue(':album', $album);
+		$st->bindValue(':img', $current);
+		$res = $st->execute();
+
+		if ($res)
+			return $res->fetchArray(SQLITE3_ASSOC);
+
+		return false;
 	}
 
 	public function getAlbumExtract($hash)
@@ -428,8 +462,11 @@ class Fotoo_Hosting
 		return $this->db->querySingle('SELECT COUNT(*) FROM pictures WHERE album = \''.$this->db->escapeString($hash).'\';');
 	}
 
-	public function removeAlbum($hash)
+	public function removeAlbum($hash, $id = null)
 	{
+		if (!$this->logged() && !$this->checkRemoveId($hash, $id))
+			return false;
+
 		$res = $this->db->query('SELECT * FROM pictures WHERE album = \''.$this->db->escapeString($hash).'\';');
 
 		while ($row = $res->fetchArray(SQLITE3_ASSOC))
@@ -455,12 +492,20 @@ class Fotoo_Hosting
 			. '.' . strtolower($img['format']);
 	}
 
-	public function getUrl($img)
+	public function getUrl($img, $append_id = false)
 	{
-		return $this->config->image_page_url
+		$url = $this->config->image_page_url
 			. $img['hash']
 			. ($img['filename'] ? '.' . $img['filename'] : '')
 			. '.' . strtolower($img['format']);
+
+		if ($append_id)
+		{
+			$id = $this->makeRemoveId($img['hash']);
+			$url .= (strpos($url, '?') !== false) ? '&c=' . $id : '?c=' . $id;
+		}
+
+		return $url;
 	}
 
 	public function getImageUrl($img)

@@ -270,34 +270,35 @@ if (!is_bool($config->allow_upload) && is_callable($config->allow_upload))
 
 $fh = new Fotoo_Hosting($config);
 
-if ($fh->logged())
+if (!empty($_GET['delete']))
 {
-    if (!empty($_GET['delete']))
-    {
-        if ($fh->remove($_GET['delete']))
-        {
-            header('Location: '.$config->base_url.'?list');
-        }
-        else
-        {
-            echo "Can't delete picture";
-        }
+    $id = !empty($_GET['c']) ? trim($_GET['c']) : false;
 
-        exit;
-    }
-    elseif (!empty($_GET['deleteAlbum']))
+    if ($fh->remove($_GET['delete'], $id))
     {
-        if ($fh->removeAlbum($_GET['deleteAlbum']))
-        {
-            header('Location: ' . $config->base_url . '?albums');
-        }
-        else
-        {
-            echo "Can't delete album";
-        }
-
-        exit;
+        header('Location: '.$config->base_url.'?list');
     }
+    else
+    {
+        echo "Can't delete picture";
+    }
+
+    exit;
+}
+elseif (!empty($_GET['deleteAlbum']))
+{
+    $id = !empty($_GET['c']) ? trim($_GET['c']) : false;
+
+    if ($fh->removeAlbum($_GET['deleteAlbum'], $id))
+    {
+        header('Location: ' . $config->base_url . '?albums');
+    }
+    else
+    {
+        echo "Can't delete album";
+    }
+
+    exit;
 }
 
 if (isset($_POST['album_create']))
@@ -305,7 +306,7 @@ if (isset($_POST['album_create']))
     if (!empty($_POST['title']))
     {
         $id = $fh->createAlbum($_POST['title'], empty($_POST['private']) ? false : true);
-        echo "$id";
+        echo "$id/" . $fh->makeRemoveId($id);
         exit;
     }
 
@@ -366,16 +367,9 @@ if (isset($_GET['upload']))
     else
     {
         $img = $fh->get($res);
-        $url = $fh->getUrl($img);
+        $url = $fh->getUrl($img, true);
 
-        if (isset($_GET['from_flash']))
-        {
-            echo "OK\n" . $url;
-        }
-        else
-        {
-            header('Location: ' . $url);
-        }
+        header('Location: ' . $url);
 
         exit;
     }
@@ -558,6 +552,14 @@ elseif (!empty($_GET['a']))
     $list = $fh->getAlbumPictures($album['hash'], $page);
     $max = $fh->countAlbumPictures($album['hash']);
 
+    $bbcode = '[b][url=' . $config->album_page_url . $album['hash'] . ']' . $album['title'] . "[/url][/b]\n";
+
+    foreach ($list as $img)
+    {
+        $label = $img['filename'] ? escape(preg_replace('![_-]!', ' ', $img['filename'])) : 'View image';
+        $bbcode .= '[url='.$fh->getUrl($img).'][img='.$label.']'.$fh->getImageThumbUrl($img)."[/img][/url] ";
+    }
+
     $html = '
         <article class="browse">
             <h2>'.escape($title).'</h2>
@@ -568,6 +570,8 @@ elseif (!empty($_GET['a']))
             <aside class="examples">
                 <dt>Share this album using this URL:</dt>
                 <dd><input type="text" onclick="this.select();" value="'.escape($config->album_page_url . $album['hash']).'" /></dd>
+                <dt>All pictures for a forum (BBCode):</dt>
+                <dd><textarea cols="70" rows="1" onclick="this.select();">'.escape($bbcode).'</textarea></dd>
             </aside>';
 
     if ($fh->logged())
@@ -575,6 +579,21 @@ elseif (!empty($_GET['a']))
         $html .= '
         <p class="admin">
             <a href="?deleteAlbum='.rawurlencode($album['hash']).'" onclick="return confirm(\'Really?\');">Delete album</a>
+        </p>';
+    }
+    elseif (!empty($_GET['c']))
+    {
+        $url = $config->album_page_url . $album['hash'] 
+            . (strpos($config->album_page_url, '?') !== false ? '&c=' : '?c=') 
+            . $fh->makeRemoveId($album['hash']);
+
+        $html .= '
+        <p class="admin">
+            <a href="?deleteAlbum='.rawurlencode($album['hash']).'&amp;c='.rawurldecode($_GET['c']).'" onclick="return confirm(\'Really?\');">Delete album</a>
+        </p>
+        <p class="admin">
+            Keep this URL in your favorites to be able to delete this album later:<br />
+            <input type="text" onclick="this.select();" value="'.escape($url).'" />
         </p>';
     }
 
@@ -676,11 +695,75 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
             </p>
         </footer>';
 
+    if (!empty($img['album']))
+    {
+        $prev = $fh->getAlbumPrevNext($img['album'], $img['hash'], -1);
+        $next = $fh->getAlbumPrevNext($img['album'], $img['hash'], 1);
+        $album = $fh->getAlbum($img['album']);
+
+        $html .= '
+        <footer class="context">';
+
+        if ($prev)
+        {
+            $thumb_url = $fh->getImageThumbUrl($prev);
+            $url = $fh->getUrl($prev);
+            $label = $prev['filename'] ? escape(preg_replace('![_-]!', ' ', $prev['filename'])) : 'View image';
+
+            $html .= '
+            <figure class="prev">
+                <a href="'.$url.'"><b>&larr;</b><img src="'.$thumb_url.'" alt="'.$label.'" /></a>
+                <figcaption><a href="'.$url.'">'.$label.'</a></figcaption>
+            </figure>';
+        }
+        else
+        {
+            $html .= '<figure class="prev"><b>…</b></figure>';
+        }
+
+        $html .= '
+            <figure>
+                <h3>Album:</h3>
+                <h2><a href="' . $config->album_page_url . $album['hash'] . '"> ' . escape($album['title']) .'</a></h2></figure
+            </figure>';
+
+        if ($next)
+        {
+            $thumb_url = $fh->getImageThumbUrl($next);
+            $url = $fh->getUrl($next);
+            $label = $next['filename'] ? escape(preg_replace('![_-]!', ' ', $next['filename'])) : 'View image';
+
+            $html .= '
+            <figure class="prev">
+                <a href="'.$url.'"><img src="'.$thumb_url.'" alt="'.$label.'" /><b>&rarr;</b></a>
+                <figcaption><a href="'.$url.'">'.$label.'</a></figcaption>
+            </figure>';
+        }
+        else
+        {
+            $html .= '<figure class="next"><b>…</b></figure>';
+        }
+
+        $html .= '
+            </footer>';
+    }
+
     if ($fh->logged())
     {
         $html .= '
         <p class="admin">
-            <a href="?delete='.rawurlencode($img['hash']).'" onclick="return confirm(\'Really?\');">Delete image</a>
+            <a href="?delete='.rawurlencode($img['hash']).'" onclick="return confirm(\'Really?\');">Delete picture</a>
+        </p>';
+    }
+    elseif (!empty($_GET['c']))
+    {
+        $html .= '
+        <p class="admin">
+            <a href="?delete='.rawurlencode($img['hash']).'&amp;c='.rawurldecode($_GET['c']).'" onclick="return confirm(\'Really?\');">Delete picture</a>
+        </p>
+        <p class="admin">
+            Keep this URL in your favorites to be able to delete this picture later:<br />
+            <input type="text" onclick="this.select();" value="'.$fh->getUrl($img, true).'" />
         </p>';
     }
 

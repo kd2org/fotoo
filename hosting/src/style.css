@@ -143,18 +143,56 @@ fieldset {
 	margin: 1em 0;
 }
 
+.picture footer.context {
+	background: rgb(220, 220, 220);
+	background: rgba(255, 255, 255, 0.25);
+	border-radius: .5em;
+	padding: 1em;
+	max-width: 650px;
+	margin: 1em auto;
+}
+
+.picture footer.context img {
+	max-width: 200px;
+	max-height: 150px;
+}
+
+.picture footer.context figure {
+	position: relative;
+	width: 200px;
+	height: 180px;
+	margin: 0;
+}
+
+.picture footer.context figure b {
+	font-size: 100px;
+	line-height: 150px;
+	width: 200px;
+	height: 150px;
+	position: absolute;
+	display: block;
+	top: 0;
+	left: 0;
+	color: rgb(255, 255, 255);
+	color: rgba(255, 255, 255, 0.5);
+	text-shadow: 0px 0px 10px #000;
+}
+
 .examples dt {
 	margin: .5em 0;
 	font-weight: bold;
 }
 
-.examples input {
+.examples input, .admin input, .examples textarea {
 	text-align: center;
-	background: rgb(213, 214, 182);
+	background: rgba(213, 214, 182, 0.5);
 	border: 1px solid #fff;
 	border-radius: .5em;
 	font-family: Courier New, Courier, mono;
 	max-width: 50em;
+	width: 100%;
+	font-size: 10pt;
+	padding: .2em;
 }
 
 figure {
