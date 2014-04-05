@@ -346,7 +346,7 @@ class fotoo
 
         if (!empty($exif['FocalPlaneXResolution']))
         {
-            if (preg_match('^(\d+)/(\d+)$', $exif['FocalPlaneXResolution'], $match)
+            if (preg_match('!^(\d+)/(\d+)$!', $exif['FocalPlaneXResolution'], $match)
                 && (int)$match[1] && (int)$match[2])
             {
                 $res = (int)$match[1] / (int)$match[2];
@@ -374,7 +374,7 @@ class fotoo
             $size = max($width, $height);
             $ccd_width = (float)($size * $unit / $res);
 
-            return round($focal / $ccd_width * 36 + 0.5, 1);
+            return round($exif['FocalLength'] / $ccd_width * 36 + 0.5, 1);
         }
 
         if (preg_match('!^([0-9.]+)/([0-9.]+)$!', $exif['FocalLength'], $match)
@@ -721,7 +721,7 @@ class fotoo
             {
                 $pic['exposure'] = $exif['EXIF']['ExposureTime'];
 
-                if (preg_match('!^([0-9.]+)/([0-9.]+)$!', $time, $match)
+                if (preg_match('!^([0-9.]+)/([0-9.]+)$!', $pic['exposure'], $match)
                     && (float)$match[1] > 0 && (float)$match[2] > 0)
                 {
                     $pic['exposure'] = (float)$match[1] / (float)$match[2];
