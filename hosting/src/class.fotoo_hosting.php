@@ -219,7 +219,7 @@ class Fotoo_Hosting
 
 		if ($img_mp > $max_mp)
 		{
-			$ratio = $imp_mp / $max_mp;
+			$ratio = $img_mp / $max_mp;
 			$width = round($img['width'] / $ratio);
 			$height = round($img['height'] / $ratio);
 			$resize = true;
