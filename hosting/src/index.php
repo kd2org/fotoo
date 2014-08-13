@@ -622,7 +622,7 @@ elseif (!empty($_GET['a']))
             <ul>
         ';
 
-        $url = $config->album_page_url . ((strpos($config->album_page_url, '?') === false) ? '?p=' : '&amp;p=');
+        $url = $config->album_page_url . $album['hash'] . ((strpos($config->album_page_url, '?') === false) ? '?p=' : '&amp;p=');
 
         for ($p = 1; $p <= $max_page; $p++)
         {
