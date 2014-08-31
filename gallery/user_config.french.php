@@ -93,7 +93,7 @@ $french_strings = array(
         =>  'Longueur focale :',
     'Original resolution:'
         =>  'Résolution originale :',
-    'Statistics':
+    'Statistics:'
         =>  'Statistiques',
 );
 
