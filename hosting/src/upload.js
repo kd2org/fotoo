@@ -332,7 +332,7 @@
                     }
                     else
                     {
-                        progress.innerHTML = 'The chosen file is not an image.';
+                        progress.innerHTML = 'The chosen file is not an image: ' + this.files[0].type;
                         document.getElementById('f_submit').style.display = 'none';
                         return false;
                     }

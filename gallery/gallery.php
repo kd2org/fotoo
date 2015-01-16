@@ -354,7 +354,7 @@ class fotoo
     {
         if (!empty($exif['FocalLengthIn35mmFilm']))
         {
-            if (preg_match('^(\d+)/(\d+)$', $exif['FocalLengthIn35mmFilm'], $match)
+            if (preg_match('!^(\d+)/(\d+)$!', $exif['FocalLengthIn35mmFilm'], $match)
                 && (int)$match[1] && (int)$match[2])
             {
                 return round((int)$match[1] / (int)$match[2], 1);
@@ -1182,10 +1182,10 @@ class fotoo
             $out[__('Camera:')] = $pic['camera'];
 
         if (!is_null($pic['exposure']))
-            $out[__('Exposure time:')] = $pic['exposure'];
+            $out[__('Exposure time:')] = $this->normalizeExposureTime($pic['exposure']);
 
         if (!is_null($pic['fnumber']))
-            $out[__('Aperture:')] = '<i>f</i>/' . $this->normalizeExposureTime($pic['fnumber']);
+            $out[__('Aperture:')] = '<i>f</i>/' . $pic['fnumber'];
 
         if (!is_null($pic['iso']))
             $out[__('ISO speed:')] = $pic['iso'];
@@ -1194,7 +1194,7 @@ class fotoo
             $out[__('Flash:')] = $pic['flash'] ? __('On') : __('Off');
 
         if (!is_null($pic['focal']))
-            $out[__('Focal length:')] = $pic['focal'] . ' mm';
+            $out[__('Focal length:')] = (int)$pic['focal'] . ' mm';
 
         if (!is_null($pic['orig_width']) && !is_null($pic['orig_height']))
             $out[__('Original resolution:')] = $pic['orig_width'] . ' x ' . $pic['orig_height'];
@@ -1296,6 +1296,13 @@ class fotoo
         }
 
         return array($width, $height);
+    }
+
+    public function getNb()
+    {
+        $query = $this->db->prepare('SELECT COUNT(*) FROM photos;');
+        $query->execute();
+        return $query->fetchColumn();
     }
 
     public function getStats()
@@ -2217,6 +2224,10 @@ elseif ($mode == 'stats')
         echo '<p class="info">'.__('No statistics available.').'</p>';
     else
     {
+        $nb = $f->getNb();
+
+        echo '<p class="info">'.sprintf(_('%s pictures in this gallery'), (int)$nb).'</p>';
+
         $cameras = $f->getCameraStats();
 
         echo '<table class="stats">

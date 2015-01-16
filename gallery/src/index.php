@@ -699,6 +699,10 @@ elseif ($mode == 'stats')
         echo '<p class="info">'.__('No statistics available.').'</p>';
     else
     {
+        $nb = $f->getNb();
+
+        echo '<p class="info">'.sprintf(_('%s pictures in this gallery'), (int)$nb).'</p>';
+
         $cameras = $f->getCameraStats();
 
         echo '<table class="stats">

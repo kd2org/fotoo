@@ -95,6 +95,8 @@ $french_strings = array(
         =>  'Résolution originale :',
     'Statistics:'
         =>  'Statistiques',
+    '%s pictures in this gallery'
+        =>  '%s photos dans cette galerie',
 );
 
 // Days of the week translations
