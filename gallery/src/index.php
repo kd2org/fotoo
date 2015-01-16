@@ -701,7 +701,7 @@ elseif ($mode == 'stats')
     {
         $nb = $f->getNb();
 
-        echo '<p class="info">'.sprintf(_('%s pictures in this gallery'), (int)$nb).'</p>';
+        echo '<p class="info">'.sprintf(__('%s pictures in this gallery'), (int)$nb).'</p>';
 
         $cameras = $f->getCameraStats();
 
@@ -710,9 +710,9 @@ elseif ($mode == 'stats')
             <tr>
                 <th>'.__('Month').'</th>
                 <td>'.__('Number of pictures').'</td>
-                <td>'.__('Pictures taken by camera').'</td>
+                <td>'.__('Camera').'</td>
                 <td>'.__('File size').'</td>
-                <td>'.__('Resolution').'</td>
+                <td>'.__('Original resolution').'</td>
                 <td>'.__('Focal length').'</td>
                 <td>'.__('Aperture').'</td>
             </tr>

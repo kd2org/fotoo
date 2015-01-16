@@ -75,28 +75,36 @@ $french_strings = array(
         =>  'Reprendre',
     'Back'
         =>  'Retour',
-    'Camera:'
-        =>  'Appareil photo :',
-    'Exposure time:'
-        =>  'Temps de pose :',
-    'Aperture:'
-        =>  'Ouverture :',
-    'ISO speed:'
-        =>  'Sensibilité ISO :',
-    'Flash:'
-        =>  'Flash :',
+    'Camera'
+        =>  'Appareil photo',
+    'Exposure time'
+        =>  'Temps de pose',
+    'Aperture'
+        =>  'Ouverture',
+    'ISO speed'
+        =>  'Sensibilité ISO',
+    'Flash'
+        =>  'Flash',
     'On'
         =>  'Activé',
     'Off'
         =>  'Désactivé',
-    'Focal length:'
-        =>  'Longueur focale :',
-    'Original resolution:'
-        =>  'Résolution originale :',
-    'Statistics:'
+    'Focal length'
+        =>  'Longueur focale',
+    'Original resolution'
+        =>  'Résolution originale',
+    'Statistics'
         =>  'Statistiques',
     '%s pictures in this gallery'
         =>  '%s photos dans cette galerie',
+    'Month'
+        =>  'Mois',
+    'No statistics available.'
+        =>  'Aucune statistique disponible.',
+    'File size'
+        =>  'Taille fichier',
+    'Number of pictures'
+        =>  'Nombre de photos prises',
 );
 
 // Days of the week translations

@@ -1145,25 +1145,25 @@ class fotoo
         $out = array();
 
         if ($pic['camera'])
-            $out[__('Camera:')] = $pic['camera'];
+            $out[__('Camera')] = $pic['camera'];
 
         if (!is_null($pic['exposure']))
-            $out[__('Exposure time:')] = $this->normalizeExposureTime($pic['exposure']);
+            $out[__('Exposure time')] = $this->normalizeExposureTime($pic['exposure']);
 
         if (!is_null($pic['fnumber']))
-            $out[__('Aperture:')] = '<i>f</i>/' . $pic['fnumber'];
+            $out[__('Aperture')] = '<i>f</i>/' . $pic['fnumber'];
 
         if (!is_null($pic['iso']))
-            $out[__('ISO speed:')] = $pic['iso'];
+            $out[__('ISO speed')] = $pic['iso'];
 
         if (!is_null($pic['flash']))
-            $out[__('Flash:')] = $pic['flash'] ? __('On') : __('Off');
+            $out[__('Flash')] = $pic['flash'] ? __('On') : __('Off');
 
         if (!is_null($pic['focal']))
-            $out[__('Focal length:')] = (int)$pic['focal'] . ' mm';
+            $out[__('Focal length')] = (int)$pic['focal'] . ' mm';
 
         if (!is_null($pic['orig_width']) && !is_null($pic['orig_height']))
-            $out[__('Original resolution:')] = $pic['orig_width'] . ' x ' . $pic['orig_height'];
+            $out[__('Original resolution')] = $pic['orig_width'] . ' x ' . $pic['orig_height'];
 
         return $out;
     }

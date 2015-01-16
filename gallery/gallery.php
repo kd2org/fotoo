@@ -1179,25 +1179,25 @@ class fotoo
         $out = array();
 
         if ($pic['camera'])
-            $out[__('Camera:')] = $pic['camera'];
+            $out[__('Camera')] = $pic['camera'];
 
         if (!is_null($pic['exposure']))
-            $out[__('Exposure time:')] = $this->normalizeExposureTime($pic['exposure']);
+            $out[__('Exposure time')] = $this->normalizeExposureTime($pic['exposure']);
 
         if (!is_null($pic['fnumber']))
-            $out[__('Aperture:')] = '<i>f</i>/' . $pic['fnumber'];
+            $out[__('Aperture')] = '<i>f</i>/' . $pic['fnumber'];
 
         if (!is_null($pic['iso']))
-            $out[__('ISO speed:')] = $pic['iso'];
+            $out[__('ISO speed')] = $pic['iso'];
 
         if (!is_null($pic['flash']))
-            $out[__('Flash:')] = $pic['flash'] ? __('On') : __('Off');
+            $out[__('Flash')] = $pic['flash'] ? __('On') : __('Off');
 
         if (!is_null($pic['focal']))
-            $out[__('Focal length:')] = (int)$pic['focal'] . ' mm';
+            $out[__('Focal length')] = (int)$pic['focal'] . ' mm';
 
         if (!is_null($pic['orig_width']) && !is_null($pic['orig_height']))
-            $out[__('Original resolution:')] = $pic['orig_width'] . ' x ' . $pic['orig_height'];
+            $out[__('Original resolution')] = $pic['orig_width'] . ' x ' . $pic['orig_height'];
 
         return $out;
     }
@@ -2226,7 +2226,7 @@ elseif ($mode == 'stats')
     {
         $nb = $f->getNb();
 
-        echo '<p class="info">'.sprintf(_('%s pictures in this gallery'), (int)$nb).'</p>';
+        echo '<p class="info">'.sprintf(__('%s pictures in this gallery'), (int)$nb).'</p>';
 
         $cameras = $f->getCameraStats();
 
@@ -2235,9 +2235,9 @@ elseif ($mode == 'stats')
             <tr>
                 <th>'.__('Month').'</th>
                 <td>'.__('Number of pictures').'</td>
-                <td>'.__('Pictures taken by camera').'</td>
+                <td>'.__('Camera').'</td>
                 <td>'.__('File size').'</td>
-                <td>'.__('Resolution').'</td>
+                <td>'.__('Original resolution').'</td>
                 <td>'.__('Focal length').'</td>
                 <td>'.__('Aperture').'</td>
             </tr>
