@@ -557,7 +557,7 @@ elseif (!empty($_GET['a']))
     foreach ($list as $img)
     {
         $label = $img['filename'] ? escape(preg_replace('![_-]!', ' ', $img['filename'])) : 'View image';
-        $bbcode .= '[url='.$fh->getUrl($img).'][img='.$label.']'.$fh->getImageThumbUrl($img)."[/img][/url] ";
+        $bbcode .= '[url='.$fh->getImageUrl($img).'][img'.$label.']'.$fh->getImageThumbUrl($img)."[/img][/url] ";
     }
 
     $html = '
