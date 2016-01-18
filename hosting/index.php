@@ -1,5 +1,5 @@
 <?php
-// Fotoo Hosting single-file release version 2.0.2
+// Fotoo Hosting single-file release version 2.1.0
 ?><?php if (isset($_GET["js"])): header("Content-Type: text/javascript"); ?>
 (function () {
     if (!Array.prototype.indexOf)
@@ -264,7 +264,11 @@
                 xhr.setRequestHeader("Connection", "close");
 
                 xhr.onreadystatechange = function () {
-                    if (xhr.readyState == 4 && xhr.status == 200)
+                    if (xhr.readyState == 4 && xhr.status == 400)
+                    {
+                        alert(xhr.responseText);
+                    }
+                    else if (xhr.readyState == 4 && xhr.status == 200)
                     {
                         var txt = xhr.responseText.split('/');
                         album_id = txt[0];
@@ -792,7 +796,7 @@ fieldset {
 	font-weight: bold;
 }
 
-.examples input, .admin input, .examples textarea {
+.examples input, .admin input[type=text], .examples textarea {
 	text-align: center;
 	background: rgba(213, 214, 182, 0.5);
 	border: 1px solid #fff;
@@ -931,7 +935,8 @@ class Fotoo_Hosting
 					thumb INT NOT NULL DEFAULT 0,
 					private INT NOT NULL DEFAULT 0,
 					size INT NOT NULL DEFAULT 0,
-					album TEXT NULL
+					album TEXT NULL,
+					ip TEXT NULL
 				);
 
 				CREATE INDEX date ON pictures (private, date);
@@ -951,6 +956,163 @@ class Fotoo_Hosting
 		if (!file_exists($config->storage_path))
 			mkdir($config->storage_path);
 	}
+
+    public function isClientBanned()
+    {
+    	if (count($this->config->banned_ips) < 1)
+    		return false;
+
+        if (!empty($_SERVER['REMOTE_ADDR']) && self::isIpBanned($_SERVER['REMOTE_ADDR'], $this->config->banned_ips))
+        {
+        	return true;
+        }
+
+        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR']) && filter_var($_SERVER['HTTP_X_FORWARDED_FOR'], FILTER_VALIDATE_IP) 
+        	&& self::isIpBanned($_SERVER['HTTP_X_FORWARDED_FOR'], $this->config->banned_ips))
+        {
+        	return true;
+        }
+        
+        if (!empty($_SERVER['HTTP_CLIENT_IP']) && filter_var($_SERVER['HTTP_CLIENT_IP'], FILTER_VALIDATE_IP) 
+        	&& self::isIpBanned($_SERVER['HTTP_CLIENT_IP'], $this->config->banned_ips))
+        {
+        	return true;
+        }
+
+        return false;
+    }
+
+    static public function getIPAsString()
+    {
+    	$out = '';
+
+        if (!empty($_SERVER['REMOTE_ADDR']))
+        {
+            $out .= $_SERVER['REMOTE_ADDR'];
+        }
+
+        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR']) && filter_var($_SERVER['HTTP_X_FORWARDED_FOR'], FILTER_VALIDATE_IP))
+        {
+        	$out .= (!empty($out) ? ', ' : '') . 'X-Forwarded-For: ' . $_SERVER['HTTP_X_FORWARDED_FOR'];
+        }
+        
+        if (!empty($_SERVER['HTTP_CLIENT_IP']) && filter_var($_SERVER['HTTP_CLIENT_IP'], FILTER_VALIDATE_IP))
+        {
+        	$out .= (!empty($out) ? ', ' : '') . 'Client-IP: ' . $_SERVER['HTTP_CLIENT_IP'];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Returns an integer if $ip is in addresses given in $check array
+     * This integer may be used to store the IP address in database eventually
+     *
+     * Examples:
+     * - check_ip('192.168.1.102', array('192.168.1.*'))
+     * - check_ip('2a01:e34:ee89:c060:503f:d19b:b8fa:32fd', array('2a01::*'))
+     * - check_ip('2a01:e34:ee89:c060:503f:d19b:b8fa:32fd', array('2a01:e34:ee89:c06::/64'))
+     */
+    static public function isIpBanned($ip = null, $check)
+    {
+        $ip = strtolower(is_null($ip) ? $_SERVER['REMOTE_ADDR'] : $ip);
+
+        if (strpos($ip, ':') === false)
+        {
+            $ipv6 = false;
+            $ip = ip2long($ip);
+        }
+        else
+        {
+            $ipv6 = true;
+            $ip = bin2hex(inet_pton($ip));
+        }
+
+        foreach ($check as $c)
+        {
+            if (strpos($c, ':') === false)
+            {
+                if ($ipv6)
+                {
+                    continue;
+                }
+
+                // Check against mask
+                if (strpos($c, '/') !== false)
+                {
+                    list($c, $mask) = explode('/', $c);
+                    $c = ip2long($c);
+                    $mask = ~((1 << (32 - $mask)) - 1);
+
+                    if (($ip & $mask) == $c)
+                    {
+                        return $c;
+                    }
+                }
+                elseif (strpos($c, '*') !== false)
+                {
+                    $c = substr($c, 0, -1);
+                    $mask = substr_count($c, '.');
+                    $c .= '0' . str_repeat('.0', (3 - $mask));
+                    $c = ip2long($c);
+                    $mask = ~((1 << (32 - ($mask * 8))) - 1);
+
+                    if (($ip & $mask) == $c)
+                    {
+                        return $c;
+                    }
+                }
+                else
+                {
+                    if ($ip == ip2long($c))
+                    {
+                        return $c;
+                    }
+                }
+            }
+            else
+            {
+                if (!$ipv6)
+                {
+                    continue;
+                }
+
+                // Check against mask
+                if (strpos($c, '/') !== false)
+                {
+                    list($c, $mask) = explode('/', $c);
+                    $c = bin2hex(inet_pton($c));
+                    $mask = $mask / 4;
+                    $c = substr($c, 0, $mask);
+
+                    if (substr($ip, 0, $mask) == $c)
+                    {
+                        return $c;
+                    }
+                }
+                elseif (strpos($c, '*') !== false)
+                {
+                    $c = substr($c, 0, -1);
+                    $c = bin2hex(inet_pton($c));
+                    $c = rtrim($c, '0');
+
+                    if (substr($ip, 0, strlen($c)) == $c)
+                    {
+                        return $c;
+                    }
+                }
+                else
+                {
+                    if ($ip == inet_pton($c))
+                    {
+                        return $c;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
 
 	static private function baseConv($num, $base=null)
 	{
@@ -1053,6 +1215,11 @@ class Fotoo_Hosting
 
 	public function upload($file, $name = '', $private = false, $album = null)
 	{
+		if ($this->isClientBanned())
+		{
+			throw new FotooException('Upload error: upload not permitted.', -42);
+		}
+
 		$client_resize = false;
 
 		if (isset($file['content']) && $this->_processEncodedUpload($file))
@@ -1197,20 +1364,27 @@ class Fotoo_Hosting
 
 		$hash = substr($hash, -2) . '/' . $base;
 
-		$this->db->exec('INSERT INTO pictures (hash, filename, date, format,
-			width, height, thumb, private, size, album)
-			VALUES (
-				\''.$this->db->escapeString($hash).'\',
-				\''.$this->db->escapeString($name).'\',
-				\''.time().'\',
-				\''.$img['format'].'\',
-				\''.(int)$width.'\',
-				\''.(int)$height.'\',
-				\''.(int)$thumb.'\',
-				\''.($private ? '1' : '0').'\',
-				\''.(int)$size.'\',
-				'.(is_null($album) ? 'NULL' : '\''.$this->db->escapeString($album).'\'').'
-			);');
+		$req = $this->db->prepare('INSERT INTO pictures 
+			(hash, filename, date, format, width, height, thumb, private, size, album, ip)
+			VALUES (:hash, :filename, :date, :format, :width, :height, :thumb, :private, :size, :album, :ip);');
+
+		$req->bindValue(':hash', $hash);
+		$req->bindValue(':filename', $name);
+		$req->bindValue(':date', time());
+		$req->bindValue(':format', $img['format']);
+		$req->bindValue(':width', (int)$width);
+		$req->bindValue(':height', (int)$height);
+		$req->bindValue(':thumb', (int)$thumb);
+		$req->bindValue(':private', $private ? '1' : '0');
+		$req->bindValue(':size', (int)$size);
+		$req->bindValue(':album', is_null($album) ? NULL : $album);
+		$req->bindValue(':ip', self::getIPAsString());
+
+		$req->execute();
+
+		// Automated deletion of IP addresses to comply with local low
+		$expiration = time() - ($this->config->ip_storage_expiration * 24 * 3600);
+		$this->db->query('UPDATE pictures SET ip = "R" WHERE date < ' . (int)$expiration . ';');
 
 		return $hash;
 	}
@@ -1479,6 +1653,11 @@ class Fotoo_Hosting
 
 	public function createAlbum($title, $private = false)
 	{
+		if ($this->isClientBanned())
+		{
+			throw new FotooException('Upload error: upload not permitted.');
+		}
+
 		$hash = self::baseConv(hexdec(uniqid()));
 		$this->db->exec('INSERT INTO albums (hash, title, date, private)
 			VALUES (\''.$this->db->escapeString($hash).'\',
@@ -2321,6 +2500,8 @@ class Fotoo_Hosting_Config
     private $nb_pictures_by_page = null;
 
     private $admin_password = null;
+    private $banned_ips = null;
+    private $ip_storage_expiration = null;
 
     public function __set($key, $value)
     {
@@ -2330,6 +2511,7 @@ class Fotoo_Hosting_Config
             case 'thumb_width':
             case 'max_file_size':
             case 'nb_pictures_by_page':
+            case 'ip_storage_expiration':
                 $this->$key = (int) $value;
                 break;
             case 'db_file':
@@ -2341,6 +2523,9 @@ class Fotoo_Hosting_Config
             case 'album_page_url':
             case 'admin_password':
                 $this->$key = (string) $value;
+                break;
+            case 'banned_ips':
+                $this->$key = (array) $value;
                 break;
             case 'allow_upload':
                 $this->$key = is_bool($value) ? (bool) $value : $value;
@@ -2438,7 +2623,10 @@ class Fotoo_Hosting_Config
             case 'album_page_url':  return 'URL to the album page, hash is added at the end.';
             case 'allow_upload':    return 'Allow upload of files? You can use this to restrict upload access. Can be a boolean or a PHP callback. See the FAQ for more informations.';
             case 'admin_password':  return 'Password to access admin UI? (edit/delete files, see private pictures)';
+            case 'banned_ips':      return 'List of banned IP addresses (netmasks and wildcards accepted, IPv6 supported)';
             case 'allowed_formats': return 'Allowed formats, separated by a comma';
+            case 'ip_storage_expiration':
+                                    return 'Expiration (in days) of IP storage, after this delay IP addresses will be removed from database';
             default: return '';
         }
     }
@@ -2479,6 +2667,8 @@ class Fotoo_Hosting_Config
         $this->max_file_size = $size;
         $this->allow_upload = true;
         $this->admin_password = 'fotoo';
+        $this->banned_ips = [];
+        $this->ip_storage_expiration = 366;
         $this->nb_pictures_by_page = 20;
 
         $this->allowed_formats = array('PNG', 'JPEG', 'GIF', 'SVG', 'XCF');
@@ -2555,14 +2745,41 @@ elseif (!empty($_GET['deleteAlbum']))
 
     exit;
 }
+elseif (!empty($_POST['delete_albums']) && $fh->logged())
+{
+    foreach ($_POST['albums'] as $album)
+    {
+        $fh->removeAlbum($album, null);
+    }
+
+    header('Location: ' . $config->base_url . '?albums');
+    exit;
+}
+elseif (!empty($_POST['delete_pictures']) && $fh->logged())
+{
+    foreach ($_POST['pictures'] as $pic)
+    {
+        $fh->remove($pic, null);
+    }
+
+    header('Location: ' . $config->base_url . '?list');
+    exit;
+}
 
 if (isset($_POST['album_create']))
 {
     if (!empty($_POST['title']))
     {
-        $id = $fh->createAlbum($_POST['title'], empty($_POST['private']) ? false : true);
-        echo "$id/" . $fh->makeRemoveId($id);
-        exit;
+        try {
+            $id = $fh->createAlbum($_POST['title'], empty($_POST['private']) ? false : true);
+            echo "$id/" . $fh->makeRemoveId($id);
+            exit;
+        }
+        catch (FotooException $e)
+        {
+            header('HTTP/1.1 400 Bad Request', true, 400);
+            die("Upload not permitted.");
+        }
     }
 
     header('HTTP/1.1 400 Bad Request', true, 400);
@@ -2686,7 +2903,17 @@ elseif (isset($_GET['list']))
     $list = $fh->getList($page);
     $max = $fh->countList();
 
-    $html = '
+    $html = '';
+
+    if ($fh->logged())
+    {
+        $html .= '<form method="post" action="" onsubmit="return confirm(\'Delete all the checked pictures?\');">
+        <p class="admin">
+            <input type="button" value="Check / uncheck all" onclick="var l = this.form.querySelectorAll(\'input[type=checkbox]\'), s = l[0].checked; for (var i = 0; i < l.length; i++) { l[i].checked = s ? false : true; }" />
+        </p>';
+    }
+
+    $html .= '
         <article class="browse">
             <h2>'.$title.'</h2>';
 
@@ -2700,12 +2927,30 @@ elseif (isset($_GET['list']))
         $html .= '
         <figure>
             <a href="'.$url.'">'.($img['private'] ? '<span class="private">Private</span>' : '').'<img src="'.$thumb_url.'" alt="'.$label.'" /></a>
-            <figcaption><a href="'.$url.'">'.$label.'</a></figcaption>
+            <figcaption><a href="'.$url.'">'.$label.'</a></figcaption>';
+
+
+        if ($fh->logged())
+        {
+            $html .= '<label><input type="checkbox" name="pictures[]" value="' . escape($img['hash']) . '" /> Delete</label>';
+        }
+
+        $html .= '
         </figure>';
     }
 
     $html .= '
         </article>';
+
+
+    if ($fh->logged())
+    {
+        $html .= '
+        <p class="admin submit">
+            <input type="submit" name="delete_pictures" value="Delete checked pictures" />
+        </p>
+        </form>';
+    }
 
     if ($max > $config->nb_pictures_by_page)
     {
@@ -2737,7 +2982,17 @@ elseif (isset($_GET['albums']))
     $list = $fh->getAlbumList($page);
     $max = $fh->countAlbumList();
 
-    $html = '
+    $html = '';
+
+    if ($fh->logged())
+    {
+        $html .= '<form method="post" action="" onsubmit="return confirm(\'Delete all the checked albums?\');">
+        <p class="admin">
+            <input type="button" value="Check / uncheck all" onclick="var l = document.forms[0].querySelectorAll(\'input[type=checkbox]\'); var s = l[0].checked; for (var i = 0; i < l.length; i++) { l[i].checked = s ? false : true; }" />
+        </p>';
+    }
+
+    $html .= '
         <article class="albums">
             <h2>'.$title.'</h2>';
 
@@ -2758,12 +3013,28 @@ elseif (isset($_GET['albums']))
             $html .= '<img src="'.$thumb_url.'" alt="" />';
         }
 
-        $html .= '</a>
+        $html .= '</a>';
+
+        if ($fh->logged())
+        {
+            $html .= '<label><input type="checkbox" name="albums[]" value="' . escape($album['hash']) . '" /> Delete</label>';
+        }
+
+        $html .= '
         </figure>';
     }
 
     $html .= '
         </article>';
+
+    if ($fh->logged())
+    {
+        $html .= '
+        <p class="admin submit">
+            <input type="submit" name="delete_albums" value="Delete checked albums" />
+        </p>
+        </form>';
+    }
 
     if ($max > round($config->nb_pictures_by_page / 2))
     {
@@ -2812,7 +3083,7 @@ elseif (!empty($_GET['a']))
     foreach ($list as $img)
     {
         $label = $img['filename'] ? escape(preg_replace('![_-]!', ' ', $img['filename'])) : 'View image';
-        $bbcode .= '[url='.$fh->getUrl($img).'][img='.$label.']'.$fh->getImageThumbUrl($img)."[/img][/url] ";
+        $bbcode .= '[url='.$fh->getImageUrl($img).'][img'.$label.']'.$fh->getImageThumbUrl($img)."[/img][/url] ";
     }
 
     $html = '
@@ -3006,6 +3277,9 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
     if ($fh->logged())
     {
         $html .= '
+        <p class="admin">
+            IP address: ' . escape(is_null($img['ip']) ? 'Not available' : ($img['ip'] == 'R' ? 'Automatically removed from database' : $img['ip'])) . '
+        </p>
         <p class="admin">
             <a href="?delete='.rawurlencode($img['hash']).'" onclick="return confirm(\'Really?\');">Delete picture</a>
         </p>';
