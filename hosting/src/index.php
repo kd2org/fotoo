@@ -66,6 +66,8 @@ class Fotoo_Hosting_Config
     private $nb_pictures_by_page = null;
 
     private $admin_password = null;
+    private $banned_ips = null;
+    private $ip_storage_expiration = null;
 
     public function __set($key, $value)
     {
@@ -75,6 +77,7 @@ class Fotoo_Hosting_Config
             case 'thumb_width':
             case 'max_file_size':
             case 'nb_pictures_by_page':
+            case 'ip_storage_expiration':
                 $this->$key = (int) $value;
                 break;
             case 'db_file':
@@ -86,6 +89,9 @@ class Fotoo_Hosting_Config
             case 'album_page_url':
             case 'admin_password':
                 $this->$key = (string) $value;
+                break;
+            case 'banned_ips':
+                $this->$key = (array) $value;
                 break;
             case 'allow_upload':
                 $this->$key = is_bool($value) ? (bool) $value : $value;
@@ -183,7 +189,10 @@ class Fotoo_Hosting_Config
             case 'album_page_url':  return 'URL to the album page, hash is added at the end.';
             case 'allow_upload':    return 'Allow upload of files? You can use this to restrict upload access. Can be a boolean or a PHP callback. See the FAQ for more informations.';
             case 'admin_password':  return 'Password to access admin UI? (edit/delete files, see private pictures)';
+            case 'banned_ips':      return 'List of banned IP addresses (netmasks and wildcards accepted, IPv6 supported)';
             case 'allowed_formats': return 'Allowed formats, separated by a comma';
+            case 'ip_storage_expiration':
+                                    return 'Expiration (in days) of IP storage, after this delay IP addresses will be removed from database';
             default: return '';
         }
     }
@@ -224,6 +233,8 @@ class Fotoo_Hosting_Config
         $this->max_file_size = $size;
         $this->allow_upload = true;
         $this->admin_password = 'fotoo';
+        $this->banned_ips = [];
+        $this->ip_storage_expiration = 366;
         $this->nb_pictures_by_page = 20;
 
         $this->allowed_formats = array('PNG', 'JPEG', 'GIF', 'SVG', 'XCF');
@@ -325,9 +336,16 @@ if (isset($_POST['album_create']))
 {
     if (!empty($_POST['title']))
     {
-        $id = $fh->createAlbum($_POST['title'], empty($_POST['private']) ? false : true);
-        echo "$id/" . $fh->makeRemoveId($id);
-        exit;
+        try {
+            $id = $fh->createAlbum($_POST['title'], empty($_POST['private']) ? false : true);
+            echo "$id/" . $fh->makeRemoveId($id);
+            exit;
+        }
+        catch (FotooException $e)
+        {
+            header('HTTP/1.1 400 Bad Request', true, 400);
+            die("Upload not permitted.");
+        }
     }
 
     header('HTTP/1.1 400 Bad Request', true, 400);
@@ -825,6 +843,9 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
     if ($fh->logged())
     {
         $html .= '
+        <p class="admin">
+            IP address: ' . escape(is_null($img['ip']) ? 'Not available' : ($img['ip'] == 'R' ? 'Automatically removed from database' : $img['ip'])) . '
+        </p>
         <p class="admin">
             <a href="?delete='.rawurlencode($img['hash']).'" onclick="return confirm(\'Really?\');">Delete picture</a>
         </p>';

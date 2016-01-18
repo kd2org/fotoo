@@ -30,7 +30,8 @@ class Fotoo_Hosting
 					thumb INT NOT NULL DEFAULT 0,
 					private INT NOT NULL DEFAULT 0,
 					size INT NOT NULL DEFAULT 0,
-					album TEXT NULL
+					album TEXT NULL,
+					ip TEXT NULL
 				);
 
 				CREATE INDEX date ON pictures (private, date);
@@ -50,6 +51,163 @@ class Fotoo_Hosting
 		if (!file_exists($config->storage_path))
 			mkdir($config->storage_path);
 	}
+
+    public function isClientBanned()
+    {
+    	if (count($this->config->banned_ips) < 1)
+    		return false;
+
+        if (!empty($_SERVER['REMOTE_ADDR']) && self::isIpBanned($_SERVER['REMOTE_ADDR'], $this->config->banned_ips))
+        {
+        	return true;
+        }
+
+        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR']) && filter_var($_SERVER['HTTP_X_FORWARDED_FOR'], FILTER_VALIDATE_IP) 
+        	&& self::isIpBanned($_SERVER['HTTP_X_FORWARDED_FOR'], $this->config->banned_ips))
+        {
+        	return true;
+        }
+        
+        if (!empty($_SERVER['HTTP_CLIENT_IP']) && filter_var($_SERVER['HTTP_CLIENT_IP'], FILTER_VALIDATE_IP) 
+        	&& self::isIpBanned($_SERVER['HTTP_CLIENT_IP'], $this->config->banned_ips))
+        {
+        	return true;
+        }
+
+        return false;
+    }
+
+    static public function getIPAsString()
+    {
+    	$out = '';
+
+        if (!empty($_SERVER['REMOTE_ADDR']))
+        {
+            $out .= $_SERVER['REMOTE_ADDR'];
+        }
+
+        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR']) && filter_var($_SERVER['HTTP_X_FORWARDED_FOR'], FILTER_VALIDATE_IP))
+        {
+        	$out .= (!empty($out) ? ', ' : '') . 'X-Forwarded-For: ' . $_SERVER['HTTP_X_FORWARDED_FOR'];
+        }
+        
+        if (!empty($_SERVER['HTTP_CLIENT_IP']) && filter_var($_SERVER['HTTP_CLIENT_IP'], FILTER_VALIDATE_IP))
+        {
+        	$out .= (!empty($out) ? ', ' : '') . 'Client-IP: ' . $_SERVER['HTTP_CLIENT_IP'];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Returns an integer if $ip is in addresses given in $check array
+     * This integer may be used to store the IP address in database eventually
+     *
+     * Examples:
+     * - check_ip('192.168.1.102', array('192.168.1.*'))
+     * - check_ip('2a01:e34:ee89:c060:503f:d19b:b8fa:32fd', array('2a01::*'))
+     * - check_ip('2a01:e34:ee89:c060:503f:d19b:b8fa:32fd', array('2a01:e34:ee89:c06::/64'))
+     */
+    static public function isIpBanned($ip = null, $check)
+    {
+        $ip = strtolower(is_null($ip) ? $_SERVER['REMOTE_ADDR'] : $ip);
+
+        if (strpos($ip, ':') === false)
+        {
+            $ipv6 = false;
+            $ip = ip2long($ip);
+        }
+        else
+        {
+            $ipv6 = true;
+            $ip = bin2hex(inet_pton($ip));
+        }
+
+        foreach ($check as $c)
+        {
+            if (strpos($c, ':') === false)
+            {
+                if ($ipv6)
+                {
+                    continue;
+                }
+
+                // Check against mask
+                if (strpos($c, '/') !== false)
+                {
+                    list($c, $mask) = explode('/', $c);
+                    $c = ip2long($c);
+                    $mask = ~((1 << (32 - $mask)) - 1);
+
+                    if (($ip & $mask) == $c)
+                    {
+                        return $c;
+                    }
+                }
+                elseif (strpos($c, '*') !== false)
+                {
+                    $c = substr($c, 0, -1);
+                    $mask = substr_count($c, '.');
+                    $c .= '0' . str_repeat('.0', (3 - $mask));
+                    $c = ip2long($c);
+                    $mask = ~((1 << (32 - ($mask * 8))) - 1);
+
+                    if (($ip & $mask) == $c)
+                    {
+                        return $c;
+                    }
+                }
+                else
+                {
+                    if ($ip == ip2long($c))
+                    {
+                        return $c;
+                    }
+                }
+            }
+            else
+            {
+                if (!$ipv6)
+                {
+                    continue;
+                }
+
+                // Check against mask
+                if (strpos($c, '/') !== false)
+                {
+                    list($c, $mask) = explode('/', $c);
+                    $c = bin2hex(inet_pton($c));
+                    $mask = $mask / 4;
+                    $c = substr($c, 0, $mask);
+
+                    if (substr($ip, 0, $mask) == $c)
+                    {
+                        return $c;
+                    }
+                }
+                elseif (strpos($c, '*') !== false)
+                {
+                    $c = substr($c, 0, -1);
+                    $c = bin2hex(inet_pton($c));
+                    $c = rtrim($c, '0');
+
+                    if (substr($ip, 0, strlen($c)) == $c)
+                    {
+                        return $c;
+                    }
+                }
+                else
+                {
+                    if ($ip == inet_pton($c))
+                    {
+                        return $c;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
 
 	static private function baseConv($num, $base=null)
 	{
@@ -152,6 +310,11 @@ class Fotoo_Hosting
 
 	public function upload($file, $name = '', $private = false, $album = null)
 	{
+		if ($this->isClientBanned())
+		{
+			throw new FotooException('Upload error: upload not permitted.', -42);
+		}
+
 		$client_resize = false;
 
 		if (isset($file['content']) && $this->_processEncodedUpload($file))
@@ -296,20 +459,27 @@ class Fotoo_Hosting
 
 		$hash = substr($hash, -2) . '/' . $base;
 
-		$this->db->exec('INSERT INTO pictures (hash, filename, date, format,
-			width, height, thumb, private, size, album)
-			VALUES (
-				\''.$this->db->escapeString($hash).'\',
-				\''.$this->db->escapeString($name).'\',
-				\''.time().'\',
-				\''.$img['format'].'\',
-				\''.(int)$width.'\',
-				\''.(int)$height.'\',
-				\''.(int)$thumb.'\',
-				\''.($private ? '1' : '0').'\',
-				\''.(int)$size.'\',
-				'.(is_null($album) ? 'NULL' : '\''.$this->db->escapeString($album).'\'').'
-			);');
+		$req = $this->db->prepare('INSERT INTO pictures 
+			(hash, filename, date, format, width, height, thumb, private, size, album, ip)
+			VALUES (:hash, :filename, :date, :format, :width, :height, :thumb, :private, :size, :album, :ip);');
+
+		$req->bindValue(':hash', $hash);
+		$req->bindValue(':filename', $name);
+		$req->bindValue(':date', time());
+		$req->bindValue(':format', $img['format']);
+		$req->bindValue(':width', (int)$width);
+		$req->bindValue(':height', (int)$height);
+		$req->bindValue(':thumb', (int)$thumb);
+		$req->bindValue(':private', $private ? '1' : '0');
+		$req->bindValue(':size', (int)$size);
+		$req->bindValue(':album', is_null($album) ? NULL : $album);
+		$req->bindValue(':ip', self::getIPAsString());
+
+		$req->execute();
+
+		// Automated deletion of IP addresses to comply with local low
+		$expiration = time() - ($this->config->ip_storage_expiration * 24 * 3600);
+		$this->db->query('UPDATE pictures SET ip = "R" WHERE date < ' . (int)$expiration . ';');
 
 		return $hash;
 	}
@@ -578,6 +748,11 @@ class Fotoo_Hosting
 
 	public function createAlbum($title, $private = false)
 	{
+		if ($this->isClientBanned())
+		{
+			throw new FotooException('Upload error: upload not permitted.');
+		}
+
 		$hash = self::baseConv(hexdec(uniqid()));
 		$this->db->exec('INSERT INTO albums (hash, title, date, private)
 			VALUES (\''.$this->db->escapeString($hash).'\',

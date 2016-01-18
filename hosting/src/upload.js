@@ -261,7 +261,11 @@
                 xhr.setRequestHeader("Connection", "close");
 
                 xhr.onreadystatechange = function () {
-                    if (xhr.readyState == 4 && xhr.status == 200)
+                    if (xhr.readyState == 4 && xhr.status == 400)
+                    {
+                        alert(xhr.responseText);
+                    }
+                    else if (xhr.readyState == 4 && xhr.status == 200)
                     {
                         var txt = xhr.responseText.split('/');
                         album_id = txt[0];
