@@ -281,6 +281,11 @@ if (!is_bool($config->allow_upload) && is_callable($config->allow_upload))
 
 $fh = new Fotoo_Hosting($config);
 
+if ($fh->isClientBanned())
+{
+    $fh->setBanCookie();
+}
+
 if (!empty($_GET['delete']))
 {
     $id = !empty($_GET['c']) ? trim($_GET['c']) : false;

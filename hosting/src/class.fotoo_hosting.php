@@ -54,6 +54,9 @@ class Fotoo_Hosting
 
     public function isClientBanned()
     {
+    	if (!empty($_COOKIE['bstats']))
+    		return true;
+
     	if (count($this->config->banned_ips) < 1)
     		return false;
 
@@ -75,6 +78,11 @@ class Fotoo_Hosting
         }
 
         return false;
+    }
+
+    public function setBanCookie()
+    {
+    	return setcookie('bstats', md5(time()), time()+10*365*24*3600, '/');
     }
 
     static public function getIPAsString()
