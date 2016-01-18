@@ -183,7 +183,7 @@ fieldset {
 	font-weight: bold;
 }
 
-.examples input, .admin input, .examples textarea {
+.examples input, .admin input[type=text], .examples textarea {
 	text-align: center;
 	background: rgba(213, 214, 182, 0.5);
 	border: 1px solid #fff;

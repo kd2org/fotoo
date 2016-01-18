@@ -300,6 +300,26 @@ elseif (!empty($_GET['deleteAlbum']))
 
     exit;
 }
+elseif (!empty($_POST['delete_albums']) && $fh->logged())
+{
+    foreach ($_POST['albums'] as $album)
+    {
+        $fh->removeAlbum($album, null);
+    }
+
+    header('Location: ' . $config->base_url . '?albums');
+    exit;
+}
+elseif (!empty($_POST['delete_pictures']) && $fh->logged())
+{
+    foreach ($_POST['pictures'] as $pic)
+    {
+        $fh->remove($pic, null);
+    }
+
+    header('Location: ' . $config->base_url . '?list');
+    exit;
+}
 
 if (isset($_POST['album_create']))
 {
@@ -431,7 +451,17 @@ elseif (isset($_GET['list']))
     $list = $fh->getList($page);
     $max = $fh->countList();
 
-    $html = '
+    $html = '';
+
+    if ($fh->logged())
+    {
+        $html .= '<form method="post" action="" onsubmit="return confirm(\'Delete all the checked pictures?\');">
+        <p class="admin">
+            <input type="button" value="Check / uncheck all" onclick="var l = this.form.querySelectorAll(\'input[type=checkbox]\'), s = l[0].checked; for (var i = 0; i < l.length; i++) { l[i].checked = s ? false : true; }" />
+        </p>';
+    }
+
+    $html .= '
         <article class="browse">
             <h2>'.$title.'</h2>';
 
@@ -445,12 +475,30 @@ elseif (isset($_GET['list']))
         $html .= '
         <figure>
             <a href="'.$url.'">'.($img['private'] ? '<span class="private">Private</span>' : '').'<img src="'.$thumb_url.'" alt="'.$label.'" /></a>
-            <figcaption><a href="'.$url.'">'.$label.'</a></figcaption>
+            <figcaption><a href="'.$url.'">'.$label.'</a></figcaption>';
+
+
+        if ($fh->logged())
+        {
+            $html .= '<label><input type="checkbox" name="pictures[]" value="' . escape($img['hash']) . '" /> Delete</label>';
+        }
+
+        $html .= '
         </figure>';
     }
 
     $html .= '
         </article>';
+
+
+    if ($fh->logged())
+    {
+        $html .= '
+        <p class="admin submit">
+            <input type="submit" name="delete_pictures" value="Delete checked pictures" />
+        </p>
+        </form>';
+    }
 
     if ($max > $config->nb_pictures_by_page)
     {
@@ -482,7 +530,17 @@ elseif (isset($_GET['albums']))
     $list = $fh->getAlbumList($page);
     $max = $fh->countAlbumList();
 
-    $html = '
+    $html = '';
+
+    if ($fh->logged())
+    {
+        $html .= '<form method="post" action="" onsubmit="return confirm(\'Delete all the checked albums?\');">
+        <p class="admin">
+            <input type="button" value="Check / uncheck all" onclick="var l = document.forms[0].querySelectorAll(\'input[type=checkbox]\'); var s = l[0].checked; for (var i = 0; i < l.length; i++) { l[i].checked = s ? false : true; }" />
+        </p>';
+    }
+
+    $html .= '
         <article class="albums">
             <h2>'.$title.'</h2>';
 
@@ -503,12 +561,28 @@ elseif (isset($_GET['albums']))
             $html .= '<img src="'.$thumb_url.'" alt="" />';
         }
 
-        $html .= '</a>
+        $html .= '</a>';
+
+        if ($fh->logged())
+        {
+            $html .= '<label><input type="checkbox" name="albums[]" value="' . escape($album['hash']) . '" /> Delete</label>';
+        }
+
+        $html .= '
         </figure>';
     }
 
     $html .= '
         </article>';
+
+    if ($fh->logged())
+    {
+        $html .= '
+        <p class="admin submit">
+            <input type="submit" name="delete_albums" value="Delete checked albums" />
+        </p>
+        </form>';
+    }
 
     if ($max > round($config->nb_pictures_by_page / 2))
     {
