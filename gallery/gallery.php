@@ -1140,8 +1140,10 @@ class fotoo
         foreach (self::$html_tags as $tag=>$url)
         {
             $tag_class = preg_replace('![^a-zA-Z0-9_]!', '_', $tag);
-            $text = preg_replace('#(^|\s)'.preg_quote($tag, '#').':([^\s,.]+)#iem',
-                "'\\1<a href=\"'.str_replace('KEYWORD', '\\2', \$url).'\" class=\"'.\$tag_class.'\">\\2</a>\\3'", $text);
+            $text = preg_replace_callback('#(^|\s)'.preg_quote($tag, '#').':([^\s,.]+)#im',
+                function ($match) use ($tag_class, $url) {
+                	return sprintf('%s<a href="%s" class="%s">%s</a>%s', $match[1], str_replace('KEYWORD', $match[2], $url), $tag_class, $match[3]);
+                }, $text);
         }
 
         $text = nl2br($text);
