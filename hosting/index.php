@@ -1489,8 +1489,8 @@ class Fotoo_Hosting
 	public function getAlbumPrevNext($album, $current, $order = -1)
 	{
 		$st = $this->db->prepare('SELECT * FROM pictures WHERE album = :album
-			AND id '.($order > 0 ? '>' : '<').' (SELECT id FROM pictures WHERE hash = :img)
-			ORDER BY id '.($order > 0 ? 'ASC': 'DESC').' LIMIT 1;');
+			AND rowid '.($order > 0 ? '>' : '<').' (SELECT rowid FROM pictures WHERE hash = :img)
+			ORDER BY rowid '.($order > 0 ? 'ASC': 'DESC').' LIMIT 1;');
 		$st->bindValue(':album', $album);
 		$st->bindValue(':img', $current);
 		$res = $st->execute();
