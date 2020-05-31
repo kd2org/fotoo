@@ -15,4 +15,6 @@ fotoo :
 	@echo -n '<?php exit; endif; ?>' >> ${DEST}
 	@cat class.fotoo_hosting.php >> ${DEST}
 	@cat lib-image/lib.image.php >> ${DEST}
+	@cat ZipWriter.php >> ${DEST}
+	@echo '?>' >> ${DEST}
 	@cat index.php | sed 's/^require/\/\/require/' >> ${DEST}

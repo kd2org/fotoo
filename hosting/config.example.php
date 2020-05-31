@@ -29,6 +29,11 @@ if (!isset($config) || !($config instanceof Fotoo_Hosting_Config)) die("Invalid 
 // Thumb size, used for creating thumbnails.
 #$config->thumb_width = 320;
 
+// Allow visitors to download ZIP archives of albums?
+// (may put some pressure on your server, although the archives are uncompressed)
+// Default: false
+#$config->allow_album_zip = true;
+
 // Title of the service.
 #$config->title = 'Fotoo Image Hosting service';
 

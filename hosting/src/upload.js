@@ -328,7 +328,7 @@
                 {
                     var r = new RegExp('\.(' + config.allowed_formats.join('|') + ')$', 'i');
 
-                    if (/^image\//i.test(this.files[0].type) && r.test(this.files[0].name))
+                    if (/^image\/|^application\/pdf$/i.test(this.files[0].type) && r.test(this.files[0].name))
                     {
                         progress.innerHTML = "Image is recognized.";
                         can_submit = true;

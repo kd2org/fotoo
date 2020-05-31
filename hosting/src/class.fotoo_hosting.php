@@ -584,8 +584,8 @@ class Fotoo_Hosting
 	public function getAlbumPrevNext($album, $current, $order = -1)
 	{
 		$st = $this->db->prepare('SELECT * FROM pictures WHERE album = :album
-			AND date '.($order > 0 ? '>' : '<').' (SELECT date FROM pictures WHERE hash = :img)
-			ORDER BY date '.($order > 0 ? 'ASC': 'DESC').' LIMIT 1;');
+			AND id '.($order > 0 ? '>' : '<').' (SELECT id FROM pictures WHERE hash = :img)
+			ORDER BY id '.($order > 0 ? 'ASC': 'DESC').' LIMIT 1;');
 		$st->bindValue(':album', $album);
 		$st->bindValue(':img', $current);
 		$res = $st->execute();
@@ -633,6 +633,35 @@ class Fotoo_Hosting
 		}
 
 		return $out;
+	}
+
+	public function getAllAlbumPictures($hash)
+	{
+		$out = array();
+		$res = $this->db->query('SELECT * FROM pictures WHERE album = \''.$this->db->escapeString($hash).'\' ORDER BY date;');
+
+		while ($row = $res->fetchArray(SQLITE3_ASSOC))
+		{
+			$out[] = $row;
+		}
+
+		return $out;
+	}
+
+	public function downloadAlbum($hash)
+	{
+		$album = $this->getAlbum($hash);
+
+		header('Content-Type: application/zip');
+		header(sprintf('Content-Disposition: attachment; filename=%s.zip', preg_replace('/[^\w_-]+/U', '', $album['title'])));
+
+		$zip = new ZipWriter('php://output');
+
+		foreach ($this->getAllAlbumPictures($hash) as $picture) {
+			$zip->add(sprintf('%s.%s', $picture['filename'], strtolower($picture['format'])), null, $this->_getPath($picture));
+		}
+
+		$zip->close();
 	}
 
 	public function countAlbumPictures($hash)

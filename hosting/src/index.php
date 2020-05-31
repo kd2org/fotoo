@@ -44,6 +44,7 @@ function exception_error_handler($errno, $errstr, $errfile, $errline )
 set_error_handler("exception_error_handler");
 
 require_once __DIR__ . '/lib-image/lib.image.php';
+require_once __DIR__ . '/ZipWriter.php';
 
 class Fotoo_Hosting_Config
 {
@@ -63,6 +64,7 @@ class Fotoo_Hosting_Config
 
     private $max_file_size = null;
     private $allow_upload = null;
+    private $allow_album_zip = null;
     private $nb_pictures_by_page = null;
 
     private $admin_password = null;
@@ -94,6 +96,7 @@ class Fotoo_Hosting_Config
                 $this->$key = (array) $value;
                 break;
             case 'allow_upload':
+            case 'allow_album_zip':
                 $this->$key = is_bool($value) ? (bool) $value : $value;
                 break;
             case 'allowed_formats':
@@ -110,8 +113,9 @@ class Fotoo_Hosting_Config
                 foreach ($value as $f=>$format)
                 {
                     $format = strtoupper($format);
+                    static $base_support = ['PNG', 'JPEG', 'GIF'];
 
-                    if ($format != 'PNG' && $format != 'JPEG' && $format != 'GIF' && !class_exists('Imagick'))
+                    if (!in_array($format, $base_support) && !class_exists('Imagick'))
                     {
                         unset($value[$f]);
                     }
@@ -227,17 +231,18 @@ class Fotoo_Hosting_Config
 
         $memory = self::return_bytes(ini_get('memory_limit'));
 
-        if ($memory < $size)
+        if ($memory > 0 && $memory < $size)
             $size = $memory;
 
         $this->max_file_size = $size;
         $this->allow_upload = true;
+        $this->allow_album_zip = false;
         $this->admin_password = 'fotoo';
         $this->banned_ips = [];
         $this->ip_storage_expiration = 366;
         $this->nb_pictures_by_page = 20;
 
-        $this->allowed_formats = array('PNG', 'JPEG', 'GIF', 'SVG', 'XCF');
+        $this->allowed_formats = array('PNG', 'JPEG', 'GIF', 'SVG', 'XCF', 'PDF');
     }
 
     static public function return_bytes ($size_str)
@@ -639,6 +644,11 @@ elseif (!empty($_GET['a']))
         exit;
     }
 
+    if (!empty($_POST['download']) && $config->allow_album_zip) {
+        $fh->downloadAlbum($album['hash']);
+        exit;
+    }
+
     $title = $album['title'];
 
     if (!empty($_GET['p']) && is_numeric($_GET['p']))
@@ -651,7 +661,7 @@ elseif (!empty($_GET['a']))
 
     $bbcode = '[b][url=' . $config->album_page_url . $album['hash'] . ']' . $album['title'] . "[/url][/b]\n";
 
-    foreach ($list as $img)
+    foreach ($fh->getAllAlbumPictures($album['hash']) as $img)
     {
         $label = $img['filename'] ? escape(preg_replace('![_-]!', ' ', $img['filename'])) : 'View image';
         $bbcode .= '[url='.$fh->getImageUrl($img).'][img]'.$fh->getImageThumbUrl($img)."[/img][/url] ";
@@ -670,6 +680,15 @@ elseif (!empty($_GET['a']))
                 <dt>All pictures for a forum (BBCode):</dt>
                 <dd><textarea cols="70" rows="1" onclick="this.select();">'.escape($bbcode).'</textarea></dd>
             </aside>';
+
+    if ($config->allow_album_zip) {
+        $html .= '
+        <form method="post" action="">
+        <p>
+            <input type="submit" name="download" value="Download full album as a ZIP file" />
+        </p>
+        </form>';
+    }
 
     if ($fh->logged())
     {

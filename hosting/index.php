@@ -1,5 +1,5 @@
 <?php
-// Fotoo Hosting single-file release version 2.1.1
+// Fotoo Hosting single-file release version 2.2.0
 ?><?php if (isset($_GET["js"])): header("Content-Type: text/javascript"); ?>
 (function () {
     if (!Array.prototype.indexOf)
@@ -331,7 +331,7 @@
                 {
                     var r = new RegExp('\.(' + config.allowed_formats.join('|') + ')$', 'i');
 
-                    if (/^image\//i.test(this.files[0].type) && r.test(this.files[0].name))
+                    if (/^image\/|^application\/pdf$/i.test(this.files[0].type) && r.test(this.files[0].name))
                     {
                         progress.innerHTML = "Image is recognized.";
                         can_submit = true;
@@ -1489,8 +1489,8 @@ class Fotoo_Hosting
 	public function getAlbumPrevNext($album, $current, $order = -1)
 	{
 		$st = $this->db->prepare('SELECT * FROM pictures WHERE album = :album
-			AND date '.($order > 0 ? '>' : '<').' (SELECT date FROM pictures WHERE hash = :img)
-			ORDER BY date '.($order > 0 ? 'ASC': 'DESC').' LIMIT 1;');
+			AND id '.($order > 0 ? '>' : '<').' (SELECT id FROM pictures WHERE hash = :img)
+			ORDER BY id '.($order > 0 ? 'ASC': 'DESC').' LIMIT 1;');
 		$st->bindValue(':album', $album);
 		$st->bindValue(':img', $current);
 		$res = $st->execute();
@@ -1538,6 +1538,35 @@ class Fotoo_Hosting
 		}
 
 		return $out;
+	}
+
+	public function getAllAlbumPictures($hash)
+	{
+		$out = array();
+		$res = $this->db->query('SELECT * FROM pictures WHERE album = \''.$this->db->escapeString($hash).'\' ORDER BY date;');
+
+		while ($row = $res->fetchArray(SQLITE3_ASSOC))
+		{
+			$out[] = $row;
+		}
+
+		return $out;
+	}
+
+	public function downloadAlbum($hash)
+	{
+		$album = $this->getAlbum($hash);
+
+		header('Content-Type: application/zip');
+		header(sprintf('Content-Disposition: attachment; filename=%s.zip', preg_replace('/[^\w_-]+/U', '', $album['title'])));
+
+		$zip = new ZipWriter('php://output');
+
+		foreach ($this->getAllAlbumPictures($hash) as $picture) {
+			$zip->add(sprintf('%s.%s', $picture['filename'], strtolower($picture['format'])), null, $this->_getPath($picture));
+		}
+
+		$zip->close();
 	}
 
 	public function countAlbumPictures($hash)
@@ -2441,6 +2470,265 @@ function fastimagecopyresampled (&$dst_image, $src_image, $dst_x, $dst_y, $src_x
 }
 
 ?><?php
+/*
+    This file is part of KD2FW -- <http://dev.kd2.org/>
+
+    Copyright (c) 2001-2019 BohwaZ <http://bohwaz.net/>
+    All rights reserved.
+
+    KD2FW is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Foobar is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
+/**
+ * Very simple ZIP Archive writer
+ *
+ * for specs see http://www.pkware.com/appnote
+ * Inspired by https://github.com/splitbrain/php-archive/blob/master/src/Zip.php
+ */
+class ZipWriter
+{
+	protected $compression = 0;
+	protected $pos = 0;
+	protected $handle;
+	protected $directory = [];
+	protected $closed = false;
+
+	/**
+	 * Create a new ZIP file
+	 *
+	 * @param string $file
+	 * @throws RuntimeException
+	 */
+	public function __construct($file)
+	{
+		$this->handle = fopen($file, 'wb');
+
+		if (!$this->handle)
+		{
+			throw new RuntimeException('Could not open ZIP file for writing: ' . $file);
+		}
+	}
+
+	/**
+	 * Sets compression rate (0 = no compression)
+	 *
+	 * @param integer $compression 0 to 9
+	 * @return void
+	 */
+	public function setCompression($compression)
+	{
+		$compression = (int) $compression;
+		$this->compression = max(min($compression, 9), 0);
+	}
+
+	/**
+	 * Write to the current ZIP file
+	 * @param string $data
+	 * @return void
+	 */
+	protected function write($data)
+	{
+		// We can't use fwrite and ftell directly as ftell doesn't work on some pointers
+		// (eg. php://output)
+		fwrite($this->handle, $data);
+		$this->pos += strlen($data);
+	}
+
+	/**
+	 * Returns the content of the ZIP file
+	 * 
+	 * @return string
+	 */
+	public function get()
+	{
+		fseek($this->handle, 0);
+		return stream_get_contents($this->handle);
+	}
+
+	public function __destruct()
+	{
+		$this->close();
+	}
+
+	/**
+	 * Add a file to the current Zip archive using the given $data as content
+	 *
+	 * @param string $file File name
+	 * @param string|null $data binary content of the file to add
+	 * @param string|null $source Source file to use if no data is supplied
+	 * @throws LogicException
+	 * @throws RuntimeException
+	 */
+	public function add($file, $data = null, $source = null)
+	{
+		if ($this->closed)
+		{
+			throw new LogicException('Archive has been closed, files can no longer be added');
+		}
+
+		if (null === $data && null === $source) {
+			throw new LogicException('No source file or data has been supplied');
+		}
+
+		$source_handle = null;
+
+		if ($data === null)
+		{
+			$csize = $size = filesize($source);
+			list(, $crc) = unpack('N', hash_file('crc32b', $source, true));
+			$source_handle = fopen($source, 'r');
+
+			if ($this->compression)
+			{
+				// Unfortunately it's not possible to use stream_filter_append
+				// to compress data on the fly, as it's not working correctly
+				// with php://output, php://temp and php://memory streams
+				throw new RuntimeException('Compression is not supported with external files');
+			}
+		}
+		else
+		{
+			$size = strlen($data);
+			$crc  = crc32($data);
+
+			if ($this->compression)
+			{
+				// Compress data
+				$data = gzdeflate($data, $this->compression);
+			}
+
+			$csize  = strlen($data);
+		}
+
+		$offset = $this->pos;
+
+		// write local file header
+		$this->write($this->makeRecord(false, $file, $size, $csize, $crc, null));
+
+		// we store no encryption header
+
+		// Store uncompressed external file
+		if ($source_handle)
+		{
+			$this->pos += stream_copy_to_stream($source_handle, $this->handle);
+			fclose($source_handle);
+		}
+		// Store compressed or uncompressed file
+		// that was supplied
+		else
+		{
+			// write data
+			$this->write($data);
+		}
+
+		// we store no data descriptor
+
+		// add info to central file directory
+		$this->directory[] = $this->makeRecord(true, $file, $size, $csize, $crc, $offset);
+	}
+
+	/**
+	 * Add the closing footer to the archive
+	 * @throws LogicException
+	 */
+	public function finalize()
+	{
+		if ($this->closed)
+		{
+			throw new LogicException('The ZIP archive has been closed. Files can no longer be added.');
+		}
+
+		// write central directory
+		$offset = $this->pos;
+		$directory = implode('', $this->directory);
+		$this->write($directory);
+
+		$end_record = "\x50\x4b\x05\x06" // end of central dir signature
+			. "\x00\x00" // number of this disk
+			. "\x00\x00" // number of the disk with the start of the central directory
+			. pack('v', count($this->directory)) // total number of entries in the central directory on this disk
+			. pack('v', count($this->directory)) // total number of entries in the central directory
+			. pack('V', strlen($directory)) // size of the central directory
+			. pack('V', $offset) // offset of start of central directory with respect to the starting disk number
+			. "\x00\x00"; // .ZIP file comment length
+		$this->write($end_record);
+
+		$this->directory = [];
+		$this->closed = true;
+	}
+
+	/**
+	 * Close the file handle
+	 * @return void
+	 */
+	public function close()
+	{
+		if (!$this->closed)
+		{
+			$this->finalize();
+		}
+
+		if ($this->handle)
+		{
+			fclose($this->handle);
+		}
+
+		$this->handle = null;
+	}
+
+	/**
+	 * Creates a record, local or central
+	 * @param  boolean $central  TRUE for a central file record, FALSE for a local file header
+	 * @param  string  $filename File name
+	 * @param  integer $size     File size
+	 * @param  integer $compressed_size
+	 * @param  string  $crc      CRC32 of the file contents
+	 * @param  integer|null  $offset
+	 * @return string
+	 */
+	protected function makeRecord($central = false, $filename, $size, $compressed_size, $crc, $offset)
+	{
+		$header = ($central ? "\x50\x4b\x01\x02\x0e\x00" : "\x50\x4b\x03\x04");
+
+		$header .=
+			"\x14\x00" // version needed to extract - 2.0
+			. "\x00\x00" // general purpose flag - no flags set
+			. ($this->compression ? "\x08\x00" : "\x00\x00") // compression method - none
+			. "\x01\x80\xe7\x4c" //  last mod file time and date
+			. pack('V', $crc) // crc-32
+			. pack('V', $compressed_size) // compressed size
+			. pack('V', $size) // uncompressed size
+			. pack('v', strlen($filename)) // file name length
+			. "\x00\x00"; // extra field length
+
+		if ($central)
+		{
+			$header .=
+				"\x00\x00" // file comment length
+				. "\x00\x00" // disk number start
+				. "\x00\x00" // internal file attributes
+				. "\x00\x00\x00\x00" // external file attributes  @todo was 0x32!?
+				. pack('V', $offset); // relative offset of local header
+		}
+
+		$header .= $filename;
+
+		return $header;
+	}
+}
+?>
+<?php
 /**
     Fotoo Hosting
     Copyright 2010-2012 BohwaZ - http://dev.kd2.org/
@@ -2486,6 +2774,7 @@ function exception_error_handler($errno, $errstr, $errfile, $errline )
 set_error_handler("exception_error_handler");
 
 //require_once __DIR__ . '/lib-image/lib.image.php';
+//require_once __DIR__ . '/ZipWriter.php';
 
 class Fotoo_Hosting_Config
 {
@@ -2505,6 +2794,7 @@ class Fotoo_Hosting_Config
 
     private $max_file_size = null;
     private $allow_upload = null;
+    private $allow_album_zip = null;
     private $nb_pictures_by_page = null;
 
     private $admin_password = null;
@@ -2536,6 +2826,7 @@ class Fotoo_Hosting_Config
                 $this->$key = (array) $value;
                 break;
             case 'allow_upload':
+            case 'allow_album_zip':
                 $this->$key = is_bool($value) ? (bool) $value : $value;
                 break;
             case 'allowed_formats':
@@ -2552,8 +2843,9 @@ class Fotoo_Hosting_Config
                 foreach ($value as $f=>$format)
                 {
                     $format = strtoupper($format);
+                    static $base_support = ['PNG', 'JPEG', 'GIF'];
 
-                    if ($format != 'PNG' && $format != 'JPEG' && $format != 'GIF' && !class_exists('Imagick'))
+                    if (!in_array($format, $base_support) && !class_exists('Imagick'))
                     {
                         unset($value[$f]);
                     }
@@ -2669,17 +2961,18 @@ class Fotoo_Hosting_Config
 
         $memory = self::return_bytes(ini_get('memory_limit'));
 
-        if ($memory < $size)
+        if ($memory > 0 && $memory < $size)
             $size = $memory;
 
         $this->max_file_size = $size;
         $this->allow_upload = true;
+        $this->allow_album_zip = false;
         $this->admin_password = 'fotoo';
         $this->banned_ips = [];
         $this->ip_storage_expiration = 366;
         $this->nb_pictures_by_page = 20;
 
-        $this->allowed_formats = array('PNG', 'JPEG', 'GIF', 'SVG', 'XCF');
+        $this->allowed_formats = array('PNG', 'JPEG', 'GIF', 'SVG', 'XCF', 'PDF');
     }
 
     static public function return_bytes ($size_str)
@@ -3081,6 +3374,11 @@ elseif (!empty($_GET['a']))
         exit;
     }
 
+    if (!empty($_POST['download']) && $config->allow_album_zip) {
+        $fh->downloadAlbum($album['hash']);
+        exit;
+    }
+
     $title = $album['title'];
 
     if (!empty($_GET['p']) && is_numeric($_GET['p']))
@@ -3093,7 +3391,7 @@ elseif (!empty($_GET['a']))
 
     $bbcode = '[b][url=' . $config->album_page_url . $album['hash'] . ']' . $album['title'] . "[/url][/b]\n";
 
-    foreach ($list as $img)
+    foreach ($fh->getAllAlbumPictures($album['hash']) as $img)
     {
         $label = $img['filename'] ? escape(preg_replace('![_-]!', ' ', $img['filename'])) : 'View image';
         $bbcode .= '[url='.$fh->getImageUrl($img).'][img]'.$fh->getImageThumbUrl($img)."[/img][/url] ";
@@ -3112,6 +3410,15 @@ elseif (!empty($_GET['a']))
                 <dt>All pictures for a forum (BBCode):</dt>
                 <dd><textarea cols="70" rows="1" onclick="this.select();">'.escape($bbcode).'</textarea></dd>
             </aside>';
+
+    if ($config->allow_album_zip) {
+        $html .= '
+        <form method="post" action="">
+        <p>
+            <input type="submit" name="download" value="Download full album as a ZIP file" />
+        </p>
+        </form>';
+    }
 
     if ($fh->logged())
     {
