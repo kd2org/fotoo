@@ -254,7 +254,7 @@ elseif (!empty($_GET['deleteAlbum']))
 
     if ($fh->removeAlbum($_GET['deleteAlbum'], $id))
     {
-        header('Location: ' . $config->base_url . '?albums');
+        header('Location: ' . $config->base_url . '?list');
     }
     else
     {
@@ -263,21 +263,16 @@ elseif (!empty($_GET['deleteAlbum']))
 
     exit;
 }
-elseif (!empty($_POST['delete_albums']) && $fh->logged())
-{
-    foreach ($_POST['albums'] as $album)
-    {
-        $fh->removeAlbum($album, null);
-    }
-
-    header('Location: ' . $config->base_url . '?albums');
-    exit;
-}
-elseif (!empty($_POST['delete_pictures']) && $fh->logged())
+elseif (!empty($_POST['delete']) && $fh->logged())
 {
     foreach ($_POST['pictures'] as $pic)
     {
         $fh->remove($pic, null);
+    }
+
+    foreach ($_POST['albums'] as $album)
+    {
+        $fh->removeAlbum($album, null);
     }
 
     header('Location: ' . $config->base_url . '?list');
@@ -425,7 +420,7 @@ elseif (isset($_GET['list']))
 
     if ($fh->logged())
     {
-        $html .= '<form method="post" action="" onsubmit="return confirm(\'Delete all the checked pictures?\');">
+        $html .= '<form method="post" action="" onsubmit="return confirm(\'Delete all the checked pictures and albums?\');">
         <p class="admin">
             <input type="button" value="Check / uncheck all" onclick="var l = this.form.querySelectorAll(\'input[type=checkbox]\'), s = l[0].checked; for (var i = 0; i < l.length; i++) { l[i].checked = s ? false : true; }" />
         </p>';
@@ -435,26 +430,41 @@ elseif (isset($_GET['list']))
         <article class="browse">
             <h2>'.$title.'</h2>';
 
-    foreach ($list as &$img)
+    foreach ($list as $img)
     {
         $thumb_url = $fh->getImageThumbUrl($img);
-        $url = $fh->getUrl($img);
 
-        $label = $img['filename'] ? escape(preg_replace('![_-]!', ' ', $img['filename'])) : 'View image';
-
-        $html .= '
-        <figure>
-            <a href="'.$url.'">'.($img['private'] ? '<span class="private">Private</span>' : '').'<img src="'.$thumb_url.'" alt="'.$label.'" /></a>
-            <figcaption><a href="'.$url.'">'.$label.'</a></figcaption>';
-
-
-        if ($fh->logged())
-        {
-            $html .= '<label><input type="checkbox" name="pictures[]" value="' . escape($img['hash']) . '" /> Delete</label>';
+        if ($img['album']) {
+            $url = '?a=' . rawurlencode($img['album']);
+            $html .= sprintf(
+                '<figure>
+                    <a href="%s">%s<span class="count"><b>%d</b> images</span><img src="%s" alt="%s" /></a>
+                    <figcaption><a href="%1$s">%5$s</b></a></figcaption>
+                    %s
+                </figure>',
+                escape($url),
+                $img['private'] ? '<span class="private">Private</span>' : '',
+                $img['count'],
+                $thumb_url,
+                escape($img['title']),
+                !$fh->logged() ? '' : '<label><input type="checkbox" name="albums[]" value="' . escape($img['album']) . '" /> Delete</label>'
+            );
         }
-
-        $html .= '
-        </figure>';
+        else {
+            $url = $fh->getUrl($img);
+            $html .= sprintf(
+                '<figure>
+                    <a href="%s">%s<img src="%s" alt="%s" /></a>
+                    <figcaption><a href="%1$s">%4$s</a></figcaption>
+                    %s
+                </figure>',
+                escape($url),
+                $img['private'] ? '<span class="private">Private</span>' : '',
+                $thumb_url,
+                escape(preg_replace('![_-]!', ' ', $img['filename'])),
+                !$fh->logged() ? '' : '<label><input type="checkbox" name="pictures[]" value="' . escape($img['hash']) . '" /> Delete</label>'
+            );
+        }
     }
 
     $html .= '
@@ -465,7 +475,7 @@ elseif (isset($_GET['list']))
     {
         $html .= '
         <p class="admin submit">
-            <input type="submit" name="delete_pictures" value="Delete checked pictures" />
+            <input type="submit" name="delete" value="Delete checked pictures and albums" />
         </p>
         </form>';
     }
@@ -481,90 +491,6 @@ elseif (isset($_GET['list']))
         for ($p = 1; $p <= $max_page; $p++)
         {
             $html .= '<li'.($page == $p ? ' class="selected"' : '').'><a href="?list='.$p.'">'.$p.'</a></li>';
-        }
-
-        $html .= '
-            </ul>
-        </nav>';
-    }
-}
-elseif (isset($_GET['albums']))
-{
-    $title = 'Browse albums';
-
-    if (!empty($_GET['albums']) && is_numeric($_GET['albums']))
-        $page = (int) $_GET['albums'];
-    else
-        $page = 1;
-
-    $list = $fh->getAlbumList($page);
-    $max = $fh->countAlbumList();
-
-    $html = '';
-
-    if ($fh->logged())
-    {
-        $html .= '<form method="post" action="" onsubmit="return confirm(\'Delete all the checked albums?\');">
-        <p class="admin">
-            <input type="button" value="Check / uncheck all" onclick="var l = document.forms[0].querySelectorAll(\'input[type=checkbox]\'); var s = l[0].checked; for (var i = 0; i < l.length; i++) { l[i].checked = s ? false : true; }" />
-        </p>';
-    }
-
-    $html .= '
-        <article class="albums">
-            <h2>'.$title.'</h2>';
-
-    foreach ($list as $album)
-    {
-        $url = $config->album_page_url . $album['hash'];
-        $nb = $fh->countAlbumPictures($album['hash']);
-
-        $html .= '
-        <figure>
-            <h2><a href="'.$url.'">'.escape($album['title']).'</a></h2>
-            <h6>('.$nb.' pictures)</h6>
-            <a href="'.$url.'">'.($album['private'] ? '<span class="private">Private</span>' : '');
-
-        foreach ($album['extract'] as $img)
-        {
-            $thumb_url = $fh->getImageThumbUrl($img);
-            $html .= '<img src="'.$thumb_url.'" alt="" />';
-        }
-
-        $html .= '</a>';
-
-        if ($fh->logged())
-        {
-            $html .= '<label><input type="checkbox" name="albums[]" value="' . escape($album['hash']) . '" /> Delete</label>';
-        }
-
-        $html .= '
-        </figure>';
-    }
-
-    $html .= '
-        </article>';
-
-    if ($fh->logged())
-    {
-        $html .= '
-        <p class="admin submit">
-            <input type="submit" name="delete_albums" value="Delete checked albums" />
-        </p>
-        </form>';
-    }
-
-    if ($max > round($config->nb_pictures_by_page / 2))
-    {
-        $max_page = ceil($max / round($config->nb_pictures_by_page / 2));
-        $html .= '
-        <nav class="pagination">
-            <ul>
-        ';
-
-        for ($p = 1; $p <= $max_page; $p++)
-        {
-            $html .= '<li'.($page == $p ? ' class="selected"' : '').'><a href="'.$config->base_url.'?albums='.$p.'">'.$p.'</a></li>';
         }
 
         $html .= '
@@ -944,9 +870,8 @@ echo '<!DOCTYPE html>
     '.($fh->logged() ? '<h2>(admin mode)</h2>' : '').'
     <nav>
         <ul>
-            <li><a href="'.$config->base_url.'">Upload a file</a></li>
-            <li><a href="'.$config->base_url.'?list">Browse pictures</a></li>
-            <li><a href="'.$config->base_url.'?albums">Browse albums</a></li>
+            <li><a href="'.$config->base_url.'">Upload</a></li>
+            <li><a href="'.$config->base_url.'?list">Browse</a></li>
         </ul>
     </nav>
 </header>

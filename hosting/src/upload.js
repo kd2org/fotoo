@@ -112,17 +112,6 @@
         if (!FileReader && !window.URL)
             return false;
 
-        if (FileList && XMLHttpRequest)
-        {
-            var album_li = document.createElement('li');
-            var album_a = document.createElement('a');
-            album_a.href = '?album';
-            album_a.innerHTML = 'Upload an album';
-            album_li.appendChild(album_a);
-            var link = document.querySelector('header nav ul li:nth-child(2)');
-            link.parentNode.insertBefore(album_li, link);
-        }
-
         document.getElementById('f_submit').style.display = 'none';
 
         var parent = document.getElementById('albumParent');

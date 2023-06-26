@@ -535,13 +535,40 @@ class Fotoo_Hosting
 		return $this->get($hash) ? false : true;
 	}
 
+	protected function getListQuery(bool $private = false)
+	{
+		$where = $private ? '' : 'AND private != 1';
+		return sprintf('
+			SELECT p.*, COUNT(*) AS count, a.title, a.private AS private
+				FROM pictures p
+				INNER JOIN albums a ON a.hash = p.album
+				WHERE %s
+				GROUP BY p.album
+			UNION ALL
+				SELECT *, 1 AS count, NULL AS title, p.private AS private
+				FROM pictures p
+				WHERE album IS NULL AND %s',
+			$private ? '1' : 'a.private != 1',
+			$private ? '1' : 'p.private != 1'
+		);
+	}
+
 	public function getList($page)
 	{
 		$begin = ($page - 1) * $this->config->nb_pictures_by_page;
-		$where = $this->logged() ? '' : 'AND private != 1';
+		$private = $this->logged();
 
-		$out = array();
-		$res = $this->db->query('SELECT * FROM pictures WHERE album IS NULL '.$where.' ORDER BY date DESC LIMIT '.$begin.','.$this->config->nb_pictures_by_page.';');
+		$out = [];
+		$res = $this->db->query(sprintf(
+			'SELECT * FROM (%s) ORDER BY date DESC LIMIT %d,%d;',
+			$this->getListQuery($private),
+			$begin,
+			$this->config->nb_pictures_by_page
+		));
+
+		if (!$res) {
+			throw new \RuntimeException($this->db->lastErrorMsg());
+		}
 
 		while ($row = $res->fetchArray(SQLITE3_ASSOC))
 		{
@@ -549,6 +576,11 @@ class Fotoo_Hosting
 		}
 
 		return $out;
+	}
+
+	public function countList()
+	{
+		return $this->db->querySingle(sprintf('SELECT COUNT(*) FROM (%s);', $this->getListQuery($this->logged())));
 	}
 
 	public function makeRemoveId($hash)
@@ -559,29 +591,6 @@ class Fotoo_Hosting
 	public function checkRemoveId($hash, $id)
 	{
 		return sha1($this->config->storage_path . $hash) === $id;
-	}
-
-	public function countList()
-	{
-		$where = $this->logged() ? '' : 'AND private != 1';
-		return $this->db->querySingle('SELECT COUNT(*) FROM pictures WHERE album IS NULL '.$where.';');
-	}
-
-	public function getAlbumList($page)
-	{
-		$begin = ($page - 1) * round($this->config->nb_pictures_by_page / 2);
-		$where = $this->logged() ? '' : 'WHERE private != 1';
-
-		$out = array();
-		$res = $this->db->query('SELECT * FROM albums '.$where.' ORDER BY date DESC LIMIT '.$begin.','.round($this->config->nb_pictures_by_page / 2).';');
-
-		while ($row = $res->fetchArray(SQLITE3_ASSOC))
-		{
-			$row['extract'] = $this->getAlbumExtract($row['hash']);
-			$out[] = $row;
-		}
-
-		return $out;
 	}
 
 	public function getAlbumPrevNext($album, $current, $order = -1)
