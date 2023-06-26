@@ -3262,7 +3262,8 @@ class Fotoo_Hosting_Config
         // Defaults
         $this->db_file = dirname(__FILE__) . '/datas.db';
         $this->storage_path = dirname(__FILE__) . '/i/';
-        $this->base_url = 'http://'. $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']);
+        $proto = !empty($_SERVER['HTTPS']) ? 'https' : 'http';
+        $this->base_url = $proto . '://'. $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']);
 
         if ($this->base_url[strlen($this->base_url) - 1] != '/')
             $this->base_url .= '/';
