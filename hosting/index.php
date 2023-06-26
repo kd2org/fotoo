@@ -749,6 +749,8 @@ figure span {
 }
 
 figure span.private {
+	left: unset;
+	right: 0;
 	background: rgb(150, 0, 0);
 	background: rgba(150, 0, 0, 0.75);
 }
