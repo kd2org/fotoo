@@ -982,7 +982,7 @@ class fotoo
                 if ($m)
                     $subquery .= ' AND day = '.$this->db->quote((int)$row['day']);
 
-                $subquery .= 'ORDER BY time LIMIT '.(int)$start.', 5;';
+                $subquery .= 'ORDER BY random() LIMIT '.(int)$start.', 5;';
                 $subquery = $this->db->query($subquery)->fetchAll(PDO::FETCH_ASSOC);
 
                 if ($row['nb'] > 5)

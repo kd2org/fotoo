@@ -330,14 +330,22 @@ class Fotoo_Hosting
 			$client_resize = true;
 		}
 
-		if (!isset($file['error']))
-		{
-			return false;
+		if (!isset($file['error'])) {
+			throw new FotooException("Upload error.", UPLOAD_ERR_NO_FILE);
 		}
 
-		if ($file['error'] != UPLOAD_ERR_OK)
-		{
+		if ($file['error'] != UPLOAD_ERR_OK) {
 			throw new FotooException("Upload error.", $file['error']);
+		}
+
+		if (empty($file['tmp_name'])) {
+			throw new FotooException("Upload error.", UPLOAD_ERR_NO_FILE);
+		}
+
+		// Make sure tmp_name is from us
+		if (!file_exists($file['tmp_name'])
+			|| !(is_uploaded_file($file['tmp_name']) || $client_resize)) {
+			throw new FotooException("Upload error.", UPLOAD_ERR_NO_FILE);
 		}
 
 		if (!empty($name))
@@ -352,8 +360,6 @@ class Fotoo_Hosting
 		{
 			$name = '';
 		}
-
-		require_once __DIR__ . '/class.image.php';
 
 		try {
 			$img = new Image($file['tmp_name']);
@@ -492,7 +498,9 @@ class Fotoo_Hosting
 		$expiration = time() - ($this->config->ip_storage_expiration * 24 * 3600);
 		$this->db->query('UPDATE pictures SET ip = "R" WHERE date < ' . (int)$expiration . ';');
 
-		return $hash;
+		$url = $this->getUrl(['hash' => $hash, 'filename' => $name, 'format' => strtoupper($format)], true);
+
+		return $url;
 	}
 
 	public function get($hash)
@@ -815,9 +823,8 @@ class Fotoo_Hosting
 	{
 		$album = $this->db->querySingle('SELECT * FROM albums WHERE hash = \''.$this->db->escapeString($album).'\';', true);
 
-		if (!$album)
-		{
-			return false;
+		if (!$album) {
+			throw new FotooException('ALbum not found');
 		}
 
 		return $this->upload($file, $name, $album['private'], $album['hash']);

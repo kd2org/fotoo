@@ -17,12 +17,6 @@ error_reporting(E_ALL);
 require 'class.fotoo.php';
 require 'functions.php';
 
-// Against bad configurations
-if (get_magic_quotes_gpc())
-{
-    foreach ($_GET as $k=>$v)   { $_GET[$k]  = stripslashes($v); }
-}
-
 if (file_exists(dirname(__FILE__) . '/user_config.php'))
 {
     require dirname(__FILE__) . '/user_config.php';

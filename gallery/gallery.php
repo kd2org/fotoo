@@ -1016,7 +1016,7 @@ class fotoo
                 if ($m)
                     $subquery .= ' AND day = '.$this->db->quote((int)$row['day']);
 
-                $subquery .= 'ORDER BY time LIMIT '.(int)$start.', 5;';
+                $subquery .= 'ORDER BY random() LIMIT '.(int)$start.', 5;';
                 $subquery = $this->db->query($subquery)->fetchAll(PDO::FETCH_ASSOC);
 
                 if ($row['nb'] > 5)
@@ -1482,12 +1482,6 @@ function html_pagination($page, $total, $url)
 }
 
 
-
-// Against bad configurations
-if (get_magic_quotes_gpc())
-{
-    foreach ($_GET as $k=>$v)   { $_GET[$k]  = stripslashes($v); }
-}
 
 if (file_exists(dirname(__FILE__) . '/user_config.php'))
 {

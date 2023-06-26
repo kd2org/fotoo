@@ -189,7 +189,7 @@ class Fotoo_Hosting_Config
         $this->ip_storage_expiration = 366;
         $this->nb_pictures_by_page = 20;
 
-        $this->allowed_formats = ['png', 'jpeg', 'gif', 'svg', 'xcf', 'pdf', 'webp'];
+        $this->allowed_formats = ['png', 'jpeg', 'gif', 'svg', 'webp'];
     }
 
     static public function return_bytes ($size_str)
@@ -210,6 +210,7 @@ function escape($str)
 }
 
 require __DIR__ . '/class.fotoo_hosting.php';
+require_once __DIR__ . '/class.image.php';
 
 $config = new Fotoo_Hosting_Config;
 
@@ -279,43 +280,63 @@ elseif (!empty($_POST['delete']) && $fh->logged())
     exit;
 }
 
-if (isset($_POST['album_create']))
-{
-    if (!empty($_POST['title']))
-    {
-        try {
-            $id = $fh->createAlbum($_POST['title'], empty($_POST['private']) ? false : true);
-            echo "$id/" . $fh->makeRemoveId($id);
-            exit;
-        }
-        catch (FotooException $e)
-        {
-            header('HTTP/1.1 400 Bad Request', true, 400);
-            die("Upload not permitted.");
-        }
+if (isset($_GET['upload'], $_POST['album']) && $_POST['album'] === 'new') {
+    if (empty($_POST['title'])) {
+        http_response_code(400);
+        die("Bad Request");
     }
 
-    header('HTTP/1.1 400 Bad Request', true, 400);
-    die("Bad Request");
-}
-
-if (isset($_POST['album_append']))
-{
-    if (!empty($_POST['album']) && !empty($_POST['content']) && isset($_POST['name']) && isset($_POST['filename']))
-    {
-        if ($fh->appendToAlbum($_POST['album'], $_POST['name'], array('content' => $_POST['content'], 'name' => $_POST['filename'])))
-        {
-            echo "OK";
-        }
-        else
-        {
-            echo "FAIL";
-        }
+    try {
+        $hash = $fh->createAlbum($_POST['title'], empty($_POST['private']) ? false : true);
+        $key = $fh->makeRemoveId($hash);
+        http_response_code(200);
+        echo json_encode(compact('hash', 'key'));
         exit;
     }
+    catch (FotooException $e) {
+        http_response_code(400);
+        die("Upload not permitted.");
+    }
+}
+elseif (isset($_GET['upload'], $_POST['album'])) {
+    if (!$fh->checkRemoveId($_POST['album'], $_POST['key'])) {
+        http_response_code(401);
+        die("Invalid key");
+    }
 
-    header('HTTP/1.1 400 Bad Request', true, 400);
-    die("Bad Request");
+    if (empty($_POST['content']) || !isset($_POST['name'], $_POST['filename'])) {
+        http_response_code(400);
+        die("Wrong Request");
+    }
+
+    try {
+        $url = $fh->appendToAlbum($_POST['album'], $_POST['name'], ['content' => $_POST['content'], 'name' => $_POST['filename']]);
+        http_response_code(201);
+    }
+    catch (FotooException $e) {
+        http_response_code(400);
+        echo $e->getMessage();
+    }
+
+    exit;
+}
+// Single image upload, no album
+elseif (isset($_GET['upload'], $_POST['content'], $_POST['filename'], $_POST['name'], $_POST['private'])) {
+    try {
+        $url = $fh->upload([
+            'content' => $_POST['content'],
+            'name' => $_POST['filename']
+        ], $_POST['name'], $_POST['private']);
+
+        http_response_code(200);
+        echo $url;
+    }
+    catch (FotooException $e) {
+        http_response_code(400);
+        echo $e->getMessage();
+    }
+
+    exit;
 }
 
 if (isset($_GET['upload']))
@@ -329,7 +350,7 @@ if (isset($_GET['upload']))
     else
     {
         try {
-            $res = $fh->upload(!empty($_FILES['upload']) ? $_FILES['upload'] : $_POST['upload'],
+            $url = $fh->upload(!empty($_FILES['upload']) ? $_FILES['upload'] : $_POST['upload'],
                 isset($_POST['name']) ? trim($_POST['name']) : '',
                 isset($_POST['private']) ? (bool) $_POST['private'] : false
             );
@@ -351,11 +372,7 @@ if (isset($_GET['upload']))
     }
     else
     {
-        $img = $fh->get($res);
-        $url = $fh->getUrl($img, true);
-
         header('Location: ' . $url);
-
         exit;
     }
 }
@@ -406,7 +423,7 @@ elseif (isset($_GET['login']))
 }
 elseif (isset($_GET['list']))
 {
-    $title = 'Browse pictures';
+    $title = 'Browse images';
 
     if (!empty($_GET['list']) && is_numeric($_GET['list']))
         $page = (int) $_GET['list'];
@@ -536,6 +553,24 @@ elseif (!empty($_GET['a']))
     }
 
     $html = '
+        <script type="text/javascript">
+        var copy = (e, c) => {
+            if (typeof e === \'string\') {
+                e = document.querySelector(e);
+            }
+
+            e.select();
+            e.setSelectionRange(0, e.value.length);
+            navigator.clipboard.writeText(e.value);
+
+            if (!c) {
+                return;
+            }
+
+            c.value = \'Copied!\';
+            window.setTimeout(() => c.value = \'Copy\', 5000);
+        };
+        </script>
         <article class="browse">
             <h2>'.escape($title).'</h2>
             <p class="info">
@@ -543,10 +578,11 @@ elseif (!empty($_GET['a']))
                 | '.(int)$max.' picture'.((int)$max > 1 ? 's' : '').'
             </p>
             <aside class="examples">
-                <dt>Share this album using this URL:</dt>
-                <dd><input type="text" onclick="this.select();" value="'.escape($config->album_page_url . $album['hash']).'" /></dd>
-                <dt>All pictures for a forum (BBCode):</dt>
-                <dd><textarea cols="70" rows="1" onclick="this.select();">'.escape($bbcode).'</textarea></dd>
+                <dt>Share this album using this URL: <input type="button" onclick="copy(\'#url\', this);" value="Copy" /></dt>
+                <dd><input type="text" id="url" onclick="this.select();" value="'.escape($config->album_page_url . $album['hash']).'" /></dd>
+                <dt>All pictures for a forum (BBCode): <input type="button" onclick="copy(\'#all\', this);" value="Copy" /></dt>
+                <dd><textarea id="all" cols="70" rows="3" onclick="this.select(); this.setSelectionRange(0, this.value.length); navigator.clipboard.writeText(this.value);">'.escape($bbcode).'</textarea></dd>
+                <dd></dd>
             </aside>';
 
     if ($config->allow_album_zip) {
@@ -756,12 +792,12 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
 
     $html .= '
         <aside class="examples">
-            <dt>Short URL for full size</dt>
-            <dd><input type="text" onclick="this.select();" value="'.escape($short_url).'" /></dd>
-            <dt>BBCode</dt>
-            <dd><input type="text" onclick="this.select();" value="'.escape($bbcode).'" /></dd>
-            <dt>HTML code</dt>
-            <dd><input type="text" onclick="this.select();" value="'.escape($html_code).'" /></dd>
+            <dt>Short URL for full size <input type="button" onclick="copy(\'#url\', this);" value="Copy" /></dt>
+            <dd><input type="text" onclick="this.select();" value="'.escape($short_url).'" id="url" /></dd>
+            <dt>BBCode <input type="button" onclick="copy(\'#bbcode\', this);" value="Copy" /></dt>
+            <dd><textarea cols="70" rows="3" onclick="this.select();" id="bbcode">'.escape($bbcode).'</textarea></dd>
+            <dt>HTML code <input type="button" onclick="copy(\'#html\', this);" value="Copy" /></dt>
+            <dd><textarea cols="70" rows="3" onclick="this.select();" id="html">'.escape($html_code).'</textarea></dd>
         </aside>
     </article>
     ';
@@ -773,8 +809,8 @@ elseif (!$config->allow_upload)
 else
 {
     $js_url = file_exists(__DIR__ . '/upload.js')
-        ? $config->base_url . 'upload.js'
-        : $config->base_url . '?js';
+        ? $config->base_url . 'upload.js?2023'
+        : $config->base_url . '?js&2023';
 
     $html = '
         <script type="text/javascript">
@@ -786,74 +822,48 @@ else
         $html .= '<p class="error">'.escape(Fotoo_Hosting::getErrorMessage($_GET['error'])).'</p>';
     }
 
-    if (isset($_GET['album']))
-    {
-        $html .= '
-        <form method="post" action="'.$config->base_url.'?upload" id="f_upload">
-        <article class="upload">
-            <header>
-                <h2>Upload an album</h2>
-                <p class="info">
-                    Maximum file size: '.round($config->max_file_size / 1024 / 1024, 2).'MB
-                    | Image types accepted: JPEG only
-                </p>
-            </header>
-            <fieldset>
-                <dl>
-                    <dt><label for="f_title">Title:</label></dt>
-                    <dd><input type="text" name="title" id="f_title" maxlength="100" required="required" /></dd>
-                    <dt><label for="f_private">Private</label></dt>
-                    <dd class="private"><label><input type="checkbox" name="private" id="f_private" value="1" />
-                        (If checked, this album won\'t appear in &quot;browse pictures&quot;)</label></dd>
-                    <dt><label for="f_files">Files:</label></dt>
-                    <dd id="f_file_container"><input type="file" name="upload" id="f_files" multiple="multiple" accept="image/jpeg" required="required" /></dd>
-                </dl>
-            </fieldset>
-            <div id="albumParent">Please select some files...</div>
-            <p class="submit">
-                <input type="submit" id="f_submit" value="Upload" />
-            </p>
-        </article>
-        </form>';
-    }
-    else
-    {
-        $html .= '
-        <form method="post" enctype="multipart/form-data" action="'.$config->base_url.'?upload" id="f_upload">
-        <article class="upload">
-            <header>
-                <h2>Upload a file</h2>
-                <p class="info">
-                    Maximum file size: '.round($config->max_file_size / 1024 / 1024, 2).'MB
-                    | Image types accepted: '.implode(', ', array_map('strtoupper', $config->allowed_formats)).'
-                </p>
-            </header>
-            <fieldset>
-                <input type="hidden" name="MAX_FILE_SIZE" value="'.($config->max_file_size - 1024).'" />
-                <dl>
-                    <dt><label for="f_file">File:</label></dt>
-                    <dd id="f_file_container"><input type="file" name="upload" id="f_file" /></dd>
-                    <dt><label for="f_name">Name:</label></dt>
-                    <dd><input type="text" name="name" id="f_name" maxlength="30" /></dd>
-                    <dt><label for="f_private">Private</label></dt>
-                    <dd class="private"><label><input type="checkbox" name="private" id="f_private" value="1" />
-                        (If checked, picture won\'t appear in pictures list)</label></dd>
-                </dl>
-            </fieldset>
-            <div id="resizeParent"></div>
-            <p class="submit">
-                <input type="submit" id="f_submit" value="Upload" />
-            </p>
-        </article>
-        </form>';
-    }
+    $max_file_size = $config->max_file_size - 1024;
+    $max_file_size_human = round($config->max_file_size / 1024 / 1024, 2);
+    $formats = implode(', ', array_map('strtoupper', $config->allowed_formats));
 
-    $html .= '<script type="text/javascript" src="'.$js_url.'"></script>';
+    $html .= <<<EOF
+    <form method="post" enctype="multipart/form-data" action="{$config->base_url}?upload" id="f_upload">
+    <input type="hidden" name="MAX_FILE_SIZE" value="{$max_file_size}" />
+    <article class="upload">
+        <header>
+            <h2>Upload images</h2>
+            <p class="info">
+                Maximum file size: {$max_file_size_human} MB
+                | Image types accepted: {$formats}
+            </p>
+        </header>
+        <fieldset>
+            <dl>
+                <dt><label for="f_title">Title:</label></dt>
+                <dd><input type="text" name="title" id="f_title" maxlength="100" required="required" /></dd>
+                <dt><label for="f_private">Private</label></dt>
+                <dd class="private"><label><input type="checkbox" name="private" id="f_private" value="1" />
+                    (If checked, the pictures won't be listed in &quot;browse images&quot;)</label></dd>
+                <dd id="f_file_container"><input type="file" name="upload" id="f_files" multiple="multiple" accept="image/jpeg,image/webp,image/png,image/gif,image/svg+xml" required="required" /></dd>
+            </dl>
+            <p class="submit">
+                <input type="submit" value="Upload" />
+            </p>
+        </fieldset>
+        <div id="albumParent"></div>
+        <p class="submit">
+            <input type="submit" value="Upload" />
+        </p>
+    </article>
+    </form>
+    <script type="text/javascript" src="{$js_url}"></script>
+EOF;
+
 }
 
 $css_url = file_exists(__DIR__ . '/style.css')
-    ? $config->base_url . 'style.css'
-    : $config->base_url . '?css';
+    ? $config->base_url . 'style.css?2023'
+    : $config->base_url . '?css&2023';
 
 echo '<!DOCTYPE html>
 <html>
@@ -871,7 +881,7 @@ echo '<!DOCTYPE html>
     <nav>
         <ul>
             <li><a href="'.$config->base_url.'">Upload</a></li>
-            <li><a href="'.$config->base_url.'?list">Browse</a></li>
+            <li><a href="'.$config->base_url.'?list">Browse images</a></li>
         </ul>
     </nav>
 </header>

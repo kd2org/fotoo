@@ -26,12 +26,12 @@
         };
     }
 
+    var files = [];
     var can_submit = true;
     var last_filename = '';
     var loading_gif = 'data:image/gif;base64,R0lGODlhEAAQAPIAAP%2F%2F%2FwAAAMLCwkJCQgAAAGJiYoKCgpKSkiH%2BGkNyZWF0ZWQgd2l0aCBhamF4bG9hZC5pbmZvACH5BAAKAAAAIf8LTkVUU0NBUEUyLjADAQAAACwAAAAAEAAQAAADMwi63P4wyklrE2MIOggZnAdOmGYJRbExwroUmcG2LmDEwnHQLVsYOd2mBzkYDAdKa%2BdIAAAh%2BQQACgABACwAAAAAEAAQAAADNAi63P5OjCEgG4QMu7DmikRxQlFUYDEZIGBMRVsaqHwctXXf7WEYB4Ag1xjihkMZsiUkKhIAIfkEAAoAAgAsAAAAABAAEAAAAzYIujIjK8pByJDMlFYvBoVjHA70GU7xSUJhmKtwHPAKzLO9HMaoKwJZ7Rf8AYPDDzKpZBqfvwQAIfkEAAoAAwAsAAAAABAAEAAAAzMIumIlK8oyhpHsnFZfhYumCYUhDAQxRIdhHBGqRoKw0R8DYlJd8z0fMDgsGo%2FIpHI5TAAAIfkEAAoABAAsAAAAABAAEAAAAzIIunInK0rnZBTwGPNMgQwmdsNgXGJUlIWEuR5oWUIpz8pAEAMe6TwfwyYsGo%2FIpFKSAAAh%2BQQACgAFACwAAAAAEAAQAAADMwi6IMKQORfjdOe82p4wGccc4CEuQradylesojEMBgsUc2G7sDX3lQGBMLAJibufbSlKAAAh%2BQQACgAGACwAAAAAEAAQAAADMgi63P7wCRHZnFVdmgHu2nFwlWCI3WGc3TSWhUFGxTAUkGCbtgENBMJAEJsxgMLWzpEAACH5BAAKAAcALAAAAAAQABAAAAMyCLrc%2FjDKSatlQtScKdceCAjDII7HcQ4EMTCpyrCuUBjCYRgHVtqlAiB1YhiCnlsRkAAAOwAAAAAAAAAAAA%3D%3D';
-    var album_id = null;
-    var album_check = null;
-    var xhr = new XMLHttpRequest;
+    var album_hash = null;
+    var album_key = null;
 
     function cleanFileName(filename)
     {
@@ -47,17 +47,17 @@
         return filename;
     }
 
-    function uploadPicture(index, element_index)
+    function uploadPicture(index)
     {
-        var file = document.getElementById('f_files').files[index];
+        var file = files[index];
 
-        if (!(/^image\/jpe?g$/i.test(file.type)))
+        if (!(/^image\/(?:jpe?g|webp)$/i.test(file.type)))
         {
-            uploadPicture(index+1, element_index);
+            uploadPicture(index+1);
             return;
         }
 
-        var current = document.getElementById('albumParent').childNodes[element_index];
+        var current = document.getElementById('albumParent').querySelectorAll('figure')[index];
         var resized_img = document.createElement('div');
         resized_img.style.display = "none";
 
@@ -78,34 +78,54 @@
 
                 progress.innerHTML = "Uploading... <img class=\"loading\" src=\"" + loading_gif + "\" alt=\"\" />";
 
-                var params = "album_append=1&name=" + encodeURIComponent(name.value) + "&album=" + encodeURIComponent(album_id);
-                params += "&filename=" + encodeURIComponent(file.name);
-                params += "&content=" + encodeURIComponent(img.src.substr(img.src.indexOf(',') + 1));
+                var params = new URLSearchParams({
+                    'name': name.value,
+                    'filename': file.name,
+                    'content': img.src.substr(img.src.indexOf(',') + 1)
+                });
 
-                xhr.open('POST', config.base_url + '?album', true);
-                xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-                xhr.setRequestHeader("Content-length", params.length);
-                xhr.setRequestHeader("Connection", "close");
+                if (album_hash) {
+                    params.append('album', album_hash);
+                    params.append('key', album_key);
+                }
+                else {
+                    params.append('private', document.getElementById('f_private').checked ? 1 : 0);
+                }
 
-                xhr.onreadystatechange = function () {
-                    if (xhr.readyState == 4 && xhr.status == 200)
-                    {
-                        progress.innerHTML = "Uploaded <b>&#10003;</b>";
-                        img.parentNode.removeChild(img);
-
-                        if (index + 1 < document.getElementById('f_files').files.length)
-                        {
-                            uploadPicture(index+1, element_index+1);
-                        }
-                        else
-                        {
-                            location.href = config.album_page_url + album_id + (config.album_page_url.indexOf('?') ? '&c=' : '?c=') + album_check;
-                        }
+                fetch(config.base_url + '?upload', {
+                    'method': 'POST',
+                    'mode': 'same-origin',
+                    'headers': {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    'body': params
+                }).then((r) => {
+                    if (!r.ok) {
+                        console.error(r);
+                        throw Error('Upload failed');
                     }
-                };
 
-                xhr.send(params);
-                params = null;
+                    progress.innerHTML = "Uploaded <b>&#10003;</b>";
+                    img.parentNode.removeChild(img);
+
+                    if (!album_hash) {
+                        r.text().then((url) => location.href = url);
+                        return;
+                    }
+
+                    index++;
+
+                    if (index < files.length)
+                    {
+                        uploadPicture(index);
+                    }
+                    else
+                    {
+                        location.href = config.album_page_url + album_hash + (config.album_page_url.indexOf('?') ? '&c=' : '?c=') + album_key;
+                    }
+                });
+
+                delete params;
             }
         );
     }
@@ -115,313 +135,172 @@
         if (!FileReader && !window.URL)
             return false;
 
-        if (FileList && XMLHttpRequest)
-        {
-            var album_li = document.createElement('li');
-            var album_a = document.createElement('a');
-            album_a.href = '?album';
-            album_a.innerHTML = 'Upload an album';
-            album_li.appendChild(album_a);
-            var link = document.querySelector('header nav ul li:nth-child(2)');
-            link.parentNode.insertBefore(album_li, link);
-        }
-
-        document.getElementById('f_submit').style.display = 'none';
+        document.querySelectorAll('.submit').forEach((e) => e.style.display = 'none');
 
         var parent = document.getElementById('albumParent');
+        var found = new Array;
+        var to_resize = new Array;
+
+        var filesInput = document.getElementById("f_files");
+
+        filesInput.style.display = 'none';
+
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.innerText = 'Add files...';
+        btn.className = 'add';
+        btn.onclick = () => filesInput.click();
+        parent.prepend(btn);
 
         // Mode album
-        if (parent)
+        filesInput.onchange = function ()
         {
-            document.getElementById("f_files").onchange = function ()
+            if (this.files.length < 1)
             {
-                if (this.files.length < 1)
-                {
-                    return false;
-                }
-
-                if (parent.firstChild && parent.firstChild.nodeType == Node.TEXT_NODE)
-                {
-                    parent.removeChild(parent.firstChild);
-                }
-
-                var found = new Array;
-                var to_resize = new Array;
-
-                for (var i = 0; i < this.files.length; i++)
-                {
-                    var file = this.files[i];
-
-                    if (!(/^image\/jpe?g$/i.test(file.type)))
-                    {
-                        continue;
-                    }
-
-                    var id = encodeURIComponent(file.name + file.type + file.size);
-
-                    if (document.getElementById(id))
-                    {
-                        found.push(id);
-                        continue;
-                    }
-
-                    var fig = document.createElement('figure');
-                    fig.id = id;
-                    var caption = document.createElement('figcaption');
-                    var name = document.createElement('input');
-                    name.type = 'text';
-                    name.value = cleanFileName(file.name);
-
-                    var thumb = document.createElement('div');
-                    thumb.className = 'thumb';
-
-                    var progress = document.createElement('p');
-
-                    caption.appendChild(name);
-                    fig.appendChild(thumb);
-                    fig.appendChild(progress);
-                    fig.appendChild(caption);
-                    parent.appendChild(fig);
-
-                    to_resize.push(new Array(file, thumb, progress));
-                    found.push(id);
-                }
-
-                var l = parent.childNodes.length;
-                for (var i = l - 1; i >= 0; i--)
-                {
-                    if (found.indexOf(parent.childNodes[i].id) == -1)
-                    {
-                        parent.removeChild(parent.childNodes[i]);
-                    }
-                }
-
-                function resizeFromList()
-                {
-                    if (to_resize.length < 1)
-                    {
-                        can_submit = true;
-                        document.getElementById('f_submit').style.display = 'inline';
-                        return;
-                    }
-
-                    var current = to_resize[0];
-                    resize(
-                        current[0], // file
-                        config.thumb_width, // size
-                        current[1], // image resized
-                        current[2], // progress element
-                        function () {
-                            current[2].parentNode.removeChild(current[2]);
-                            resizeFromList();
-                        }
-                    );
-
-                    to_resize.splice(0, 1);
-                }
-
-                resizeFromList();
-            };
-
-            document.getElementById("f_upload").onsubmit = function ()
-            {
-                if (!can_submit)
-                {
-                    alert('A file is loading, please wait...');
-                    return false;
-                }
-
-                if (document.getElementById('f_title').value.replace('/[\s]/g', '') == '')
-                {
-                    alert('Title is mandatory.');
-                    return false;
-                }
-
-                if (document.getElementById("f_files").files.length < 1)
-                {
-                    alert('No file is selected.');
-                    return false;
-                }
-
-                var l = parent.childNodes.length;
-
-                if (l < 1)
-                {
-                    return false;
-                }
-
-                can_submit = false;
-                document.getElementById('f_submit').style.display = 'none';
-
-                var xhr = new XMLHttpRequest;
-
-                var params = "album_create=1&title=" + encodeURIComponent(document.getElementById('f_title').value);
-                params += "&private=" + (document.getElementById('f_private').checked ? '1' : '0');
-
-                xhr.open('POST', config.base_url + '?album', true);
-                xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-                xhr.setRequestHeader("Content-length", params.length);
-                xhr.setRequestHeader("Connection", "close");
-
-                xhr.onreadystatechange = function () {
-                    if (xhr.readyState == 4 && xhr.status == 400)
-                    {
-                        alert(xhr.responseText);
-                    }
-                    else if (xhr.readyState == 4 && xhr.status == 200)
-                    {
-                        var txt = xhr.responseText.split('/');
-                        album_id = txt[0];
-                        album_check = txt[1];
-                        uploadPicture(0, 0);
-                    }
-                };
-
-                xhr.send(params);
-
                 return false;
-            };
-        }
-        else // Single file mode
-        {
-            var parent = document.getElementById('resizeParent');
-
-            var figure = document.createElement('figure');
-            var thumb = document.createElement('div');
-
-            var progress = document.createElement('figcaption');
-            progress.innerHTML = 'Please select a picture...';
-
-            figure.appendChild(progress);
-            figure.appendChild(thumb);
-            parent.appendChild(figure);
-
-            document.getElementById("f_file").onchange = function ()
-            {
-                if (!this.files.length)
-                {
-                    return false;
-                }
-
-                progress.style.display = "block";
-                thumb.innerHTML = '';
-                document.getElementById('f_submit').style.display = 'none';
-                can_submit = false;
-
-                if (/^image\/jpe?g$/i.test(this.files[0].type))
-                {
-                    can_submit = false;
-
-                    resize(
-                        this.files[0],
-                        config.thumb_width, // thumb size
-                        thumb, // thumb resized
-                        progress,
-                        function () {
-                            if (thumb.firstChild)
-                            {
-                                progress.style.display = "none";
-                            }
-                            can_submit = true;
-                            document.getElementById('f_submit').style.display = 'inline';
-                        }
-                    );
-                }
-                else
-                {
-                    var r = new RegExp('\.(' + config.allowed_formats.join('|') + ')$', 'i');
-
-                    if (/^image\/|^application\/pdf$/i.test(this.files[0].type) && r.test(this.files[0].name))
-                    {
-                        progress.innerHTML = "Image is recognized.";
-                        can_submit = true;
-                        document.getElementById('f_submit').style.display = 'inline';
-                    }
-                    else
-                    {
-                        progress.innerHTML = 'The chosen file is not an image: ' + this.files[0].type;
-                        document.getElementById('f_submit').style.display = 'none';
-                        return false;
-                    }
-                }
-
-                if (document.getElementById("f_name").value != last_filename)
-                    return;
-
-                last_filename = this.files[0].name;
-                document.getElementById("f_name").value = cleanFileName(this.files[0].name);
             }
 
-            document.getElementById("f_upload").onsubmit = function ()
+            for (var i = 0; i < this.files.length; i++)
             {
-                if (can_submit == 2)
-                {
-                    return true;
+                var file = this.files[i];
+
+                if (!(/^image\/(?:jpe?g|webp|png|gif|svg)/i.test(file.type))) {
+                    continue;
                 }
 
-                if (!can_submit)
-                {
-                    alert('File is loading, please wait...');
-                    return false;
+                var t = document.getElementById('f_title');
+
+                if (!t.value) {
+                    t.value = cleanFileName(file.name);
                 }
 
-                var file = document.getElementById('f_file');
+                var id = encodeURIComponent(file.name + file.type + file.size);
 
-                if (!file.files.length)
+                if (found.indexOf(id) != -1)
                 {
-                    alert('You must choose a file before sending.');
-                    return false;
+                    continue;
                 }
 
-                var div_img = document.createElement('div');
-                div_img.style.display = "none";
+                var fig = document.createElement('figure');
+                fig.id = id;
+                var caption = document.createElement('figcaption');
+                var name = document.createElement('input');
+                name.type = 'text';
+                name.value = cleanFileName(file.name);
 
-                parent.appendChild(div_img);
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.innerText = '✖';
+                btn.onclick = function () {
+                    var f = this.parentNode.parentNode;
+                    var i = found.indexOf(f.id);
+                    found.splice(i, 1);
+                    files.splice(i, 1)
+                    f.remove();
+                };
 
-                can_submit = false;
-                document.getElementById('f_submit').style.display = 'none';
+                var thumb = document.createElement('div');
+                thumb.className = 'thumb';
 
-                if (/^image\/jpe?g$/i.test(file.files[0].type))
+                var progress = document.createElement('p');
+
+                caption.appendChild(name);
+                caption.appendChild(btn);
+                fig.appendChild(thumb);
+                fig.appendChild(progress);
+                fig.appendChild(caption);
+                parent.appendChild(fig);
+
+                to_resize.push(new Array(file, thumb, progress));
+                found.push(id);
+                files.push(file);
+            }
+
+            function resizeFromList()
+            {
+                if (to_resize.length < 1)
                 {
-                    var progress = document.createElement('span');
-                    parent.firstChild.appendChild(progress);
-
-                    resize(
-                        file.files[0],
-                        -config.max_width, // thumb size
-                        div_img, // thumb resized
-                        progress,
-                        function () {
-                            progress.innerHTML = "Uploading... <img class=\"loading\" src=\"" + loading_gif + "\" alt=\"\" />";
-
-                            var img = div_img.firstChild;
-
-                            var name = document.createElement('input');
-                            name.type = 'hidden';
-                            name.name = file.name + '[name]';
-                            name.value = file.value.replace(/^.*[\/\\]([^\/\\]*)$/, '$1');
-                            file.parentNode.appendChild(name);
-
-                            file.type = "hidden";
-                            file.name = file.name + "[content]";
-                            file.value = img.src.substr(img.src.indexOf(',') + 1);
-
-                            can_submit = 2;
-                            document.getElementById('f_upload').submit();
-                        }
-                    );
-
-                    return false;
+                    can_submit = true;
+                    document.querySelectorAll('.submit').forEach((e) => e.style.display = 'block');
+                    return;
                 }
-                else
-                {
-                    var progress = document.createElement('p');
-                    progress.innerHTML = "Uploading... <img class=\"loading\" src=\"" + loading_gif + "\" alt=\"\" />";
-                    parent.firstChild.appendChild(progress);
-                    return true;
+                else {
+                    document.querySelectorAll('.submit').forEach((e) => e.style.display = 'none');
                 }
-            };
-        }
+
+                var current = to_resize[0];
+                resize(
+                    current[0], // file
+                    config.thumb_width, // size
+                    current[1], // image resized
+                    current[2], // progress element
+                    function () {
+                        current[2].parentNode.removeChild(current[2]);
+                        resizeFromList();
+                    }
+                );
+
+                to_resize.splice(0, 1);
+            }
+
+            resizeFromList();
+        };
+
+        var form = document.getElementById("f_upload");
+        form.onsubmit = function (e)
+        {
+            if (!can_submit)
+            {
+                alert('A file is loading, please wait...');
+                return false;
+            }
+
+            if (document.getElementById('f_title').value.replace('/[\s]/g', '') == '')
+            {
+                alert('Title is mandatory.');
+                return false;
+            }
+
+            if (files.length < 1)
+            {
+                alert('No file is selected.');
+                return false;
+            }
+
+            can_submit = false;
+            document.querySelectorAll('.submit').forEach((e) => e.style.display = 'none');
+
+            var xhr = new XMLHttpRequest;
+            var url = config.base_url + '?upload';
+
+            if (files.length > 1) {
+                var params = new URLSearchParams({
+                    'album': 'new',
+                    'title': document.getElementById('f_title').value,
+                    'private': document.getElementById('f_private').checked ? 1 : 0
+                });
+
+                fetch(form.action, {
+                    method: 'POST',
+                    mode: 'same-origin',
+                    cache: 'no-cache',
+                    headers: {
+                        "Content-Type": "application/x-www-form-urlencoded"
+                    },
+                    body: params
+                }).then((r) => r.json()).then((j) => {
+                    album_hash = j.hash;
+                    album_key = j.key;
+                    uploadPicture(0);
+                });
+            }
+            else {
+                uploadPicture(0);
+            }
+
+            e.preventDefault();
+            return false;
+        };
     };
 
     var canvas = document.createElement("canvas");
@@ -471,34 +350,27 @@
 
         var size = parseInt($size, 10);
 
-        if ((/^image\/jpe?g/.test($file.type)))
+        if ($progress)
         {
-            if ($progress)
-            {
-                $progress.innerHTML = "Resizing... <img class=\"loading\" src=\"" + loading_gif + "\" alt=\"\" />";
-            }
+            $progress.innerHTML = "Resizing... <img class=\"loading\" src=\"" + loading_gif + "\" alt=\"\" />";
+        }
 
-            can_submit = false;
+        can_submit = false;
 
-            if (!(window.URL || window.webkitURL) && FileReader)
-            {
-                var file = new FileReader;
-                file.onload = load;
-                file.onabort = abort;
-                file.onerror = error;
-                file._resize = size;
-                file.readAsDataURL($file);
-            }
-            else
-            {
-                var url = (window.URL || window.webkitURL).createObjectURL($file);
-                this._url = url;
-                Resample(url, size, null, resampled);
-            }
+        if (!(window.URL || window.webkitURL) && FileReader)
+        {
+            var file = new FileReader;
+            file.onload = load;
+            file.onabort = abort;
+            file.onerror = error;
+            file._resize = size;
+            file.readAsDataURL($file);
         }
         else
         {
-            return false;
+            var url = (window.URL || window.webkitURL).createObjectURL($file);
+            this._url = url;
+            Resample(url, size, null, resampled);
         }
     }
 
@@ -598,7 +470,7 @@
                 height // destination height
             );
 
-            var r = canvas.toDataURL("image/webp", 0.80);
+            var r = canvas.toDataURL("image/webp", 0.75);
 
             if (!r.match(/image\/webp/)) {
                 r = canvas.toDataURL("image/jpeg", 0.75);
@@ -798,21 +670,39 @@ fieldset {
 	text-shadow: 0px 0px 10px #000;
 }
 
-.examples dt {
-	margin: .5em 0;
-	font-weight: bold;
+.examples {
+	margin: 1rem auto;
+	max-width: 40em;
 }
 
-.examples input, .admin input[type=text], .examples textarea {
-	text-align: center;
+.examples dt {
+	margin: .8rem 0;
+	font-weight: bold;
+	text-align: left;
+}
+
+.examples input[type=button] {
+	float: right;
+	padding: .3em .5em;
+	background: rgba(255, 255, 255, 0.5);
+	border: none;
+	border-radius: .3em;
+	cursor: pointer;
+}
+
+.examples input[type=button]:hover {
+	color: darkred;
+	box-shadow: 0px 0px 5px orange;
+}
+
+.examples input[type=text], .admin input[type=text], .examples textarea {
 	background: rgba(213, 214, 182, 0.5);
 	border: 1px solid #fff;
 	border-radius: .5em;
 	font-family: "Courier New", Courier, monospace;
-	max-width: 50em;
-	width: 100%;
+	width: calc(100% - 1em);
 	font-size: 10pt;
-	padding: .2em;
+	padding: .5em;
 }
 
 figure {
@@ -826,6 +716,20 @@ figure {
 figure figcaption {
 	font-size: small;
 	margin-top: .5em;
+}
+
+#albumParent figcaption {
+	display: flex;
+	justify-content: stretch;
+}
+
+#albumParent figcaption button {
+	font-size: 1.5em;
+	cursor: pointer;
+	color: #666;
+	border: 1px solid #666;
+	background: rgba(255, 255, 255, 0.5);
+	margin-left: .2em;
 }
 
 figure a:hover img {
@@ -854,7 +758,7 @@ figure span.private {
 	font-size: 125%;
 }
 
-#resizeParent, p.admin, #albumParent {
+p.admin, #albumParent {
 	background: rgb(100, 100, 100);
 	background: rgba(0, 0, 0, 0.25);
 	padding: 1em;
@@ -868,7 +772,29 @@ figure span.private {
 	width: 90%;
 }
 
-#resizeParent img.loading, #albumParent img.loading, #albumParent span b {
+#albumParent .add {
+	border: none;
+	border-radius: .2em;
+	cursor: pointer;
+	display: block;
+	padding: .2em;
+	padding-left: 2em;
+	font-size: 2em;
+	margin: .5rem auto;
+	background: no-repeat .5em center rgba(0, 0, 0, 0.2);
+	box-shadow: 0px 0px 5px #fff;
+	background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><path d="m296 384h-80c-13.3 0-24-10.7-24-24v-168h-87.7c-17.8 0-26.7-21.5-14.1-34.1l152.1-152.2c7.5-7.5 19.8-7.5 27.3 0l152.2 152.2c12.6 12.6 3.7 34.1-14.1 34.1h-87.7v168c0 13.3-10.7 24-24 24zm216-8v112c0 13.3-10.7 24-24 24h-464c-13.3 0-24-10.7-24-24v-112c0-13.3 10.7-24 24-24h136v8c0 30.9 25.1 56 56 56h80c30.9 0 56-25.1 56-56v-8h136c13.3 0 24 10.7 24 24zm-124 88c0-11-9-20-20-20s-20 9-20 20 9 20 20 20 20-9 20-20zm64 0c0-11-9-20-20-20s-20 9-20 20 9 20 20 20 20-9 20-20z"/></svg>');
+	background-size: 32px 32px;
+	transition: background-color .2s, color .2s, box-shadow .2s;
+}
+
+#albumParent .add:hover {
+	color: #fff;
+	box-shadow: 0px 0px 5px orange;
+	background-color: rgba(0, 0, 0, 0.5)
+}
+
+#albumParent img.loading, #albumParent span b {
 	background: #fff;
 	padding: .5em;
 	border-radius: 1em;
@@ -878,7 +804,7 @@ figure span.private {
 	line-height: 16px;
 }
 
-#resizeParent img, #albumParent img {
+#albumParent img {
 	box-shadow: 0px 0px 10px #000;
 }
 
@@ -1242,14 +1168,22 @@ class Fotoo_Hosting
 			$client_resize = true;
 		}
 
-		if (!isset($file['error']))
-		{
-			return false;
+		if (!isset($file['error'])) {
+			throw new FotooException("Upload error.", UPLOAD_ERR_NO_FILE);
 		}
 
-		if ($file['error'] != UPLOAD_ERR_OK)
-		{
+		if ($file['error'] != UPLOAD_ERR_OK) {
 			throw new FotooException("Upload error.", $file['error']);
+		}
+
+		if (empty($file['tmp_name'])) {
+			throw new FotooException("Upload error.", UPLOAD_ERR_NO_FILE);
+		}
+
+		// Make sure tmp_name is from us
+		if (!file_exists($file['tmp_name'])
+			|| !(is_uploaded_file($file['tmp_name']) || $client_resize)) {
+			throw new FotooException("Upload error.", UPLOAD_ERR_NO_FILE);
 		}
 
 		if (!empty($name))
@@ -1264,8 +1198,6 @@ class Fotoo_Hosting
 		{
 			$name = '';
 		}
-
-		require_once __DIR__ . '/class.image.php';
 
 		try {
 			$img = new Image($file['tmp_name']);
@@ -1404,7 +1336,9 @@ class Fotoo_Hosting
 		$expiration = time() - ($this->config->ip_storage_expiration * 24 * 3600);
 		$this->db->query('UPDATE pictures SET ip = "R" WHERE date < ' . (int)$expiration . ';');
 
-		return $hash;
+		$url = $this->getUrl(['hash' => $hash, 'filename' => $name, 'format' => strtoupper($format)], true);
+
+		return $url;
 	}
 
 	public function get($hash)
@@ -1447,13 +1381,40 @@ class Fotoo_Hosting
 		return $this->get($hash) ? false : true;
 	}
 
+	protected function getListQuery(bool $private = false)
+	{
+		$where = $private ? '' : 'AND private != 1';
+		return sprintf('
+			SELECT p.*, COUNT(*) AS count, a.title, a.private AS private
+				FROM pictures p
+				INNER JOIN albums a ON a.hash = p.album
+				WHERE %s
+				GROUP BY p.album
+			UNION ALL
+				SELECT *, 1 AS count, NULL AS title, p.private AS private
+				FROM pictures p
+				WHERE album IS NULL AND %s',
+			$private ? '1' : 'a.private != 1',
+			$private ? '1' : 'p.private != 1'
+		);
+	}
+
 	public function getList($page)
 	{
 		$begin = ($page - 1) * $this->config->nb_pictures_by_page;
-		$where = $this->logged() ? '' : 'AND private != 1';
+		$private = $this->logged();
 
-		$out = array();
-		$res = $this->db->query('SELECT * FROM pictures WHERE album IS NULL '.$where.' ORDER BY date DESC LIMIT '.$begin.','.$this->config->nb_pictures_by_page.';');
+		$out = [];
+		$res = $this->db->query(sprintf(
+			'SELECT * FROM (%s) ORDER BY date DESC LIMIT %d,%d;',
+			$this->getListQuery($private),
+			$begin,
+			$this->config->nb_pictures_by_page
+		));
+
+		if (!$res) {
+			throw new \RuntimeException($this->db->lastErrorMsg());
+		}
 
 		while ($row = $res->fetchArray(SQLITE3_ASSOC))
 		{
@@ -1461,6 +1422,11 @@ class Fotoo_Hosting
 		}
 
 		return $out;
+	}
+
+	public function countList()
+	{
+		return $this->db->querySingle(sprintf('SELECT COUNT(*) FROM (%s);', $this->getListQuery($this->logged())));
 	}
 
 	public function makeRemoveId($hash)
@@ -1471,29 +1437,6 @@ class Fotoo_Hosting
 	public function checkRemoveId($hash, $id)
 	{
 		return sha1($this->config->storage_path . $hash) === $id;
-	}
-
-	public function countList()
-	{
-		$where = $this->logged() ? '' : 'AND private != 1';
-		return $this->db->querySingle('SELECT COUNT(*) FROM pictures WHERE album IS NULL '.$where.';');
-	}
-
-	public function getAlbumList($page)
-	{
-		$begin = ($page - 1) * round($this->config->nb_pictures_by_page / 2);
-		$where = $this->logged() ? '' : 'WHERE private != 1';
-
-		$out = array();
-		$res = $this->db->query('SELECT * FROM albums '.$where.' ORDER BY date DESC LIMIT '.$begin.','.round($this->config->nb_pictures_by_page / 2).';');
-
-		while ($row = $res->fetchArray(SQLITE3_ASSOC))
-		{
-			$row['extract'] = $this->getAlbumExtract($row['hash']);
-			$out[] = $row;
-		}
-
-		return $out;
 	}
 
 	public function getAlbumPrevNext($album, $current, $order = -1)
@@ -1718,9 +1661,8 @@ class Fotoo_Hosting
 	{
 		$album = $this->db->querySingle('SELECT * FROM albums WHERE hash = \''.$this->db->escapeString($album).'\';', true);
 
-		if (!$album)
-		{
-			return false;
+		if (!$album) {
+			throw new FotooException('ALbum not found');
 		}
 
 		return $this->upload($file, $name, $album['private'], $album['hash']);
@@ -3354,7 +3296,7 @@ class Fotoo_Hosting_Config
         $this->ip_storage_expiration = 366;
         $this->nb_pictures_by_page = 20;
 
-        $this->allowed_formats = ['png', 'jpeg', 'gif', 'svg', 'xcf', 'pdf', 'webp'];
+        $this->allowed_formats = ['png', 'jpeg', 'gif', 'svg', 'webp'];
     }
 
     static public function return_bytes ($size_str)
@@ -3375,6 +3317,7 @@ function escape($str)
 }
 
 //require __DIR__ . '/class.fotoo_hosting.php';
+//require_once __DIR__ . '/class.image.php';
 
 $config = new Fotoo_Hosting_Config;
 
@@ -3382,7 +3325,7 @@ $config_file = __DIR__ . '/config.php';
 
 if (file_exists($config_file))
 {
-    require_once $config_file;
+//require_once $config_file;
 }
 
 // Check upload access
@@ -3419,7 +3362,7 @@ elseif (!empty($_GET['deleteAlbum']))
 
     if ($fh->removeAlbum($_GET['deleteAlbum'], $id))
     {
-        header('Location: ' . $config->base_url . '?albums');
+        header('Location: ' . $config->base_url . '?list');
     }
     else
     {
@@ -3428,64 +3371,79 @@ elseif (!empty($_GET['deleteAlbum']))
 
     exit;
 }
-elseif (!empty($_POST['delete_albums']) && $fh->logged())
-{
-    foreach ($_POST['albums'] as $album)
-    {
-        $fh->removeAlbum($album, null);
-    }
-
-    header('Location: ' . $config->base_url . '?albums');
-    exit;
-}
-elseif (!empty($_POST['delete_pictures']) && $fh->logged())
+elseif (!empty($_POST['delete']) && $fh->logged())
 {
     foreach ($_POST['pictures'] as $pic)
     {
         $fh->remove($pic, null);
     }
 
+    foreach ($_POST['albums'] as $album)
+    {
+        $fh->removeAlbum($album, null);
+    }
+
     header('Location: ' . $config->base_url . '?list');
     exit;
 }
 
-if (isset($_POST['album_create']))
-{
-    if (!empty($_POST['title']))
-    {
-        try {
-            $id = $fh->createAlbum($_POST['title'], empty($_POST['private']) ? false : true);
-            echo "$id/" . $fh->makeRemoveId($id);
-            exit;
-        }
-        catch (FotooException $e)
-        {
-            header('HTTP/1.1 400 Bad Request', true, 400);
-            die("Upload not permitted.");
-        }
+if (isset($_GET['upload'], $_POST['album']) && $_POST['album'] === 'new') {
+    if (empty($_POST['title'])) {
+        http_response_code(400);
+        die("Bad Request");
     }
 
-    header('HTTP/1.1 400 Bad Request', true, 400);
-    die("Bad Request");
-}
-
-if (isset($_POST['album_append']))
-{
-    if (!empty($_POST['album']) && !empty($_POST['content']) && isset($_POST['name']) && isset($_POST['filename']))
-    {
-        if ($fh->appendToAlbum($_POST['album'], $_POST['name'], array('content' => $_POST['content'], 'name' => $_POST['filename'])))
-        {
-            echo "OK";
-        }
-        else
-        {
-            echo "FAIL";
-        }
+    try {
+        $hash = $fh->createAlbum($_POST['title'], empty($_POST['private']) ? false : true);
+        $key = $fh->makeRemoveId($hash);
+        http_response_code(200);
+        echo json_encode(compact('hash', 'key'));
         exit;
     }
+    catch (FotooException $e) {
+        http_response_code(400);
+        die("Upload not permitted.");
+    }
+}
+elseif (isset($_GET['upload'], $_POST['album'])) {
+    if (!$fh->checkRemoveId($_POST['album'], $_POST['key'])) {
+        http_response_code(401);
+        die("Invalid key");
+    }
 
-    header('HTTP/1.1 400 Bad Request', true, 400);
-    die("Bad Request");
+    if (empty($_POST['content']) || !isset($_POST['name'], $_POST['filename'])) {
+        http_response_code(400);
+        die("Wrong Request");
+    }
+
+    try {
+        $url = $fh->appendToAlbum($_POST['album'], $_POST['name'], ['content' => $_POST['content'], 'name' => $_POST['filename']]);
+        http_response_code(201);
+    }
+    catch (FotooException $e) {
+        http_response_code(400);
+        echo $e->getMessage();
+    }
+
+    exit;
+}
+// Single image upload, no album
+elseif (isset($_GET['upload'], $_POST['content'], $_POST['filename'], $_POST['name'], $_POST['private'])) {
+    try {
+        $url = $fh->upload([
+            'content' => $_POST['content'],
+            'name' => $_POST['filename']
+        ], $_POST['name'], $_POST['private']);
+
+        http_response_code(200);
+        echo $url;
+    }
+    catch (FotooException $e) {
+        http_response_code(400);
+        echo $e->getMessage();
+    }
+
+    exit;
 }
 
 if (isset($_GET['upload']))
@@ -3499,7 +3457,7 @@ if (isset($_GET['upload']))
     else
     {
         try {
-            $res = $fh->upload(!empty($_FILES['upload']) ? $_FILES['upload'] : $_POST['upload'],
+            $url = $fh->upload(!empty($_FILES['upload']) ? $_FILES['upload'] : $_POST['upload'],
                 isset($_POST['name']) ? trim($_POST['name']) : '',
                 isset($_POST['private']) ? (bool) $_POST['private'] : false
             );
@@ -3521,11 +3479,7 @@ if (isset($_GET['upload']))
     }
     else
     {
-        $img = $fh->get($res);
-        $url = $fh->getUrl($img, true);
-
         header('Location: ' . $url);
-
         exit;
     }
 }
@@ -3576,7 +3530,7 @@ elseif (isset($_GET['login']))
 }
 elseif (isset($_GET['list']))
 {
-    $title = 'Browse pictures';
+    $title = 'Browse images';
 
     if (!empty($_GET['list']) && is_numeric($_GET['list']))
         $page = (int) $_GET['list'];
@@ -3590,7 +3544,7 @@ elseif (isset($_GET['list']))
 
     if ($fh->logged())
     {
-        $html .= '<form method="post" action="" onsubmit="return confirm(\'Delete all the checked pictures?\');">
+        $html .= '<form method="post" action="" onsubmit="return confirm(\'Delete all the checked pictures and albums?\');">
         <p class="admin">
             <input type="button" value="Check / uncheck all" onclick="var l = this.form.querySelectorAll(\'input[type=checkbox]\'), s = l[0].checked; for (var i = 0; i < l.length; i++) { l[i].checked = s ? false : true; }" />
         </p>';
@@ -3600,26 +3554,41 @@ elseif (isset($_GET['list']))
         <article class="browse">
             <h2>'.$title.'</h2>';
 
-    foreach ($list as &$img)
+    foreach ($list as $img)
     {
         $thumb_url = $fh->getImageThumbUrl($img);
-        $url = $fh->getUrl($img);
 
-        $label = $img['filename'] ? escape(preg_replace('![_-]!', ' ', $img['filename'])) : 'View image';
-
-        $html .= '
-        <figure>
-            <a href="'.$url.'">'.($img['private'] ? '<span class="private">Private</span>' : '').'<img src="'.$thumb_url.'" alt="'.$label.'" /></a>
-            <figcaption><a href="'.$url.'">'.$label.'</a></figcaption>';
-
-
-        if ($fh->logged())
-        {
-            $html .= '<label><input type="checkbox" name="pictures[]" value="' . escape($img['hash']) . '" /> Delete</label>';
+        if ($img['album']) {
+            $url = '?a=' . rawurlencode($img['album']);
+            $html .= sprintf(
+                '<figure>
+                    <a href="%s">%s<span class="count"><b>%d</b> images</span><img src="%s" alt="%s" /></a>
+                    <figcaption><a href="%1$s">%5$s</b></a></figcaption>
+                    %s
+                </figure>',
+                escape($url),
+                $img['private'] ? '<span class="private">Private</span>' : '',
+                $img['count'],
+                $thumb_url,
+                escape($img['title']),
+                !$fh->logged() ? '' : '<label><input type="checkbox" name="albums[]" value="' . escape($img['album']) . '" /> Delete</label>'
+            );
         }
-
-        $html .= '
-        </figure>';
+        else {
+            $url = $fh->getUrl($img);
+            $html .= sprintf(
+                '<figure>
+                    <a href="%s">%s<img src="%s" alt="%s" /></a>
+                    <figcaption><a href="%1$s">%4$s</a></figcaption>
+                    %s
+                </figure>',
+                escape($url),
+                $img['private'] ? '<span class="private">Private</span>' : '',
+                $thumb_url,
+                escape(preg_replace('![_-]!', ' ', $img['filename'])),
+                !$fh->logged() ? '' : '<label><input type="checkbox" name="pictures[]" value="' . escape($img['hash']) . '" /> Delete</label>'
+            );
+        }
     }
 
     $html .= '
@@ -3630,7 +3599,7 @@ elseif (isset($_GET['list']))
     {
         $html .= '
         <p class="admin submit">
-            <input type="submit" name="delete_pictures" value="Delete checked pictures" />
+            <input type="submit" name="delete" value="Delete checked pictures and albums" />
         </p>
         </form>';
     }
@@ -3646,90 +3615,6 @@ elseif (isset($_GET['list']))
         for ($p = 1; $p <= $max_page; $p++)
         {
             $html .= '<li'.($page == $p ? ' class="selected"' : '').'><a href="?list='.$p.'">'.$p.'</a></li>';
-        }
-
-        $html .= '
-            </ul>
-        </nav>';
-    }
-}
-elseif (isset($_GET['albums']))
-{
-    $title = 'Browse albums';
-
-    if (!empty($_GET['albums']) && is_numeric($_GET['albums']))
-        $page = (int) $_GET['albums'];
-    else
-        $page = 1;
-
-    $list = $fh->getAlbumList($page);
-    $max = $fh->countAlbumList();
-
-    $html = '';
-
-    if ($fh->logged())
-    {
-        $html .= '<form method="post" action="" onsubmit="return confirm(\'Delete all the checked albums?\');">
-        <p class="admin">
-            <input type="button" value="Check / uncheck all" onclick="var l = document.forms[0].querySelectorAll(\'input[type=checkbox]\'); var s = l[0].checked; for (var i = 0; i < l.length; i++) { l[i].checked = s ? false : true; }" />
-        </p>';
-    }
-
-    $html .= '
-        <article class="albums">
-            <h2>'.$title.'</h2>';
-
-    foreach ($list as $album)
-    {
-        $url = $config->album_page_url . $album['hash'];
-        $nb = $fh->countAlbumPictures($album['hash']);
-
-        $html .= '
-        <figure>
-            <h2><a href="'.$url.'">'.escape($album['title']).'</a></h2>
-            <h6>('.$nb.' pictures)</h6>
-            <a href="'.$url.'">'.($album['private'] ? '<span class="private">Private</span>' : '');
-
-        foreach ($album['extract'] as $img)
-        {
-            $thumb_url = $fh->getImageThumbUrl($img);
-            $html .= '<img src="'.$thumb_url.'" alt="" />';
-        }
-
-        $html .= '</a>';
-
-        if ($fh->logged())
-        {
-            $html .= '<label><input type="checkbox" name="albums[]" value="' . escape($album['hash']) . '" /> Delete</label>';
-        }
-
-        $html .= '
-        </figure>';
-    }
-
-    $html .= '
-        </article>';
-
-    if ($fh->logged())
-    {
-        $html .= '
-        <p class="admin submit">
-            <input type="submit" name="delete_albums" value="Delete checked albums" />
-        </p>
-        </form>';
-    }
-
-    if ($max > round($config->nb_pictures_by_page / 2))
-    {
-        $max_page = ceil($max / round($config->nb_pictures_by_page / 2));
-        $html .= '
-        <nav class="pagination">
-            <ul>
-        ';
-
-        for ($p = 1; $p <= $max_page; $p++)
-        {
-            $html .= '<li'.($page == $p ? ' class="selected"' : '').'><a href="'.$config->base_url.'?albums='.$p.'">'.$p.'</a></li>';
         }
 
         $html .= '
@@ -3775,6 +3660,24 @@ elseif (!empty($_GET['a']))
     }
 
     $html = '
+        <script type="text/javascript">
+        var copy = (e, c) => {
+            if (typeof e === \'string\') {
+                e = document.querySelector(e);
+            }
+
+            e.select();
+            e.setSelectionRange(0, e.value.length);
+            navigator.clipboard.writeText(e.value);
+
+            if (!c) {
+                return;
+            }
+
+            c.value = \'Copied!\';
+            window.setTimeout(() => c.value = \'Copy\', 5000);
+        };
+        </script>
         <article class="browse">
             <h2>'.escape($title).'</h2>
             <p class="info">
@@ -3782,10 +3685,11 @@ elseif (!empty($_GET['a']))
                 | '.(int)$max.' picture'.((int)$max > 1 ? 's' : '').'
             </p>
             <aside class="examples">
-                <dt>Share this album using this URL:</dt>
-                <dd><input type="text" onclick="this.select();" value="'.escape($config->album_page_url . $album['hash']).'" /></dd>
-                <dt>All pictures for a forum (BBCode):</dt>
-                <dd><textarea cols="70" rows="1" onclick="this.select();">'.escape($bbcode).'</textarea></dd>
+                <dt>Share this album using this URL: <input type="button" onclick="copy(\'#url\', this);" value="Copy" /></dt>
+                <dd><input type="text" id="url" onclick="this.select();" value="'.escape($config->album_page_url . $album['hash']).'" /></dd>
+                <dt>All pictures for a forum (BBCode): <input type="button" onclick="copy(\'#all\', this);" value="Copy" /></dt>
+                <dd><textarea id="all" cols="70" rows="3" onclick="this.select(); this.setSelectionRange(0, this.value.length); navigator.clipboard.writeText(this.value);">'.escape($bbcode).'</textarea></dd>
+                <dd></dd>
             </aside>';
 
     if ($config->allow_album_zip) {
@@ -3995,12 +3899,12 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
 
     $html .= '
         <aside class="examples">
-            <dt>Short URL for full size</dt>
-            <dd><input type="text" onclick="this.select();" value="'.escape($short_url).'" /></dd>
-            <dt>BBCode</dt>
-            <dd><input type="text" onclick="this.select();" value="'.escape($bbcode).'" /></dd>
-            <dt>HTML code</dt>
-            <dd><input type="text" onclick="this.select();" value="'.escape($html_code).'" /></dd>
+            <dt>Short URL for full size <input type="button" onclick="copy(\'#url\', this);" value="Copy" /></dt>
+            <dd><input type="text" onclick="this.select();" value="'.escape($short_url).'" id="url" /></dd>
+            <dt>BBCode <input type="button" onclick="copy(\'#bbcode\', this);" value="Copy" /></dt>
+            <dd><textarea cols="70" rows="3" onclick="this.select();" id="bbcode">'.escape($bbcode).'</textarea></dd>
+            <dt>HTML code <input type="button" onclick="copy(\'#html\', this);" value="Copy" /></dt>
+            <dd><textarea cols="70" rows="3" onclick="this.select();" id="html">'.escape($html_code).'</textarea></dd>
         </aside>
     </article>
     ';
@@ -4012,8 +3916,8 @@ elseif (!$config->allow_upload)
 else
 {
     $js_url = file_exists(__DIR__ . '/upload.js')
-        ? $config->base_url . 'upload.js'
-        : $config->base_url . '?js';
+        ? $config->base_url . 'upload.js?2023'
+        : $config->base_url . '?js&2023';
 
     $html = '
         <script type="text/javascript">
@@ -4025,74 +3929,48 @@ else
         $html .= '<p class="error">'.escape(Fotoo_Hosting::getErrorMessage($_GET['error'])).'</p>';
     }
 
-    if (isset($_GET['album']))
-    {
-        $html .= '
-        <form method="post" action="'.$config->base_url.'?upload" id="f_upload">
-        <article class="upload">
-            <header>
-                <h2>Upload an album</h2>
-                <p class="info">
-                    Maximum file size: '.round($config->max_file_size / 1024 / 1024, 2).'MB
-                    | Image types accepted: JPEG only
-                </p>
-            </header>
-            <fieldset>
-                <dl>
-                    <dt><label for="f_title">Title:</label></dt>
-                    <dd><input type="text" name="title" id="f_title" maxlength="100" required="required" /></dd>
-                    <dt><label for="f_private">Private</label></dt>
-                    <dd class="private"><label><input type="checkbox" name="private" id="f_private" value="1" />
-                        (If checked, this album won\'t appear in &quot;browse pictures&quot;)</label></dd>
-                    <dt><label for="f_files">Files:</label></dt>
-                    <dd id="f_file_container"><input type="file" name="upload" id="f_files" multiple="multiple" accept="image/jpeg" required="required" /></dd>
-                </dl>
-            </fieldset>
-            <div id="albumParent">Please select some files...</div>
-            <p class="submit">
-                <input type="submit" id="f_submit" value="Upload" />
-            </p>
-        </article>
-        </form>';
-    }
-    else
-    {
-        $html .= '
-        <form method="post" enctype="multipart/form-data" action="'.$config->base_url.'?upload" id="f_upload">
-        <article class="upload">
-            <header>
-                <h2>Upload a file</h2>
-                <p class="info">
-                    Maximum file size: '.round($config->max_file_size / 1024 / 1024, 2).'MB
-                    | Image types accepted: '.implode(', ', array_map('strtoupper', $config->allowed_formats)).'
-                </p>
-            </header>
-            <fieldset>
-                <input type="hidden" name="MAX_FILE_SIZE" value="'.($config->max_file_size - 1024).'" />
-                <dl>
-                    <dt><label for="f_file">File:</label></dt>
-                    <dd id="f_file_container"><input type="file" name="upload" id="f_file" /></dd>
-                    <dt><label for="f_name">Name:</label></dt>
-                    <dd><input type="text" name="name" id="f_name" maxlength="30" /></dd>
-                    <dt><label for="f_private">Private</label></dt>
-                    <dd class="private"><label><input type="checkbox" name="private" id="f_private" value="1" />
-                        (If checked, picture won\'t appear in pictures list)</label></dd>
-                </dl>
-            </fieldset>
-            <div id="resizeParent"></div>
-            <p class="submit">
-                <input type="submit" id="f_submit" value="Upload" />
-            </p>
-        </article>
-        </form>';
-    }
+    $max_file_size = $config->max_file_size - 1024;
+    $max_file_size_human = round($config->max_file_size / 1024 / 1024, 2);
+    $formats = implode(', ', array_map('strtoupper', $config->allowed_formats));
 
-    $html .= '<script type="text/javascript" src="'.$js_url.'"></script>';
+    $html .= <<<EOF
+    <form method="post" enctype="multipart/form-data" action="{$config->base_url}?upload" id="f_upload">
+    <input type="hidden" name="MAX_FILE_SIZE" value="{$max_file_size}" />
+    <article class="upload">
+        <header>
+            <h2>Upload images</h2>
+            <p class="info">
+                Maximum file size: {$max_file_size_human} MB
+                | Image types accepted: {$formats}
+            </p>
+        </header>
+        <fieldset>
+            <dl>
+                <dt><label for="f_title">Title:</label></dt>
+                <dd><input type="text" name="title" id="f_title" maxlength="100" required="required" /></dd>
+                <dt><label for="f_private">Private</label></dt>
+                <dd class="private"><label><input type="checkbox" name="private" id="f_private" value="1" />
+                    (If checked, the pictures won't be listed in &quot;browse images&quot;)</label></dd>
+                <dd id="f_file_container"><input type="file" name="upload" id="f_files" multiple="multiple" accept="image/jpeg,image/webp,image/png,image/gif,image/svg+xml" required="required" /></dd>
+            </dl>
+            <p class="submit">
+                <input type="submit" value="Upload" />
+            </p>
+        </fieldset>
+        <div id="albumParent"></div>
+        <p class="submit">
+            <input type="submit" value="Upload" />
+        </p>
+    </article>
+    </form>
+    <script type="text/javascript" src="{$js_url}"></script>
+EOF;
+
 }
 
 $css_url = file_exists(__DIR__ . '/style.css')
-    ? $config->base_url . 'style.css'
-    : $config->base_url . '?css';
+    ? $config->base_url . 'style.css?2023'
+    : $config->base_url . '?css&2023';
 
 echo '<!DOCTYPE html>
 <html>
@@ -4109,9 +3987,8 @@ echo '<!DOCTYPE html>
     '.($fh->logged() ? '<h2>(admin mode)</h2>' : '').'
     <nav>
         <ul>
-            <li><a href="'.$config->base_url.'">Upload a file</a></li>
-            <li><a href="'.$config->base_url.'?list">Browse pictures</a></li>
-            <li><a href="'.$config->base_url.'?albums">Browse albums</a></li>
+            <li><a href="'.$config->base_url.'">Upload</a></li>
+            <li><a href="'.$config->base_url.'?list">Browse images</a></li>
         </ul>
     </nav>
 </header>
