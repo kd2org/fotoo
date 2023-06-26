@@ -453,7 +453,7 @@ elseif (isset($_GET['list']))
         $thumb_url = $fh->getImageThumbUrl($img);
 
         if ($img['album']) {
-            $url = '?a=' . rawurlencode($img['album']);
+            $url = $config->album_page_url . rawurlencode($img['album']);
             $html .= sprintf(
                 '<figure>
                     <a href="%s">%s<span class="count"><b>%d</b> images</span><img src="%s" alt="%s" /></a>
