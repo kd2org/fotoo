@@ -209,7 +209,7 @@ function escape($str)
     return htmlspecialchars($str, ENT_QUOTES, 'utf-8', false);
 }
 
-require __DIR__ . '/class.fotoo_hosting.php';
+require_once __DIR__ . '/class.fotoo_hosting.php';
 require_once __DIR__ . '/class.image.php';
 
 $config = new Fotoo_Hosting_Config;
@@ -218,7 +218,7 @@ $config_file = __DIR__ . '/config.php';
 
 if (file_exists($config_file))
 {
-    require_once $config_file;
+    require $config_file;
 }
 
 // Check upload access

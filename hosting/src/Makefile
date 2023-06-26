@@ -16,4 +16,4 @@ fotoo :
 	@cat class.fotoo_hosting.php >> ${DEST}
 	@cat class.image.php >> ${DEST}
 	@cat ZipWriter.php >> ${DEST}
-	@cat index.php | sed 's/^[ ]*require/\/\/require/' >> ${DEST}
+	@cat index.php | sed 's/^require_once/\/\/require_once/' >> ${DEST}
