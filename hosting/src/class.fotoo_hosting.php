@@ -70,7 +70,7 @@ class Fotoo_Hosting
         {
         	return true;
         }
-        
+
         if (!empty($_SERVER['HTTP_CLIENT_IP']) && filter_var($_SERVER['HTTP_CLIENT_IP'], FILTER_VALIDATE_IP) 
         	&& self::isIpBanned($_SERVER['HTTP_CLIENT_IP'], $this->config->banned_ips))
         {
@@ -98,7 +98,7 @@ class Fotoo_Hosting
         {
         	$out .= (!empty($out) ? ', ' : '') . 'X-Forwarded-For: ' . $_SERVER['HTTP_X_FORWARDED_FOR'];
         }
-        
+
         if (!empty($_SERVER['HTTP_CLIENT_IP']) && filter_var($_SERVER['HTTP_CLIENT_IP'], FILTER_VALIDATE_IP))
         {
         	$out .= (!empty($out) ? ', ' : '') . 'Client-IP: ' . $_SERVER['HTTP_CLIENT_IP'];
@@ -116,7 +116,7 @@ class Fotoo_Hosting
      * - check_ip('2a01:e34:ee89:c060:503f:d19b:b8fa:32fd', array('2a01::*'))
      * - check_ip('2a01:e34:ee89:c060:503f:d19b:b8fa:32fd', array('2a01:e34:ee89:c06::/64'))
      */
-    static public function isIpBanned($ip = null, $check)
+    static public function isIpBanned($ip, $check)
     {
         $ip = strtolower(is_null($ip) ? $_SERVER['REMOTE_ADDR'] : $ip);
 
@@ -353,78 +353,73 @@ class Fotoo_Hosting
 			$name = '';
 		}
 
-		$options = array();
-		$options[image::USE_GD_FAST_RESIZE_TRICK] = true;
+		require_once __DIR__ . '/class.image.php';
 
-		$img = image::identify($file['tmp_name'], $options);
+		try {
+			$img = new Image($file['tmp_name']);
+			$format = strtolower($img->format());
 
-		if (empty($img) || empty($img['format']) || empty($img['width']) || empty($img['height'])
-			|| !in_array($img['format'], $this->config->allowed_formats))
-		{
+			if (empty($img->getSize()[0]) || !$img->format()
+				|| !in_array($format, array_map('strtolower', $this->config->allowed_formats))) {
+				throw new \RuntimeException('Invalid image');
+			}
+		}
+		catch (\RuntimeException $e) {
 			@unlink($file['tmp_name']);
 			throw new FotooException("Invalid image format.", UPLOAD_ERR_INVALID_IMAGE);
 		}
 
-		if ($img['format'] != 'PNG' && $img['format'] != 'JPEG' && $img['format'] != 'GIF')
-		{
-			$options[image::FORCE_IMAGICK] = true;
-		}
-
+		list($width, $height) = $img->getSize();
+		$format = $img->format();
 		$size = filesize($file['tmp_name']);
 
-		$hash = md5($file['tmp_name'] . time() . $img['width'] . $img['height'] . $img['format'] . $size . $file['name']);
+		$hash = md5($file['tmp_name'] . time() . $width . $height . $format . $size . $file['name']);
 		$dest = $this->config->storage_path . substr($hash, -2);
 
-		if (!file_exists($dest))
+		if (!file_exists($dest)) {
 			mkdir($dest);
+		}
 
 		$base = self::baseConv(hexdec(uniqid()));
 		$dest .= '/' . $base;
-		$ext = '.' . strtolower($img['format']);
+		$ext = '.' . strtolower($format);
 
-		if (trim($name) && !empty($name))
+		if (trim($name) && !empty($name)) {
 			$dest .= '.' . $name;
+		}
 
 		$max_mp = $this->config->max_width * $this->config->max_width;
-		$img_mp = $img['width'] * $img['height'];
+		$img_mp = $width * $height;
 
 		if ($img_mp > $max_mp)
 		{
 			$ratio = $img_mp / $max_mp;
-			$width = round($img['width'] / $ratio);
-			$height = round($img['height'] / $ratio);
+			$width = round($width / $ratio);
+			$height = round($height / $ratio);
 			$resize = true;
 		}
 		else
 		{
-			$width = $img['width'];
-			$height = $img['height'];
+			$width = $width;
+			$height = $height;
 			$resize = false;
 		}
 
 		// If JPEG or big PNG/GIF, then resize (always resize JPEG to reduce file size)
-		if ($resize || ($img['format'] == 'JPEG' && !$client_resize)
-			|| (($img['format'] == 'GIF' || $img['format'] == 'PNG') && $file['size'] > (1024 * 1024)))
-		{
-			$res = image::resize(
-				$file['tmp_name'],
-				$dest . $ext,
-				$width,
-				$height,
-				array(
-					image::JPEG_QUALITY => 80,
-					image::USE_GD_FAST_RESIZE_TRICK => true
-				)
-			);
+		if (($format == 'jpeg' || $format == 'webp') && !$client_resize) {
+			$resize = true;
+		}
+		elseif (($format == 'gif' || $format == 'png') && $file['size'] > (1024 * 1024)) {
+			$resize = true;
+		}
 
-			if (!$res)
-			{
-				return false;
-			}
-			else
-			{
-				list($width, $height) = $res;
-			}
+		if ($resize)
+		{
+			$img->resize($width, $height);
+			$img->jpeg_quality = 80;
+			$img->save($dest . $ext);
+			list($width, $height) = $img->getSize();
+			unset($img);
 		}
 		elseif ($client_resize)
 		{
@@ -439,30 +434,38 @@ class Fotoo_Hosting
 
 		// Create thumb when needed
 		if ($width > $this->config->thumb_width || $height > $this->config->thumb_width
-			|| $size > (100 * 1024) || ($img['format'] != 'JPEG' && $img['format'] != 'PNG'))
+			|| $size > (100 * 1024) || !in_array($format, ['jpeg', 'png', 'webp']))
 		{
-			$options[image::JPEG_QUALITY] = 70;
-			$thumb_ext = '.s.' . strtolower($img['format']);
+			$img = new Image($dest . $ext);
+			$img->jpeg_quality = 70;
+			$img->webp_quality = 70;
 
-			if ($img['format'] != 'JPEG' && $img['format'] != 'PNG')
-			{
-				$options[image::FORCE_OUTPUT_FORMAT] = 'JPEG';
+			if (in_array('webp', $img->getSupportedFormats())) {
+				$thumb_format = 'webp';
+				$thumb_ext = '.s.webp';
+			}
+			elseif ($format !== 'png') {
+				$thumb_format = 'jpeg';
 				$thumb_ext = '.s.jpeg';
 			}
+			else {
+				$thumb_format = $format;
+				$thumb_ext = '.s.' . $format;
+			}
 
-			image::resize(
-				$dest . $ext,
-				$dest . $thumb_ext,
+			$img->resize(
 				($width > $this->config->thumb_width) ? $this->config->thumb_width : $width,
-				($height > $this->config->thumb_width) ? $this->config->thumb_width : $height,
-				$options
+				($height > $this->config->thumb_width) ? $this->config->thumb_width : $height
 			);
+
+			$img->save($dest . $thumb_ext, $thumb_format);
 
 			$thumb = true;
 		}
 		else
 		{
 			$thumb = false;
+			$thumb_format = 0;
 		}
 
 		$hash = substr($hash, -2) . '/' . $base;
@@ -474,10 +477,10 @@ class Fotoo_Hosting
 		$req->bindValue(':hash', $hash);
 		$req->bindValue(':filename', $name);
 		$req->bindValue(':date', time());
-		$req->bindValue(':format', $img['format']);
+		$req->bindValue(':format', strtoupper($format));
 		$req->bindValue(':width', (int)$width);
 		$req->bindValue(':height', (int)$height);
-		$req->bindValue(':thumb', (int)$thumb);
+		$req->bindValue(':thumb', $thumb_format === 0 ? $thumb_format : strtoupper($thumb_format));
 		$req->bindValue(':private', $private ? '1' : '0');
 		$req->bindValue(':size', (int)$size);
 		$req->bindValue(':album', is_null($album) ? NULL : $album);
@@ -730,13 +733,14 @@ class Fotoo_Hosting
 			return $this->getImageUrl($img);
 		}
 
-		if ($img['format'] != 'JPEG' && $img['format'] != 'PNG')
+		$format = strtolower($img['format']);
+
+		if ((int)$img['thumb'] !== 1) {
+			$format = strtolower($img['thumb']);
+		}
+		elseif ($format != 'jpeg' && $format != 'png')
 		{
 			$format = 'jpeg';
-		}
-		else
-		{
-			$format = strtolower($img['format']);
 		}
 
 		$url = $this->config->storage_url . $img['hash'];

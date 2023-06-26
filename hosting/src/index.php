@@ -36,14 +36,14 @@ class FotooException extends Exception {}
 
 function exception_error_handler($errno, $errstr, $errfile, $errline )
 {
+    return;
     // For @ ignored errors
-    if (error_reporting() === 0) return;
+    if (error_reporting() & $errno) return;
     throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
 }
 
 set_error_handler("exception_error_handler");
 
-require_once __DIR__ . '/lib-image/lib.image.php';
 require_once __DIR__ . '/ZipWriter.php';
 
 class Fotoo_Hosting_Config
@@ -113,7 +113,7 @@ class Fotoo_Hosting_Config
                 foreach ($value as $f=>$format)
                 {
                     $format = strtoupper($format);
-                    static $base_support = ['PNG', 'JPEG', 'GIF'];
+                    static $base_support = ['png', 'jpeg', 'gif', 'webp'];
 
                     if (!in_array($format, $base_support) && !class_exists('Imagick'))
                     {
@@ -146,59 +146,6 @@ class Fotoo_Hosting_Config
         unset($vars['admin_password']);
 
         return json_encode($vars);
-    }
-
-    public function exportPHP()
-    {
-        $vars = get_object_vars($this);
-
-        $out = "<?php\n\n";
-        $out.= '// Do not edit the line below';
-        $out.= "\n";
-        $out.= 'if (!isset($config) || !($config instanceof Fotoo_Hosting_Config)) die("Invalid call.");';
-        $out.= "\n\n";
-        $out.= '// To edit one of the following configuration options, comment it out and change it';
-        $out.= "\n\n";
-
-        foreach ($vars as $key=>$value)
-        {
-            $out .= "// ".wordwrap($this->getComment($key), 70, "\n// ")."\n";
-            $line = '$config->'.$key.' = '.var_export($value, true).";";
-
-            if (strpos($line, "\n") !== false)
-                $out .= "/*\n".$line."\n*/\n\n";
-            else
-                $out .= '#'.$line."\n\n";
-        }
-
-        $out.= "\n?>";
-
-        return $out;
-    }
-
-    public function getComment($key)
-    {
-        switch ($key)
-        {
-            case 'max_width':       return 'Maximum image width or height, bigger images will be resized.';
-            case 'thumb_width':     return 'Maximum thumbnail size, used for creating thumbnails.';
-            case 'max_file_size':   return 'Maximum uploaded file size (in bytes). By default it\'s the maximum size allowed by the PHP configuration. See the FAQ for more informations.';
-            case 'nb_pictures_by_page': return 'Number of images to display on each page in the pictures list.';
-            case 'db_file':         return 'Path to the SQLite DB file.';
-            case 'storage_path':    return 'Path to where the pictures are stored.';
-            case 'base_url':        return 'URL of the webservice index.';
-            case 'storage_url':     return 'URL to where the pictures are stored. Filename is added at the end.';
-            case 'title':           return 'Title of the service.';
-            case 'image_page_url':  return 'URL to the picture information page, hash is added at the end.';
-            case 'album_page_url':  return 'URL to the album page, hash is added at the end.';
-            case 'allow_upload':    return 'Allow upload of files? You can use this to restrict upload access. Can be a boolean or a PHP callback. See the FAQ for more informations.';
-            case 'admin_password':  return 'Password to access admin UI? (edit/delete files, see private pictures)';
-            case 'banned_ips':      return 'List of banned IP addresses (netmasks and wildcards accepted, IPv6 supported)';
-            case 'allowed_formats': return 'Allowed formats, separated by a comma';
-            case 'ip_storage_expiration':
-                                    return 'Expiration (in days) of IP storage, after this delay IP addresses will be removed from database';
-            default: return '';
-        }
     }
 
     public function __construct()
@@ -242,7 +189,7 @@ class Fotoo_Hosting_Config
         $this->ip_storage_expiration = 366;
         $this->nb_pictures_by_page = 20;
 
-        $this->allowed_formats = array('PNG', 'JPEG', 'GIF', 'SVG', 'XCF', 'PDF');
+        $this->allowed_formats = ['png', 'jpeg', 'gif', 'svg', 'xcf', 'pdf', 'webp'];
     }
 
     static public function return_bytes ($size_str)
@@ -271,11 +218,6 @@ $config_file = __DIR__ . '/config.php';
 if (file_exists($config_file))
 {
     require_once $config_file;
-}
-elseif (isset($_GET['create_config']))
-{
-    file_put_contents($config_file, $config->exportPHP());
-    die("Default configuration created in config.php file, edit it to change default values.");
 }
 
 // Check upload access
@@ -671,7 +613,7 @@ elseif (!empty($_GET['a']))
         <article class="browse">
             <h2>'.escape($title).'</h2>
             <p class="info">
-                Uploaded on <time datetime="'.date(DATE_W3C, $album['date']).'">'.strftime('%c', $album['date']).'</time>
+                Uploaded on <time datetime="'.date(DATE_W3C, $album['date']).'">'.@strftime('%c', $album['date']).'</time>
                 | '.(int)$max.' picture'.((int)$max > 1 ? 's' : '').'
             </p>
             <aside class="examples">
@@ -798,7 +740,7 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
         <header>
             '.(trim($img['filename']) ? '<h2>' . escape(strtr($img['filename'], '-_.', '   ')) . '</h2>' : '').'
             <p class="info">
-                Uploaded on <time datetime="'.date(DATE_W3C, $img['date']).'">'.strftime('%c', $img['date']).'</time>
+                Uploaded on <time datetime="'.date(DATE_W3C, $img['date']).'">'.@strftime('%c', $img['date']).'</time>
                 | Size: '.$img['width'].' × '.$img['height'].'
             </p>
         </header>
@@ -807,7 +749,7 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
         </figure>
         <footer>
             <p>
-                <a href="'.$img_url.'">View full size ('.$img['format'].', '.$size.')</a>
+                <a href="'.$img_url.'">View full size ('.strtoupper($img['format']).', '.$size.')</a>
             </p>
         </footer>';
 
@@ -957,7 +899,7 @@ else
                 <h2>Upload a file</h2>
                 <p class="info">
                     Maximum file size: '.round($config->max_file_size / 1024 / 1024, 2).'MB
-                    | Image types accepted: '.implode(', ', $config->allowed_formats).'
+                    | Image types accepted: '.implode(', ', array_map('strtoupper', $config->allowed_formats)).'
                 </p>
             </header>
             <fieldset>

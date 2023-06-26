@@ -579,8 +579,9 @@
             delete img._width;
             delete img._height;
 
-            canvas.width = width;
-            canvas.height = height;
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = width * dpr;
+            canvas.height = height * dpr;
 
             context.drawImage(
                 img, // original image
@@ -594,7 +595,13 @@
                 height // destination height
             );
 
-            onresample(canvas.toDataURL("image/jpeg", 0.75));
+            var r = canvas.toDataURL("image/webp", 0.80);
+
+            if (!r.match(/image\/webp/)) {
+                r = canvas.toDataURL("image/jpeg", 0.75);
+            }
+
+            onresample(r);
             context.clearRect(0, 0, canvas.width, canvas.height);
         }
 

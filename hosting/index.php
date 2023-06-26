@@ -1,5 +1,5 @@
 <?php
-// Fotoo Hosting single-file release version 2.2.0
+// Fotoo Hosting single-file release version 3.0.0
 ?><?php if (isset($_GET["js"])): header("Content-Type: text/javascript"); ?>
 (function () {
     if (!Array.prototype.indexOf)
@@ -582,8 +582,9 @@
             delete img._width;
             delete img._height;
 
-            canvas.width = width;
-            canvas.height = height;
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = width * dpr;
+            canvas.height = height * dpr;
 
             context.drawImage(
                 img, // original image
@@ -597,7 +598,13 @@
                 height // destination height
             );
 
-            onresample(canvas.toDataURL("image/jpeg", 0.75));
+            var r = canvas.toDataURL("image/webp", 0.80);
+
+            if (!r.match(/image\/webp/)) {
+                r = canvas.toDataURL("image/jpeg", 0.75);
+            }
+
+            onresample(r);
             context.clearRect(0, 0, canvas.width, canvas.height);
         }
 
@@ -975,7 +982,7 @@ class Fotoo_Hosting
         {
         	return true;
         }
-        
+
         if (!empty($_SERVER['HTTP_CLIENT_IP']) && filter_var($_SERVER['HTTP_CLIENT_IP'], FILTER_VALIDATE_IP) 
         	&& self::isIpBanned($_SERVER['HTTP_CLIENT_IP'], $this->config->banned_ips))
         {
@@ -1003,7 +1010,7 @@ class Fotoo_Hosting
         {
         	$out .= (!empty($out) ? ', ' : '') . 'X-Forwarded-For: ' . $_SERVER['HTTP_X_FORWARDED_FOR'];
         }
-        
+
         if (!empty($_SERVER['HTTP_CLIENT_IP']) && filter_var($_SERVER['HTTP_CLIENT_IP'], FILTER_VALIDATE_IP))
         {
         	$out .= (!empty($out) ? ', ' : '') . 'Client-IP: ' . $_SERVER['HTTP_CLIENT_IP'];
@@ -1021,7 +1028,7 @@ class Fotoo_Hosting
      * - check_ip('2a01:e34:ee89:c060:503f:d19b:b8fa:32fd', array('2a01::*'))
      * - check_ip('2a01:e34:ee89:c060:503f:d19b:b8fa:32fd', array('2a01:e34:ee89:c06::/64'))
      */
-    static public function isIpBanned($ip = null, $check)
+    static public function isIpBanned($ip, $check)
     {
         $ip = strtolower(is_null($ip) ? $_SERVER['REMOTE_ADDR'] : $ip);
 
@@ -1258,78 +1265,73 @@ class Fotoo_Hosting
 			$name = '';
 		}
 
-		$options = array();
-		$options[image::USE_GD_FAST_RESIZE_TRICK] = true;
+		require_once __DIR__ . '/class.image.php';
 
-		$img = image::identify($file['tmp_name'], $options);
+		try {
+			$img = new Image($file['tmp_name']);
+			$format = strtolower($img->format());
 
-		if (empty($img) || empty($img['format']) || empty($img['width']) || empty($img['height'])
-			|| !in_array($img['format'], $this->config->allowed_formats))
-		{
+			if (empty($img->getSize()[0]) || !$img->format()
+				|| !in_array($format, array_map('strtolower', $this->config->allowed_formats))) {
+				throw new \RuntimeException('Invalid image');
+			}
+		}
+		catch (\RuntimeException $e) {
 			@unlink($file['tmp_name']);
 			throw new FotooException("Invalid image format.", UPLOAD_ERR_INVALID_IMAGE);
 		}
 
-		if ($img['format'] != 'PNG' && $img['format'] != 'JPEG' && $img['format'] != 'GIF')
-		{
-			$options[image::FORCE_IMAGICK] = true;
-		}
-
+		list($width, $height) = $img->getSize();
+		$format = $img->format();
 		$size = filesize($file['tmp_name']);
 
-		$hash = md5($file['tmp_name'] . time() . $img['width'] . $img['height'] . $img['format'] . $size . $file['name']);
+		$hash = md5($file['tmp_name'] . time() . $width . $height . $format . $size . $file['name']);
 		$dest = $this->config->storage_path . substr($hash, -2);
 
-		if (!file_exists($dest))
+		if (!file_exists($dest)) {
 			mkdir($dest);
+		}
 
 		$base = self::baseConv(hexdec(uniqid()));
 		$dest .= '/' . $base;
-		$ext = '.' . strtolower($img['format']);
+		$ext = '.' . strtolower($format);
 
-		if (trim($name) && !empty($name))
+		if (trim($name) && !empty($name)) {
 			$dest .= '.' . $name;
+		}
 
 		$max_mp = $this->config->max_width * $this->config->max_width;
-		$img_mp = $img['width'] * $img['height'];
+		$img_mp = $width * $height;
 
 		if ($img_mp > $max_mp)
 		{
 			$ratio = $img_mp / $max_mp;
-			$width = round($img['width'] / $ratio);
-			$height = round($img['height'] / $ratio);
+			$width = round($width / $ratio);
+			$height = round($height / $ratio);
 			$resize = true;
 		}
 		else
 		{
-			$width = $img['width'];
-			$height = $img['height'];
+			$width = $width;
+			$height = $height;
 			$resize = false;
 		}
 
 		// If JPEG or big PNG/GIF, then resize (always resize JPEG to reduce file size)
-		if ($resize || ($img['format'] == 'JPEG' && !$client_resize)
-			|| (($img['format'] == 'GIF' || $img['format'] == 'PNG') && $file['size'] > (1024 * 1024)))
-		{
-			$res = image::resize(
-				$file['tmp_name'],
-				$dest . $ext,
-				$width,
-				$height,
-				array(
-					image::JPEG_QUALITY => 80,
-					image::USE_GD_FAST_RESIZE_TRICK => true
-				)
-			);
+		if (($format == 'jpeg' || $format == 'webp') && !$client_resize) {
+			$resize = true;
+		}
+		elseif (($format == 'gif' || $format == 'png') && $file['size'] > (1024 * 1024)) {
+			$resize = true;
+		}
 
-			if (!$res)
-			{
-				return false;
-			}
-			else
-			{
-				list($width, $height) = $res;
-			}
+		if ($resize)
+		{
+			$img->resize($width, $height);
+			$img->jpeg_quality = 80;
+			$img->save($dest . $ext);
+			list($width, $height) = $img->getSize();
+			unset($img);
 		}
 		elseif ($client_resize)
 		{
@@ -1344,30 +1346,38 @@ class Fotoo_Hosting
 
 		// Create thumb when needed
 		if ($width > $this->config->thumb_width || $height > $this->config->thumb_width
-			|| $size > (100 * 1024) || ($img['format'] != 'JPEG' && $img['format'] != 'PNG'))
+			|| $size > (100 * 1024) || !in_array($format, ['jpeg', 'png', 'webp']))
 		{
-			$options[image::JPEG_QUALITY] = 70;
-			$thumb_ext = '.s.' . strtolower($img['format']);
+			$img = new Image($dest . $ext);
+			$img->jpeg_quality = 70;
+			$img->webp_quality = 70;
 
-			if ($img['format'] != 'JPEG' && $img['format'] != 'PNG')
-			{
-				$options[image::FORCE_OUTPUT_FORMAT] = 'JPEG';
+			if (in_array('webp', $img->getSupportedFormats())) {
+				$thumb_format = 'webp';
+				$thumb_ext = '.s.webp';
+			}
+			elseif ($format !== 'png') {
+				$thumb_format = 'jpeg';
 				$thumb_ext = '.s.jpeg';
 			}
+			else {
+				$thumb_format = $format;
+				$thumb_ext = '.s.' . $format;
+			}
 
-			image::resize(
-				$dest . $ext,
-				$dest . $thumb_ext,
+			$img->resize(
 				($width > $this->config->thumb_width) ? $this->config->thumb_width : $width,
-				($height > $this->config->thumb_width) ? $this->config->thumb_width : $height,
-				$options
+				($height > $this->config->thumb_width) ? $this->config->thumb_width : $height
 			);
+
+			$img->save($dest . $thumb_ext, $thumb_format);
 
 			$thumb = true;
 		}
 		else
 		{
 			$thumb = false;
+			$thumb_format = 0;
 		}
 
 		$hash = substr($hash, -2) . '/' . $base;
@@ -1379,10 +1389,10 @@ class Fotoo_Hosting
 		$req->bindValue(':hash', $hash);
 		$req->bindValue(':filename', $name);
 		$req->bindValue(':date', time());
-		$req->bindValue(':format', $img['format']);
+		$req->bindValue(':format', strtoupper($format));
 		$req->bindValue(':width', (int)$width);
 		$req->bindValue(':height', (int)$height);
-		$req->bindValue(':thumb', (int)$thumb);
+		$req->bindValue(':thumb', $thumb_format === 0 ? $thumb_format : strtoupper($thumb_format));
 		$req->bindValue(':private', $private ? '1' : '0');
 		$req->bindValue(':size', (int)$size);
 		$req->bindValue(':album', is_null($album) ? NULL : $album);
@@ -1635,13 +1645,14 @@ class Fotoo_Hosting
 			return $this->getImageUrl($img);
 		}
 
-		if ($img['format'] != 'JPEG' && $img['format'] != 'PNG')
+		$format = strtolower($img['format']);
+
+		if ((int)$img['thumb'] !== 1) {
+			$format = strtolower($img['thumb']);
+		}
+		elseif ($format != 'jpeg' && $format != 'png')
 		{
 			$format = 'jpeg';
-		}
-		else
-		{
-			$format = strtolower($img['format']);
 		}
 
 		$url = $this->config->storage_url . $img['hash'];
@@ -1718,237 +1729,314 @@ class Fotoo_Hosting
 
 ?><?php
 
-// Generic image resize library
-// Copyleft (C) 2005-11 BohwaZ <http://dev.kd2.org/>
-// Licensed under the GNU LGPL licence
-
-class imageLibException extends Exception
+class Image
 {
-}
+    static private $init = false;
 
-class image
-{
-    // Image aspect options
-    const CROP = 'CROP';
-    const IGNORE_ASPECT_RATIO = 'IGNORE_ASPECT_RATIO';
-    const FORCE_SIZE_USING_BACKGROUND_COLOR = 'FORCE_SIZE_USING_BACKGROUND_COLOR';
+    protected $libraries = [];
 
-    // Libs options
-    const IMAGE_LIB = 'IMAGE_LIB';
-    const FORCE_GD = 'FORCE_GD';
-    const FORCE_IMAGICK = 'FORCE_IMAGICK';
-    const FORCE_IMLIB = 'FORCE_IMLIB';
-    const USE_GD_FAST_RESIZE_TRICK = 'USE_GD_FAST_RESIZE_TRICK';
-    const ENABLE_REPORT = 'ENABLE_REPORT';
+    protected $path = null;
+    protected $blob = null;
 
-    // Formats options
-    const FORCE_OUTPUT_FORMAT = 'FORCE_OUTPUT_FORMAT';
-    const PROGRESSIVE_JPEG = 'PROGRESSIVE_JPEG';
-    const JPEG_QUALITY = 'JPEG_QUALITY';
-    const PNG_COMPRESSION = 'PNG_COMPRESSION';
+    protected $width = null;
+    protected $height = null;
+    protected $type = null;
+    protected $format = null;
 
-    // Libs
-    const IMLIB = 1;
-    const IMAGICK = 2;
-    const GD = 3;
+    protected $pointer = null;
+    protected $library = null;
 
-    const TRANSPARENT_COLOR = 'transparent';
+    public $use_gd_fast_resize_trick = true;
 
-    static public $default_jpeg_quality = 75;
-    static public $default_png_compression = 9;
-    static public $default_background_color = '000000';
+    /**
+     * WebP quality, from 0 to 100
+     * @var integer
+     */
+    public int $webp_quality = 80;
 
-    static private $report = array(
-    );
+    /**
+     * JPEG quality, from 1 to 100
+     * @var integer
+     */
+    public $jpeg_quality = 90;
 
-    static protected $options = array(
-    );
+    /**
+     * Progressive JPEG output?
+     * Only supported by GD and Imagick!
+     * You can also use the command line tool jpegtran (package libjpeg-progs)
+     * to losslessly convert to and from progressive.
+     * @var boolean
+     */
+    public $progressive_jpeg = true;
 
-    static protected $cache = array(
-    );
+    /**
+     * LZW compression index, used by TIFF and PNG, from 0 to 9
+     * @var integer
+     */
+    public $compression = 9;
 
-    static public function canUseImlib()
+    public function __construct($path = null, $library = null)
     {
-        return (extension_loaded('imlib') && function_exists('imlib_load_image'));
-    }
+        $this->libraries = [
+            'epeg'    => function_exists('\epeg_open'),
+            'imagick' => class_exists('\Imagick', false),
+            'gd'      => function_exists('\imagecreatefromjpeg'),
+        ];
 
-    static public function canUseImagick()
-    {
-        return (extension_loaded('imagick') && class_exists('Imagick'));
-    }
-
-    static public function canUseGD()
-    {
-        return (extension_loaded('gd') && function_exists('imagecreatefromjpeg'));
-    }
-
-    static protected function option($id)
-    {
-        if (array_key_exists($id, self::$options))
-            return self::$options[$id];
-        else
-            return false;
-    }
-
-    static protected function parseOptions($options)
-    {
-        self::$options = array();
-
-        foreach ($options as $key=>$value)
+        if (!self::$init)
         {
-            if (defined($key))
-                self::$options[$key] = $value;
-            elseif (defined($value))
-                self::$options[$value] = true;
-            elseif (defined('image::'.$value))
-                self::$options[$value] = true;
-            elseif (defined('image::'.$key))
-                self::$options[constant('image::'.$key)] = $value;
-        }
-
-        unset($options);
-
-        if (self::option(self::FORCE_IMLIB))
-        {
-            if (!self::canUseImlib())
-                throw new imageLibException('Imlib seems not installed');
-
-            self::$options[self::IMAGE_LIB] = self::IMLIB;
-        }
-        elseif (self::option(self::FORCE_GD))
-        {
-            if (!self::canUseGD())
-                throw new imageLibException('GD seems not installed');
-
-            self::$options[self::IMAGE_LIB] = self::GD;
-        }
-        elseif (self::option(self::FORCE_IMAGICK))
-        {
-            if (!self::canUseImagick())
-                throw new imageLibException('Imagick seems not installed');
-
-            self::$options[self::IMAGE_LIB] = self::IMAGICK;
-        }
-
-        if ($format = self::option(self::FORCE_OUTPUT_FORMAT))
-        {
-            if ($format != 'JPEG' && $format != 'PNG')
+            if (empty($path))
             {
-                throw new imageLibException('FORCE_OUTPUT_FORMAT must be either JPEG or PNG');
+                throw new \InvalidArgumentException('Empty source file argument passed');
+            }
+
+            if (!is_readable($path))
+            {
+                throw new \InvalidArgumentException(sprintf('Can\'t read source file: %s', $path));
             }
         }
 
-        return true;
-    }
-
-    static public function identify($src_file)
-    {
-        if (empty($src_file))
-            throw new imageLibException('No source file argument passed');
-
-        $hash = sha1($src_file);
-
-        if (array_key_exists($hash, self::$cache))
+        if ($library && !self::$init)
         {
-            return self::$cache[$hash];
-        }
-
-        $image = false;
-
-        if (self::canUseImlib())
-        {
-            $im = @imlib_load_image($src_file);
-
-            if ($im)
+            if (!isset($this->libraries[$library]))
             {
-                $image = array(
-                    'format'    =>  strtoupper(imlib_image_format($im)),
-                    'width'     =>  imlib_image_get_width($im),
-                    'height'    =>  imlib_image_get_height($im),
-                );
-
-                imlib_free_image($im);
+                throw new \InvalidArgumentException(sprintf('Library \'%s\' is not supported.', $library));
             }
 
-            unset($im);
+            if (!$this->libraries[$library])
+            {
+                throw new \RuntimeException(sprintf('Library \'%s\' is not installed and can not be used.', $library));
+            }
         }
 
-        if (!$image && self::canUseImagick())
+        if (!self::$init)
         {
+            $this->path = $path;
+
             try {
-                $im = new Imagick($src_file);
+                $info = getimagesize($path);
+            }
+            catch (\Throwable $e) {
+                throw new \RuntimeException(sprintf('Invalid image format: %s (%s)', $path, $e->getMessage()), 0, $e);
+            }
 
-                if ($im)
+            if (!$info && function_exists('mime_content_type'))
+            {
+                $info = ['mime' => mime_content_type($path)];
+            }
+
+            if (!$info)
+            {
+                throw new \RuntimeException(sprintf('Invalid image format: %s', $path));
+            }
+
+            $this->init($info, $library);
+        }
+    }
+
+    static public function getBytesFromINI($size_str)
+    {
+        if ($size_str == -1)
+        {
+            return null;
+        }
+
+        $unit = strtoupper(substr($size_str, -1));
+
+        switch ($unit)
+        {
+            case 'G': return (int) $size_str * pow(1024, 3);
+            case 'M': return (int) $size_str * pow(1024, 2);
+            case 'K': return (int) $size_str * 1024;
+            default:  return (int) $size_str;
+        }
+    }
+
+    static public function getMaxUploadSize($max_user_size = null)
+    {
+        $sizes = [
+            ini_get('upload_max_filesize'),
+            ini_get('post_max_size'),
+            ini_get('memory_limit'),
+            $max_user_size,
+        ];
+
+        // Convert to bytes
+        $sizes = array_map([self::class, 'getBytesFromINI'], $sizes);
+
+        // Remove sizes that are null or -1 (unlimited)
+        $sizes = array_filter($sizes, function ($size) {
+            return !is_null($size);
+        });
+
+        // Return maximum file size allowed
+        return min($sizes);
+    }
+
+    protected function init(array $info, $library = null)
+    {
+        if (isset($info[0]))
+        {
+            $this->width = $info[0];
+            $this->height = $info[1];
+        }
+
+        $this->type = $info['mime'];
+        $this->format = $this->getFormatFromType($this->type);
+
+        if (!$this->format)
+        {
+            throw new \RuntimeException('Not an image format: ' . $this->type);
+        }
+
+        if ($library)
+        {
+            $supported_formats = call_user_func([$this, $library . '_formats']);
+
+            if (!in_array($this->format, $supported_formats))
+            {
+                throw new \RuntimeException(sprintf('Library \'%s\' doesn\'t support files of type \'%s\'.', $library, $this->type));
+            }
+        }
+        else
+        {
+            foreach ($this->libraries as $name => $enabled)
+            {
+                if (!$enabled)
                 {
-                    $image = array(
-                        'width'     =>  $im->getImageWidth(),
-                        'height'    =>  $im->getImageHeight(),
-                        'format'    =>  strtoupper($im->getImageFormat()),
-                    );
-
-                    $im->destroy();
+                    continue;
                 }
 
-                unset($im);
-            }
-            catch (ImagickException $e)
-            {
+                $supported_formats = call_user_func([$this, $name . '_formats']);
+
+                if (in_array($this->format, $supported_formats))
+                {
+                    $library = $name;
+                    break;
+                }
             }
 
+            if (!$library)
+            {
+                throw new \RuntimeException('No suitable image library found for type: ' . $this->type);
+            }
         }
 
-        if (!$image && self::canUseGD())
+        $this->library = $library;
+
+        if (!$this->width && !$this->height)
         {
-            $gd_img = getimagesize($src_file);
-
-            if (!$gd_img)
-                return false;
-
-            $image['width'] = $gd_img[0];
-            $image['height'] = $gd_img[1];
-
-            switch ($gd_img[2])
-            {
-                case IMAGETYPE_GIF:
-                    $image['format'] = 'GIF';
-                    break;
-                case IMAGETYPE_JPEG:
-                    $image['format'] = 'JPEG';
-                    break;
-                case IMAGETYPE_PNG:
-                    $image['format'] = 'PNG';
-                    break;
-                default:
-                    $image['format'] = false;
-                    break;
-            }
+            $this->open();
         }
-
-        self::$cache[$hash] = $image;
-
-        return $image;
     }
 
-    static public function resize($src_file, $dst_file, $new_width, $new_height=null, $options=array())
+    public function __get($key)
     {
-        if (empty($src_file))
-            throw new imageLibException('No source file argument passed');
-
-        if (empty($dst_file))
-            throw new imageLibException('No destination file argument passed');
-
-        if (empty($new_width))
-            throw new imageLibException('Needs at least the new width as argument');
-
-        self::parseOptions($options);
-
-        if (self::option(self::ENABLE_REPORT))
+        if (!property_exists($this, $key))
         {
-            self::$report = array(
-                'engine_used'   =>  '',
-                'time_taken'    =>  0,
-                'start_time'    =>  microtime(true),
-            );
+            throw new \RuntimeException('Unknown property: ' . $key);
+        }
+
+        return $this->$key;
+    }
+
+    public function __set($key, $value)
+    {
+        $this->key = $value;
+    }
+
+    static public function createFromBlob($blob, $library = null)
+    {
+        // Trick to allow empty source in constructor
+        self::$init = true;
+        $obj = new Image(null, $library);
+
+        $info = getimagesizefromstring($blob);
+
+        // Find MIME type
+        if (!$info && function_exists('finfo_open'))
+        {
+            $f = finfo_open(FILEINFO_MIME);
+            $info = ['mime' => strstr(finfo_buffer($f, $blob), ';', true)];
+            finfo_close($f);
+        }
+
+        if (!$info)
+        {
+            throw new \RuntimeException('Invalid image format, couldn\'t be read: from string');
+        }
+
+        $obj->blob = $blob;
+        $obj->init($info, $library);
+
+        self::$init = false;
+
+        return $obj;
+    }
+
+    /**
+     * Open an image file
+     */
+    public function open()
+    {
+        if ($this->pointer !== null)
+        {
+            return true;
+        }
+
+        if ($this->path)
+        {
+            call_user_func([$this, $this->library . '_open']);
+        }
+        else
+        {
+            call_user_func([$this, $this->library . '_blob'], $this->blob);
+            $this->blob = null;
+        }
+
+        if (!$this->pointer)
+        {
+            throw new \RuntimeException('Invalid image format, couldn\'t be read: ' . $this->path);
+        }
+
+        call_user_func([$this, $this->library . '_size']);
+
+        return $this;
+    }
+
+    public function __destruct()
+    {
+        $this->blob = null;
+        $this->path = null;
+
+        if ($this->pointer)
+        {
+            call_user_func([$this, $this->library . '_close']);
+        }
+    }
+
+    /**
+     * Returns image width and height
+     * @return array            array(ImageWidth, ImageHeight)
+     */
+    public function getSize()
+    {
+        return [$this->width, $this->height];
+    }
+
+    /**
+     * Crop the current image to this dimensions
+     * @param  integer $new_width  Width of the desired image
+     * @param  integer $new_height Height of the desired image
+     * @return Image
+     */
+    public function crop($new_width = null, $new_height = null)
+    {
+        $this->open();
+
+        if (!$new_width)
+        {
+            $new_width = $new_height = min($this->width, $this->height);
         }
 
         if (!$new_height)
@@ -1956,538 +2044,862 @@ class image
             $new_height = $new_width;
         }
 
+        $method = $this->library . '_crop';
+
+        if (!method_exists($this, $method))
+        {
+            throw new \RuntimeException('Crop is not supported by the current library: ' . $this->library);
+        }
+
+        $this->$method((int) $new_width, (int) $new_height);
+        call_user_func([$this, $this->library . '_size']);
+
+        return $this;
+    }
+
+    public function resize($new_width, $new_height = null, $ignore_aspect_ratio = false)
+    {
+        $this->open();
+
+        if (!$new_height)
+        {
+            $new_height = $new_width;
+        }
+
+        if ($this->width <= $new_width && $this->height <= $new_height)
+        {
+            // Nothing to do
+            return $this;
+        }
+
         $new_height = (int) $new_height;
         $new_width = (int) $new_width;
 
-        $lib = false;
+        call_user_func([$this, $this->library . '_resize'], $new_width, $new_height, $ignore_aspect_ratio);
+        call_user_func([$this, $this->library . '_size']);
 
-        if (self::option(self::FORCE_IMLIB))
-        {
-            if (!self::canUseImlib())
-                throw new imageLibException('Imlib seems not installed');
-
-            $lib = self::IMLIB;
-        }
-        elseif (self::option(self::FORCE_GD))
-        {
-            if (!self::canUseGD())
-                throw new imageLibException('GD seems not installed');
-
-            $lib = self::GD;
-        }
-        elseif (self::option(self::FORCE_IMAGICK))
-        {
-            if (!self::canUseImagick())
-                throw new imageLibException('Imagick seems not installed');
-
-            $lib = self::IMAGICK;
-        }
-
-        if (self::option(self::FORCE_SIZE_USING_BACKGROUND_COLOR))
-        {
-            if ($lib == self::IMLIB)
-            {
-                throw new imageLibException("You can't use Imlib to force image size width background color.");
-            }
-
-            if (!$lib && self::canUseImagick())
-            {
-                $lib = self::IMAGICK;
-            }
-            elseif (!$lib && self::canUseGD())
-            {
-                $lib = self::GD;
-            }
-            elseif (!$lib)
-            {
-                throw new imageLibException("You need GD or Imagick to force image size using background color.");
-            }
-        }
-
-        if (!$lib)
-        {
-            if (self::canUseImlib())
-                $lib = self::IMLIB;
-            elseif (self::canUseImagick())
-                $lib = self::IMAGICK;
-            elseif (self::canUseGD())
-                $lib = self::GD;
-        }
-
-        if (empty($lib))
-        {
-            throw new imageLibException('No usable image library found');
-        }
-
-        if ($lib == self::IMLIB)
-        {
-            $res = self::imlibResize($src_file, $dst_file, $new_width, $new_height);
-        }
-        elseif ($lib == self::IMAGICK)
-        {
-            $res = self::imagickResize($src_file, $dst_file, $new_width, $new_height);
-        }
-        elseif ($lib == self::GD)
-        {
-            $res = self::gdResize($src_file, $dst_file, $new_width, $new_height);
-        }
-
-        if (self::option(self::ENABLE_REPORT))
-        {
-            if ($lib == self::IMLIB)
-                self::$report['engine_used'] = 'imlib';
-            elseif ($lib == self::IMAGICK)
-                self::$report['engine_used'] = 'imagick';
-            elseif ($lib == self::GD)
-                self::$report['engine_used'] = 'gd';
-
-            self::$report['time_taken'] = microtime(true) - self::$report['start_time'];
-            unset(self::$report['start_time']);
-        }
-
-        return $res;
+        return $this;
     }
 
-    static public function getReport()
+    public function rotate($angle)
     {
-        return self::$report;
+        $this->open();
+
+        if (!$angle)
+        {
+            return $this;
+        }
+
+        $method = $this->library . '_rotate';
+
+        if (!method_exists($this, $method))
+        {
+            throw new \RuntimeException('Rotate is not supported by the current library: ' . $this->library);
+        }
+
+        call_user_func([$this, $method], $angle);
+        call_user_func([$this, $this->library . '_size']);
+
+        return $this;
     }
 
-    static protected function getCropGeometry($w, $h, $new_width, $new_height)
+    public function autoRotate()
+    {
+        $orientation = $this->getOrientation();
+
+        if (!$orientation)
+        {
+            return $this;
+        }
+
+        if (in_array($orientation, [2, 4, 5, 7]))
+        {
+            $this->flip();
+        }
+
+        switch ($orientation)
+        {
+            case 3:
+            case 4:
+                return $this->rotate(180);
+            case 5:
+            case 8:
+                return $this->rotate(270);
+            case 7:
+            case 6:
+                return $this->rotate(90);
+        }
+
+        return $this;
+    }
+
+    public function flip()
+    {
+        $this->open();
+        $method = $this->library . '_flip';
+
+        if (!method_exists($this, $method))
+        {
+            throw new \RuntimeException('Flip is not supported by the current library: ' . $this->library);
+        }
+
+        call_user_func([$this, $method]);
+
+        return $this;
+    }
+
+    public function cropResize($new_width, $new_height = null)
+    {
+        $this->open();
+
+        if (!$new_height)
+        {
+            $new_height = $new_width;
+        }
+
+        $source_aspect_ratio = $this->width / $this->height;
+        $desired_aspect_ratio = $new_width / $new_height;
+
+        if ($source_aspect_ratio > $desired_aspect_ratio)
+        {
+            $temp_height = $new_height;
+            $temp_width = (int) ($new_height * $source_aspect_ratio);
+        }
+        else
+        {
+            $temp_width = $new_width;
+            $temp_height = (int) ($new_width / $source_aspect_ratio);
+        }
+
+        return $this->resize($temp_width, $temp_height)->crop($new_width, $new_height);
+    }
+
+    public function getSupportedFormats(): array
+    {
+        return call_user_func([$this, $this->library . '_formats']);
+    }
+
+    public function save($destination, $format = null)
+    {
+        $this->open();
+
+        $supported = call_user_func([$this, $this->library . '_formats']);
+
+        if (is_null($format)) {
+            $format = $this->format;
+        }
+        // Support for multiple output formats
+        elseif (is_array($format)) {
+            foreach ($format as $f) {
+                if (null === $f) {
+                    $format = $this->format;
+                    break;
+                }
+                elseif (in_array($f, $supported)) {
+                    $format = $f;
+                    break;
+                }
+            }
+
+            if (!is_string($format)) {
+                throw new \InvalidArgumentException(sprintf('None of the specified formats %s can be saved by %s', implode(', ', $format), $this->library));
+            }
+        }
+
+        if (!in_array($format, call_user_func([$this, $this->library . '_formats']))) {
+            throw new \InvalidArgumentException('The specified format ' . $format . ' can not be used by ' . $this->library);
+        }
+
+        return call_user_func([$this, $this->library . '_save'], $destination, $format);
+    }
+
+    public function output($format = null, $return = false)
+    {
+        $this->open();
+
+        if (is_null($format))
+        {
+            $format = $this->format;
+        }
+
+        if (!in_array($format, call_user_func([$this, $this->library . '_formats'])))
+        {
+            throw new \InvalidArgumentException('The specified format ' . $format . ' can not be used by ' . $this->library);
+        }
+
+        return call_user_func([$this, $this->library . '_output'], $format, $return);
+    }
+
+    public function format()
+    {
+        return $this->format;
+    }
+
+    protected function getCropGeometry($w, $h, $new_width, $new_height)
     {
         $proportion_src = $w / $h;
         $proportion_dst = $new_width / $new_height;
 
         $x = $y = 0;
-        $out_w = $w;
-        $out_h = $h;
+        $out_w = $new_width;
+        $out_h = $new_height;
 
         if ($proportion_src > $proportion_dst)
         {
-            $out_w = $h * $proportion_dst;
+            $out_w = $out_h * $proportion_dst;
             $x = round(($w - $out_w) / 2);
         }
         else
         {
-            $out_h = $w / $proportion_dst;
+            $out_h = $out_h / $proportion_dst;
             $y = round(($h - $out_h) / 2);
         }
 
-        return array($x, $y, round($out_w), round($out_h));
+        return [$x, $y, round($out_w), round($out_h)];
     }
 
-    static protected function imlibResize($src_file, $dst_file, $new_width, $new_height)
+    /**
+     * Returns the format name from the MIME type
+     * @param  string $type MIME type
+     * @return Format: jpeg, gif, svg, etc.
+     */
+    public function getFormatFromType($type)
     {
-        $src = @imlib_load_image($src_file);
-
-        if (!$src)
-            return false;
-
-        if ($format = self::option(self::FORCE_OUTPUT_FORMAT))
-            $type = strtolower($format);
-        else
-            $type = strtolower(imlib_image_format($src));
-
-        $w = imlib_image_get_width($src);
-        $h = imlib_image_get_height($src);
-
-        if (self::option(self::CROP))
+        switch ($type)
         {
-            list($x, $y, $w, $h) = self::getCropGeometry($w, $h, $new_width, $new_height);
-
-            $dst = imlib_create_cropped_scaled_image($src, $x, $y, $w, $h, $new_width, $new_height);
-        }
-        elseif (self::option(self::IGNORE_ASPECT_RATIO))
-        {
-            $dst = imlib_create_scaled_image($src, $new_width, $new_height);
-        }
-        else
-        {
-            if ($w > $h)
-                $new_height = 0;
-            else
-                $new_width = 0;
-
-            $dst = imlib_create_scaled_image($src, $new_width, $new_height);
-        }
-
-        imlib_free_image($src);
-
-        if ($type == 'png')
-        {
-            $png_compression = (int) self::option(self::PNG_COMPRESSION);
-
-            if (empty($png_compression))
-                $png_compression = self::$default_png_compression;
-
-            imlib_image_set_format($dst, 'png');
-            $res = imlib_save_image($dst, $dst_file, $err, (int)$png_compression);
-        }
-        elseif ($type == 'gif')
-        {
-            imlib_image_set_format($dst, 'gif');
-            $res = imlib_save_image($dst, $dst_file);
-        }
-        else
-        {
-            $jpeg_quality = (int) self::option(self::JPEG_QUALITY);
-
-            if (empty($jpeg_quality))
-                $jpeg_quality = self::$default_jpeg_quality;
-
-            imlib_image_set_format($dst, 'jpeg');
-            $res = imlib_save_image($dst, $dst_file, $err, (int)$jpeg_quality);
-        }
-
-        $w = imlib_image_get_width($dst);
-        $h = imlib_image_get_height($dst);
-
-        imlib_free_image($dst);
-
-        return ($res ? array($w, $h) : $res);
-    }
-
-    static protected function imagickResize($src_file, $dst_file, $new_width, $new_height)
-    {
-        try {
-            $im = new Imagick($src_file);
-        }
-        catch (ImagickException $e)
-        {
-            return false;
-        }
-
-        if ($format = self::option(self::FORCE_OUTPUT_FORMAT))
-            $type = strtolower($format);
-        else
-            $type = strtolower($im->getImageFormat());
-
-        $im->setImageFormat($type);
-
-        if (self::option(self::CROP))
-        {
-            $im->cropThumbnailImage($new_width, $new_height);
-        }
-        elseif (self::option(self::FORCE_SIZE_USING_BACKGROUND_COLOR))
-        {
-            if (self::option(self::FORCE_SIZE_USING_BACKGROUND_COLOR) == self::TRANSPARENT_COLOR)
-                $c = new ImagickPixel('transparent');
-            elseif (strlen(self::option(self::FORCE_SIZE_USING_BACKGROUND_COLOR)) != 6)
-                $c = new ImagickPixel('#' . self::$default_background_color);
-            else
-                $c = new ImagickPixel('#' . self::option(self::FORCE_SIZE_USING_BACKGROUND_COLOR));
-
-            $im->thumbnailImage($new_width, $new_height, true);
-
-            $bg = new Imagick;
-            $bg->newImage($new_width, $new_height, $c, 'png');
-
-            $geometry = $im->getImageGeometry();
-
-            /* The overlay x and y coordinates */
-            $x = ($new_width - $geometry['width']) / 2;
-            $y = ($new_height - $geometry['height']) / 2;
-
-            $bg->compositeImage($im, imagick::COMPOSITE_OVER, $x, $y);
-            $im->destroy();
-            $im = $bg;
-            unset($bg);
-        }
-        else
-        {
-            $im->thumbnailImage($new_width, $new_height, !self::option(self::IGNORE_ASPECT_RATIO));
-        }
-
-        if ($type == 'png')
-        {
-            $png_compression = (int) self::option(self::PNG_COMPRESSION);
-
-            if (empty($png_compression))
-                $png_compression = self::$default_png_compression;
-
-            $im->setImageFormat('png');
-            $im->setCompression(Imagick::COMPRESSION_LZW);
-            $im->setCompressionQuality($png_compression * 10);
-        }
-        elseif ($type == 'gif')
-        {
-            $im->setImageFormat('gif');
-        }
-        else
-        {
-            $jpeg_quality = (int) self::option(self::JPEG_QUALITY);
-
-            if (empty($jpeg_quality))
-                $jpeg_quality = self::$default_jpeg_quality;
-
-            $im->setImageFormat('jpeg');
-            $im->setCompression(Imagick::COMPRESSION_JPEG);
-            $im->setCompressionQuality($jpeg_quality);
-        }
-
-        $res = file_put_contents($dst_file, $im);
-
-        $w = $im->getImageWidth();
-        $h = $im->getImageHeight();
-
-        $im->destroy();
-
-        return ($res ? array($w, $h) : $res);
-    }
-
-    static protected function gdResize($src_file, $dst_file, $new_width, $new_height)
-    {
-        $infos = self::identify($src_file);
-
-        if (!$infos)
-            return false;
-
-        if (self::option(self::FORCE_OUTPUT_FORMAT))
-            $type = self::option(self::FORCE_OUTPUT_FORMAT);
-        else
-            $type = $infos['format'];
-
-        try
-        {
-            switch ($infos['format'])
-            {
-                case 'JPEG':
-                    $src = imagecreatefromjpeg($src_file);
-                    break;
-                case 'PNG':
-                    $src = imagecreatefrompng($src_file);
-                    break;
-                case 'GIF':
-                    $src = imagecreatefromgif($src_file);
-                    break;
-                default:
-                    return false;
-            }
-
-            if (!$src)
-                throw new Exception("No source image created");
-        }
-        catch (Exception $e)
-        {
-            throw new imageLibException("Invalid input format: ".$e->getMessage());
-        }
-
-        $w = $infos['width'];
-        $h = $infos['height'];
-
-        $dst_x = 0;
-        $dst_y = 0;
-        $src_x = 0;
-        $src_y = 0;
-        $dst_w = $new_width;
-        $dst_h = $new_height;
-        $src_w = $w;
-        $src_h = $h;
-        $out_w = $new_width;
-        $out_h = $new_height;
-
-        if (self::option(self::CROP))
-        {
-            list($src_x, $src_y, $src_w, $src_h) = self::getCropGeometry($w, $h, $new_width, $new_height);
-        }
-        elseif (!self::option(self::IGNORE_ASPECT_RATIO))
-        {
-            if ($w <= $new_width && $h <= $new_height)
-            {
-                $dst_w = $out_w = $w;
-                $dst_h = $out_h = $h;
-            }
-            else
-            {
-                $in_ratio = $w / $h;
-                $out_ration = $new_width / $new_height;
-
-                $pic_width = $new_width;
-                $pic_height = $new_height;
-
-                if ($in_ratio >= $out_ration)
-                {
-                    $pic_height = $new_width / $in_ratio;
-                }
-                else
-                {
-                    $pic_width = $new_height * $in_ratio;
-                }
-
-                $dst_w = $out_w = $pic_width;
-                $dst_h = $out_h = $pic_height;
-            }
-        }
-
-        if (self::option(self::FORCE_SIZE_USING_BACKGROUND_COLOR))
-        {
-            $diff_width = $new_width - $dst_w;
-            $diff_height = $new_height - $dst_h;
-            $offset_x = $diff_width / 2;
-            $offset_y = $diff_height / 2;
-
-            $dst_x = round($offset_x);
-            $dst_y = round($offset_y);
-            $out_w = $new_width;
-            $out_h = $new_height;
-        }
-
-        $dst = imagecreatetruecolor($out_w, $out_h);
-
-        if (!$dst)
-        {
-            return false;
-        }
-
-        imageinterlace($dst, 0);
-
-        $use_background = false;
-
-        if (self::option(self::FORCE_SIZE_USING_BACKGROUND_COLOR))
-        {
-            if (self::option(self::FORCE_SIZE_USING_BACKGROUND_COLOR) == self::TRANSPARENT_COLOR
-                || strlen(self::option(self::FORCE_SIZE_USING_BACKGROUND_COLOR)) == 6)
-                $use_background = self::option(self::FORCE_SIZE_USING_BACKGROUND_COLOR);
-            else
-                $use_background = self::$default_background_color;
-        }
-
-        if (!$use_background || $use_background == self::TRANSPARENT_COLOR)
-        {
-            imagealphablending($dst, false);
-            imagesavealpha($dst, true);
-            imagefill($dst, 0, 0, imagecolorallocatealpha($dst, 0, 0, 0, 127));
-        }
-        else
-        {
-            $color = imagecolorallocate($dst,
-                hexdec(substr($use_background, 0, 2)),
-                hexdec(substr($use_background, 2, 2)),
-                hexdec(substr($use_background, 4, 2))
-                );
-
-            imagefill($dst, 0, 0, $color);
-        }
-
-
-        if (self::option(self::USE_GD_FAST_RESIZE_TRICK))
-        {
-            fastimagecopyresampled($dst, $src, $dst_x, $dst_y, $src_x, $src_y, $dst_w, $dst_h, $src_w, $src_h, 2);
-        }
-        else
-        {
-            imagecopyresampled($dst, $src, $dst_x, $dst_y, $src_x, $src_y, $dst_w, $dst_h, $src_w, $src_h);
-        }
-
-        imagedestroy($src);
-
-        try
-        {
-            if ($type == 'PNG')
-            {
-                $png_compression = (int) self::option(self::PNG_COMPRESSION);
-
-                if (empty($png_compression))
-                    $png_compression = self::$default_png_compression;
-
-                $res = imagepng($dst, $dst_file, $png_compression, PNG_NO_FILTER);
-            }
-            elseif ($type == 'GIF')
-            {
-                $res = imagegif($dst, $dst_file);
-            }
-            else
-            {
-                $jpeg_quality = (int) self::option(self::JPEG_QUALITY);
-
-                if (empty($jpeg_quality))
-                    $jpeg_quality = self::$default_jpeg_quality;
-
-                $res = imagejpeg($dst, $dst_file, $jpeg_quality);
-            }
-
-            imagedestroy($dst);
-        }
-        catch (Exception $e)
-        {
-            throw new imageLibException("Unable to create destination file: ".$e->getMessage());
-        }
-
-        return ($res ? array($dst_w, $dst_h) : $res);
-    }
-
-    static public function getImageStreamFormat($bytes)
-    {
-        $b = substr($bytes, 0, 4);
-
-        switch ($b)
-        {
-            case 'GIF8':
-                return 'GIF';
-            case pack('H*', 'ffd8ffe0'):
-                return 'JPEG';
-            case pack('H*', '89504e47'):
-                return 'PNG';
+            // Special cases
+            case 'image/svg+xml':   return 'svg';
+            case 'application/pdf': return 'pdf';
+            case 'image/vnd.adobe.photoshop': return 'psd';
+            case 'image/x-icon': return 'bmp';
+            case 'image/webp': return 'webp';
             default:
+                if (preg_match('!^image/([\w\d]+)$!', $type, $match))
+                {
+                    return $match[1];
+                }
+
                 return false;
         }
     }
-}
 
-function fastimagecopyresampled (&$dst_image, $src_image, $dst_x, $dst_y, $src_x, $src_y, $dst_w, $dst_h, $src_w, $src_h, $quality = 3)
-{
-    // Plug-and-Play fastimagecopyresampled function replaces much slower imagecopyresampled.
-    // Just include this function and change all "imagecopyresampled" references to "fastimagecopyresampled".
-    // Typically from 30 to 60 times faster when reducing high resolution images down to thumbnail size using the default quality setting.
-    // Author: Tim Eckel - Date: 09/07/07 - Version: 1.1 - Project: FreeRingers.net - Freely distributable - These comments must remain.
-    //
-    // Optional "quality" parameter (defaults is 3). Fractional values are allowed, for example 1.5. Must be greater than zero.
-    // Between 0 and 1 = Fast, but mosaic results, closer to 0 increases the mosaic effect.
-    // 1 = Up to 350 times faster. Poor results, looks very similar to imagecopyresized.
-    // 2 = Up to 95 times faster.  Images appear a little sharp, some prefer this over a quality of 3.
-    // 3 = Up to 60 times faster.  Will give high quality smooth results very close to imagecopyresampled, just faster.
-    // 4 = Up to 25 times faster.  Almost identical to imagecopyresampled for most images.
-    // 5 = No speedup. Just uses imagecopyresampled, no advantage over imagecopyresampled.
-
-    if (empty($src_image) || empty($dst_image) || $quality <= 0)
+    static public function getLibrariesForFormat($format)
     {
+        self::$init = true;
+        $im = new Image;
+        self::$init = false;
+
+        $libraries = [];
+
+        foreach ($im->libraries as $name => $enabled)
+        {
+            if (!$enabled)
+            {
+                continue;
+            }
+
+            if (in_array($format, call_user_func([$im, $name . '_formats'])))
+            {
+                $libraries[] = $name;
+            }
+        }
+
+        return $libraries;
+    }
+
+    /**
+     * Returns orientation of a JPEG file according to its EXIF tag
+     * @link  http://magnushoff.com/jpeg-orientation.html See to interpret the orientation value
+     * @return integer|boolean An integer between 1 and 8 or false if no orientation tag have been found
+     */
+    public function getOrientation()
+    {
+        if ($this->format != 'jpeg') {
+            return false;
+        }
+
+        $file = fopen($this->path, 'rb');
+        rewind($file);
+
+        // Get length of file
+        fseek($file, 0, SEEK_END);
+        $length = ftell($file);
+        rewind($file);
+
+        $sign = 'n';
+
+        if (fread($file, 2) !== "\xff\xd8")
+        {
+            return false;
+        }
+
+        while (!feof($file))
+        {
+            $marker = fread($file, 2);
+            $l = fread($file, 2);
+
+            if (strlen($marker) != 2 || strlen($l) != 2) {
+                return false;
+            }
+
+            $info = unpack('nlength', $l);
+            $section_length = $info['length'];
+
+            if ($marker == "\xff\xe1")
+            {
+                if (fread($file, 6) != "Exif\x00\x00")
+                {
+                    return false;
+                }
+
+                if (fread($file, 2) == "\x49\x49")
+                {
+                    $sign = 'v';
+                }
+
+                fseek($file, 2, SEEK_CUR);
+
+                $info = unpack(strtoupper($sign) . 'offset', fread($file, 4));
+                fseek($file, $info['offset'] - 8, SEEK_CUR);
+
+                $info = unpack($sign . 'tags', fread($file, 2));
+                $tags = $info['tags'];
+
+                for ($i = 0; $i < $tags; $i++)
+                {
+                    $info = unpack(sprintf('%stag', $sign), fread($file, 2));
+
+                    if ($info['tag'] == 0x0112)
+                    {
+                        fseek($file, 6, SEEK_CUR);
+                        $info = unpack(sprintf('%sorientation', $sign), fread($file, 2));
+                        return $info['orientation'];
+                    }
+                    else
+                    {
+                        fseek($file, 10, SEEK_CUR);
+                    }
+                }
+            }
+            else if (is_numeric($marker) && $marker & 0xFF00 && $marker != "\xFF\x00")
+            {
+                break;
+            }
+            else
+            {
+                fseek($file, $section_length - 2, SEEK_CUR);
+            }
+        }
+
         return false;
     }
 
-    if ($quality < 5 && (($dst_w * $quality) < $src_w || ($dst_h * $quality) < $src_h))
+    // EPEG methods //////////////////////////////////////////////////////////
+    protected function epeg_open()
     {
-        $temp = imagecreatetruecolor ($dst_w * $quality + 1, $dst_h * $quality + 1);
-        imagecopyresized ($temp, $src_image, 0, 0, $src_x, $src_y, $dst_w * $quality + 1, $dst_h * $quality + 1, $src_w, $src_h);
-        imagecopyresampled ($dst_image, $temp, $dst_x, $dst_y, 0, 0, $dst_w, $dst_h, $dst_w * $quality, $dst_h * $quality);
-        imagedestroy ($temp);
-    }
-    else
-    {
-        imagecopyresampled ($dst_image, $src_image, $dst_x, $dst_y, $src_x, $src_y, $dst_w, $dst_h, $src_w, $src_h);
+        $this->pointer = new \Epeg($this->path);
+        $this->format = 'jpeg';
     }
 
-    return true;
+    protected function epeg_formats()
+    {
+        return ['jpeg'];
+    }
+
+    protected function epeg_blob($data)
+    {
+        $this->pointer = \Epeg::openBuffer($data);
+    }
+
+    protected function epeg_size()
+    {
+        // Do nothing as it only returns the original size of the JPEG
+        // not the resized size
+        /*
+        $size = $this->pointer->getSize();
+        $this->width = $size[0];
+        $this->height = $size[1];
+        */
+    }
+
+    protected function epeg_close()
+    {
+        $this->pointer = null;
+    }
+
+    protected function epeg_save($destination, $format)
+    {
+        $this->pointer->setQuality($this->jpeg_quality);
+        return $this->pointer->encode($destination);
+    }
+
+    protected function epeg_output($format, $return)
+    {
+        $this->pointer->setQuality($this->jpeg_quality);
+
+        if ($return)
+        {
+            return $this->pointer->encode();
+        }
+
+        echo $this->pointer->encode();
+        return true;
+    }
+
+    protected function epeg_crop($new_width, $new_height)
+    {
+        if (!method_exists($this->pointer, 'setDecodeBounds'))
+        {
+            throw new \RuntimeException('Crop is not supported by EPEG');
+        }
+
+        $x = floor(($this->width - $new_width) / 2);
+        $y = floor(($this->height - $new_height) / 2);
+
+        $this->pointer->setDecodeBounds($x, $y, $new_width, $new_height);
+    }
+
+    protected function epeg_resize($new_width, $new_height, $ignore_aspect_ratio)
+    {
+        if (!$ignore_aspect_ratio)
+        {
+            $in_ratio = $this->width / $this->height;
+
+            $out_ratio = $new_width / $new_height;
+
+            if ($in_ratio >= $out_ratio)
+            {
+                $new_height = $new_width / $in_ratio;
+            }
+            else
+            {
+                $new_width = $new_height * $in_ratio;
+            }
+        }
+
+        $this->width = $new_width;
+        $this->height = $new_height;
+
+        $this->pointer->setDecodeSize($new_width, $new_height, true);
+    }
+
+    // Imagick methods ////////////////////////////////////////////////////////
+    protected function imagick_open()
+    {
+        try {
+            $this->pointer = new \Imagick($this->path);
+        }
+        catch (\ImagickException $e)
+        {
+            throw new \RuntimeException('Unable to open file: ' . $this->path, false, $e);
+        }
+
+        $this->format = strtolower($this->pointer->getImageFormat());
+    }
+
+    protected function imagick_formats()
+    {
+        return array_map('strtolower', (new \Imagick)->queryFormats());
+    }
+
+    protected function imagick_blob($data)
+    {
+        try {
+            $this->pointer = new \Imagick;
+            $this->pointer->readImageBlob($data);
+        }
+        catch (\ImagickException $e)
+        {
+            throw new \RuntimeException('Unable to open data string of length ' . strlen($data), false, $e);
+        }
+
+        $this->format = strtolower($this->pointer->getImageFormat());
+    }
+
+    protected function imagick_size()
+    {
+        $this->width = $this->pointer->getImageWidth();
+        $this->height = $this->pointer->getImageHeight();
+    }
+
+    protected function imagick_close()
+    {
+        $this->pointer->destroy();
+    }
+
+    protected function imagick_save($destination, $format)
+    {
+        $this->pointer->setImageFormat($format);
+
+        if ($format == 'png')
+        {
+            $this->pointer->setOption('png:compression-level', 9);
+            $this->pointer->setImageCompression(\Imagick::COMPRESSION_LZW);
+            $this->pointer->setImageCompressionQuality($this->compression * 10);
+        }
+        elseif ($format == 'jpeg')
+        {
+            $this->pointer->setImageCompression(\Imagick::COMPRESSION_JPEG);
+            $this->pointer->setImageCompressionQuality($this->jpeg_quality);
+            $this->pointer->setInterlaceScheme($this->progressive_jpeg ? \Imagick::INTERLACE_PLANE : \Imagick::INTERLACE_NO);
+        }
+        elseif ($format == 'webp') {
+            $this->pointer->setImageCompressionQuality($this->webp_quality);
+        }
+
+        $this->pointer->stripImage();
+
+        if ($format == 'gif' && $this->pointer->getNumberImages() > 1) {
+            // writeImages is buggy in old versions of Imagick
+            return file_put_contents($destination, $this->pointer->getImagesBlob());
+        }
+        else {
+            return $this->pointer->writeImage($destination);
+        }
+    }
+
+    protected function imagick_output($format, $return)
+    {
+        $this->pointer->setImageFormat($format);
+
+        if ($format == 'png')
+        {
+            $this->pointer->setOption('png:compression-level', 9);
+            $this->pointer->setImageCompression(\Imagick::COMPRESSION_LZW);
+            $this->pointer->setImageCompressionQuality($this->compression * 10);
+            $this->pointer->stripImage();
+        }
+        else if ($format == 'jpeg')
+        {
+            $this->pointer->setImageCompression(\Imagick::COMPRESSION_JPEG);
+            $this->pointer->setImageCompressionQuality($this->jpeg_quality);
+            $this->pointer->setInterlaceScheme($this->progressive_jpeg ? \Imagick::INTERLACE_PLANE : \Imagick::INTERLACE_NO);
+        }
+        elseif ($format == 'webp') {
+            $this->pointer->setImageCompressionQuality($this->webp_quality);
+        }
+
+        if ($format == 'gif' && $this->pointer->getNumberImages() > 1) {
+            $res = $this->pointer->getImagesBlob();
+        }
+        else {
+            $res = (string) $this->pointer;
+        }
+
+        if ($return) {
+            return $res;
+        }
+
+        echo $res;
+        return true;
+    }
+
+    protected function imagick_crop($new_width, $new_height)
+    {
+        $src_x = floor(($this->width - $new_width) / 2);
+        $src_y = floor(($this->height - $new_height) / 2);
+
+        // Detect animated GIF
+        if ($this->format == 'gif')
+        {
+            $this->pointer = $this->pointer->coalesceImages();
+
+            do {
+                $this->pointer->cropImage($new_width, $new_height, $src_x, $src_y);
+                $this->pointer->setImagePage($new_width, $new_height, 0, 0);
+            } while ($this->pointer->nextImage());
+
+            $this->pointer = $this->pointer->deconstructImages();
+        }
+        else
+        {
+            $this->pointer->cropImage($new_width, $new_height, $src_x, $src_y);
+            $this->pointer->setImagePage($new_width, $new_height, 0, 0);
+        }
+    }
+
+    protected function imagick_resize($new_width, $new_height, $ignore_aspect_ratio = false)
+    {
+        // Detect animated GIF
+        if ($this->format == 'gif' && $this->pointer->getNumberImages() > 1)
+        {
+            $image = $this->pointer->coalesceImages();
+
+            foreach ($image as $frame)
+            {
+                $frame->thumbnailImage($new_width, $new_height, !$ignore_aspect_ratio);
+                $frame->setImagePage($new_width, $new_height, 0, 0);
+            }
+
+            $this->pointer = $image->deconstructImages();
+        }
+        else
+        {
+            $this->pointer->resizeImage($new_width, $new_height, \Imagick::FILTER_CATROM, 1, !$ignore_aspect_ratio, false);
+        }
+    }
+
+    protected function imagick_rotate($angle)
+    {
+        $pixel = new \ImagickPixel('#00000000');
+
+        if ($this->format == 'gif' && $this->pointer->getNumberImages() > 1) {
+            $image = $this->pointer->coalesceImages();
+
+            foreach ($image as $frame) {
+                $frame->rotateImage($pixel, $angle);
+                $frame->setImageOrientation(\Imagick::ORIENTATION_UNDEFINED);
+            }
+
+            $this->pointer = $image->deconstructImages();
+        }
+        else {
+            $this->pointer->rotateImage($pixel, $angle);
+            $this->pointer->setImageOrientation(\Imagick::ORIENTATION_UNDEFINED);
+        }
+    }
+
+    protected function imagick_flip()
+    {
+        if ($this->format == 'gif' && $this->pointer->getNumberImages() > 1) {
+            $image = $this->pointer->coalesceImages();
+
+            foreach ($image as $frame) {
+                $frame->flopImage();
+            }
+
+            $this->pointer = $image->deconstructImages();
+        }
+        else {
+            $this->pointer->flopImage();
+        }
+    }
+
+    // GD methods /////////////////////////////////////////////////////////////
+    protected function gd_open()
+    {
+        $this->pointer = call_user_func('imagecreatefrom' . $this->format, $this->path);
+
+        if ($this->format == 'png' || $this->format == 'gif') {
+            imagealphablending($this->pointer, false);
+            imagesavealpha($this->pointer, true);
+        }
+    }
+
+    protected function gd_formats()
+    {
+        $supported = imagetypes();
+        $formats = [];
+
+        if (\IMG_PNG & $supported)
+            $formats[] = 'png';
+
+        if (\IMG_GIF & $supported)
+            $formats[] = 'gif';
+
+        if (\IMG_JPEG & $supported)
+            $formats[] = 'jpeg';
+
+        if (\IMG_WBMP & $supported)
+            $formats[] = 'wbmp';
+
+        if (\IMG_XPM & $supported)
+            $formats[] = 'xpm';
+
+        if (function_exists('imagecreatefromwebp'))
+            $formats[] = 'webp';
+
+        return $formats;
+    }
+
+    protected function gd_blob($data)
+    {
+        $this->pointer = imagecreatefromstring($data);
+
+        if ($this->format == 'png' || $this->format == 'gif') {
+            imagealphablending($this->pointer, false);
+            imagesavealpha($this->pointer, true);
+        }
+    }
+
+    protected function gd_size()
+    {
+        $this->width = imagesx($this->pointer);
+        $this->height = imagesy($this->pointer);
+    }
+
+    protected function gd_close()
+    {
+        return imagedestroy($this->pointer);
+    }
+
+    protected function gd_save($destination, $format)
+    {
+        if ($format == 'jpeg')
+        {
+            imageinterlace($this->pointer, (int)$this->progressive_jpeg);
+        }
+
+        switch ($format)
+        {
+            case 'png':
+                return imagepng($this->pointer, $destination, $this->compression, PNG_NO_FILTER);
+            case 'gif':
+                return imagegif($this->pointer, $destination);
+            case 'jpeg':
+                return imagejpeg($this->pointer, $destination, $this->jpeg_quality);
+            case 'webp':
+                return imagewebp($this->pointer, $destination, $this->webp_quality);
+            default:
+                throw new \InvalidArgumentException('Image format ' . $format . ' is unknown.');
+        }
+    }
+
+    protected function gd_output($format, $return)
+    {
+        if ($return)
+        {
+            ob_start();
+        }
+
+        $res = $this->gd_save(null, $format);
+
+        if ($return)
+        {
+            return ob_get_clean();
+        }
+
+        return $res;
+    }
+
+    protected function gd_create($w, $h)
+    {
+        $new = imagecreatetruecolor((int)$w, (int)$h);
+
+        if ($this->format == 'png' || $this->format == 'gif')
+        {
+            imagealphablending($new, false);
+            imagesavealpha($new, true);
+            imagefilledrectangle($new, 0, 0, (int)$w, (int)$h, imagecolorallocatealpha($new, 255, 255, 255, 127));
+        }
+
+        return $new;
+    }
+
+    protected function gd_crop($new_width, $new_height)
+    {
+        $new = $this->gd_create($new_width, $new_height);
+
+        $src_x = floor(($this->width - $new_width) / 2);
+        $src_y = floor(($this->height - $new_height) / 2);
+
+        imagecopy($new, $this->pointer, 0, 0, $src_x, $src_y, (int)$new_width, (int)$new_height);
+        imagedestroy($this->pointer);
+        $this->pointer = $new;
+    }
+
+    protected function gd_resize($new_width, $new_height, $ignore_aspect_ratio)
+    {
+        if (!$ignore_aspect_ratio)
+        {
+            $in_ratio = $this->width / $this->height;
+
+            $out_ratio = $new_width / $new_height;
+
+            if ($in_ratio >= $out_ratio)
+            {
+                $new_height = $new_width / $in_ratio;
+            }
+            else
+            {
+                $new_width = $new_height * $in_ratio;
+            }
+        }
+
+        $new = $this->gd_create((int)$new_width, (int)$new_height);
+
+        if ($this->use_gd_fast_resize_trick)
+        {
+            $this->gd_fastimagecopyresampled($new, $this->pointer, 0, 0, 0, 0, (int)$new_width, (int)$new_height, $this->width, $this->height, 2);
+        }
+        else
+        {
+            imagecopyresampled($new, $this->pointer, 0, 0, 0, 0, (int)$new_width, (int)$new_height, $this->width, $this->height);
+        }
+
+        imagedestroy($this->pointer);
+        $this->pointer = $new;
+    }
+
+    protected function gd_flip()
+    {
+        imageflip($this->pointer, IMG_FLIP_HORIZONTAL);
+    }
+
+    protected function gd_rotate($angle)
+    {
+        // GD is using counterclockwise
+        $angle = -($angle);
+
+        $this->pointer = imagerotate($this->pointer, (int)$angle, 0);
+    }
+
+    protected function gd_fastimagecopyresampled(&$dst_image, $src_image, $dst_x, $dst_y, $src_x, $src_y, $dst_w, $dst_h, $src_w, $src_h, $quality = 3)
+    {
+        // Plug-and-Play fastimagecopyresampled function replaces much slower imagecopyresampled.
+        // Just include this function and change all "imagecopyresampled" references to "fastimagecopyresampled".
+        // Typically from 30 to 60 times faster when reducing high resolution images down to thumbnail size using the default quality setting.
+        // Author: Tim Eckel - Date: 09/07/07 - Version: 1.1 - Project: FreeRingers.net - Freely distributable - These comments must remain.
+        //
+        // Optional "quality" parameter (defaults is 3). Fractional values are allowed, for example 1.5. Must be greater than zero.
+        // Between 0 and 1 = Fast, but mosaic results, closer to 0 increases the mosaic effect.
+        // 1 = Up to 350 times faster. Poor results, looks very similar to imagecopyresized.
+        // 2 = Up to 95 times faster.  Images appear a little sharp, some prefer this over a quality of 3.
+        // 3 = Up to 60 times faster.  Will give high quality smooth results very close to imagecopyresampled, just faster.
+        // 4 = Up to 25 times faster.  Almost identical to imagecopyresampled for most images.
+        // 5 = No speedup. Just uses imagecopyresampled, no advantage over imagecopyresampled.
+
+        if (empty($src_image) || empty($dst_image) || $quality <= 0)
+        {
+            return false;
+        }
+
+        if ($quality < 5 && (($dst_w * $quality) < $src_w || ($dst_h * $quality) < $src_h))
+        {
+            $temp = imagecreatetruecolor(intval($dst_w * $quality + 1), intval($dst_h * $quality + 1));
+            imagecopyresized($temp, $src_image, 0, 0, (int)$src_x, (int)$src_y, intval($dst_w * $quality + 1), intval($dst_h * $quality + 1), (int)$src_w, (int)$src_h);
+            imagecopyresampled($dst_image, $temp, (int)$dst_x, (int)$dst_y, 0, 0, (int)$dst_w, (int)$dst_h, intval($dst_w * $quality), intval($dst_h * $quality));
+            imagedestroy($temp);
+        }
+        else
+        {
+            imagecopyresampled($dst_image, $src_image, (int) $dst_x, (int) $dst_y, (int) $src_x, (int) $src_y, (int) $dst_w, (int) $dst_h, (int) $src_w, (int) $src_h);
+        }
+
+        return true;
+    }
 }
 
-?><?php
+?>
+<?php
 /*
-    This file is part of KD2FW -- <http://dev.kd2.org/>
+	This file is part of KD2FW -- <http://dev.kd2.org/>
 
-    Copyright (c) 2001-2019 BohwaZ <http://bohwaz.net/>
-    All rights reserved.
+	Copyright (c) 2001-2019 BohwaZ <http://bohwaz.net/>
+	All rights reserved.
 
-    KD2FW is free software: you can redistribute it and/or modify
-    it under the terms of the GNU Affero General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+	KD2FW is free software: you can redistribute it and/or modify
+	it under the terms of the GNU Affero General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
 
-    Foobar is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU Affero General Public License for more details.
+	Foobar is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU Affero General Public License for more details.
 
-    You should have received a copy of the GNU Affero General Public License
-    along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
+	You should have received a copy of the GNU Affero General Public License
+	along with Foobar.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 /**
@@ -2526,7 +2938,7 @@ class ZipWriter
 	 * @param integer $compression 0 to 9
 	 * @return void
 	 */
-	public function setCompression($compression)
+	public function setCompression(int $compression): void
 	{
 		$compression = (int) $compression;
 		$this->compression = max(min($compression, 9), 0);
@@ -2537,7 +2949,7 @@ class ZipWriter
 	 * @param string $data
 	 * @return void
 	 */
-	protected function write($data)
+	protected function write(string $data): void
 	{
 		// We can't use fwrite and ftell directly as ftell doesn't work on some pointers
 		// (eg. php://output)
@@ -2547,10 +2959,10 @@ class ZipWriter
 
 	/**
 	 * Returns the content of the ZIP file
-	 * 
+	 *
 	 * @return string
 	 */
-	public function get()
+	public function get(): string
 	{
 		fseek($this->handle, 0);
 		return stream_get_contents($this->handle);
@@ -2570,7 +2982,7 @@ class ZipWriter
 	 * @throws LogicException
 	 * @throws RuntimeException
 	 */
-	public function add($file, $data = null, $source = null)
+	public function add(string $file, ?string $data = null, ?string $source = null): void
 	{
 		if ($this->closed)
 		{
@@ -2642,7 +3054,7 @@ class ZipWriter
 	 * Add the closing footer to the archive
 	 * @throws LogicException
 	 */
-	public function finalize()
+	public function finalize(): void
 	{
 		if ($this->closed)
 		{
@@ -2672,7 +3084,7 @@ class ZipWriter
 	 * Close the file handle
 	 * @return void
 	 */
-	public function close()
+	public function close(): void
 	{
 		if (!$this->closed)
 		{
@@ -2697,20 +3109,22 @@ class ZipWriter
 	 * @param  integer|null  $offset
 	 * @return string
 	 */
-	protected function makeRecord($central = false, $filename, $size, $compressed_size, $crc, $offset)
+	protected function makeRecord(bool $central, string $filename, int $size, int $compressed_size, string $crc, ?int $offset): string
 	{
 		$header = ($central ? "\x50\x4b\x01\x02\x0e\x00" : "\x50\x4b\x03\x04");
 
+		list($filename, $extra) = $this->encodeFilename($filename);
+
 		$header .=
 			"\x14\x00" // version needed to extract - 2.0
-			. "\x00\x00" // general purpose flag - no flags set
+			. "\x00\x08" // general purpose flag - bit 11 set = enable UTF-8 support
 			. ($this->compression ? "\x08\x00" : "\x00\x00") // compression method - none
 			. "\x01\x80\xe7\x4c" //  last mod file time and date
 			. pack('V', $crc) // crc-32
 			. pack('V', $compressed_size) // compressed size
 			. pack('V', $size) // uncompressed size
 			. pack('v', strlen($filename)) // file name length
-			. "\x00\x00"; // extra field length
+			. pack('v', strlen($extra)); // extra field length
 
 		if ($central)
 		{
@@ -2723,10 +3137,31 @@ class ZipWriter
 		}
 
 		$header .= $filename;
+		$header .= $extra;
 
 		return $header;
 	}
+
+	protected function encodeFilename(string $original): array
+	{
+		// For epub/opendocument files
+		if (!preg_match('//u', $original) || $original == 'mimetype') {
+			return [$original, ''];
+		}
+
+		$data = "\x01" // version
+			. pack('V', crc32($original))
+			. $original;
+
+		return [
+			$original,
+			"\x70\x75" // tag
+			. pack('v', strlen($data)) // length of data
+			. $data
+		];
+	}
 }
+
 ?>
 <?php
 /**
@@ -2766,14 +3201,14 @@ class FotooException extends Exception {}
 
 function exception_error_handler($errno, $errstr, $errfile, $errline )
 {
+    return;
     // For @ ignored errors
-    if (error_reporting() === 0) return;
+    if (error_reporting() & $errno) return;
     throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
 }
 
 set_error_handler("exception_error_handler");
 
-//require_once __DIR__ . '/lib-image/lib.image.php';
 //require_once __DIR__ . '/ZipWriter.php';
 
 class Fotoo_Hosting_Config
@@ -2843,7 +3278,7 @@ class Fotoo_Hosting_Config
                 foreach ($value as $f=>$format)
                 {
                     $format = strtoupper($format);
-                    static $base_support = ['PNG', 'JPEG', 'GIF'];
+                    static $base_support = ['png', 'jpeg', 'gif', 'webp'];
 
                     if (!in_array($format, $base_support) && !class_exists('Imagick'))
                     {
@@ -2876,59 +3311,6 @@ class Fotoo_Hosting_Config
         unset($vars['admin_password']);
 
         return json_encode($vars);
-    }
-
-    public function exportPHP()
-    {
-        $vars = get_object_vars($this);
-
-        $out = "<?php\n\n";
-        $out.= '// Do not edit the line below';
-        $out.= "\n";
-        $out.= 'if (!isset($config) || !($config instanceof Fotoo_Hosting_Config)) die("Invalid call.");';
-        $out.= "\n\n";
-        $out.= '// To edit one of the following configuration options, comment it out and change it';
-        $out.= "\n\n";
-
-        foreach ($vars as $key=>$value)
-        {
-            $out .= "// ".wordwrap($this->getComment($key), 70, "\n// ")."\n";
-            $line = '$config->'.$key.' = '.var_export($value, true).";";
-
-            if (strpos($line, "\n") !== false)
-                $out .= "/*\n".$line."\n*/\n\n";
-            else
-                $out .= '#'.$line."\n\n";
-        }
-
-        $out.= "\n?>";
-
-        return $out;
-    }
-
-    public function getComment($key)
-    {
-        switch ($key)
-        {
-            case 'max_width':       return 'Maximum image width or height, bigger images will be resized.';
-            case 'thumb_width':     return 'Maximum thumbnail size, used for creating thumbnails.';
-            case 'max_file_size':   return 'Maximum uploaded file size (in bytes). By default it\'s the maximum size allowed by the PHP configuration. See the FAQ for more informations.';
-            case 'nb_pictures_by_page': return 'Number of images to display on each page in the pictures list.';
-            case 'db_file':         return 'Path to the SQLite DB file.';
-            case 'storage_path':    return 'Path to where the pictures are stored.';
-            case 'base_url':        return 'URL of the webservice index.';
-            case 'storage_url':     return 'URL to where the pictures are stored. Filename is added at the end.';
-            case 'title':           return 'Title of the service.';
-            case 'image_page_url':  return 'URL to the picture information page, hash is added at the end.';
-            case 'album_page_url':  return 'URL to the album page, hash is added at the end.';
-            case 'allow_upload':    return 'Allow upload of files? You can use this to restrict upload access. Can be a boolean or a PHP callback. See the FAQ for more informations.';
-            case 'admin_password':  return 'Password to access admin UI? (edit/delete files, see private pictures)';
-            case 'banned_ips':      return 'List of banned IP addresses (netmasks and wildcards accepted, IPv6 supported)';
-            case 'allowed_formats': return 'Allowed formats, separated by a comma';
-            case 'ip_storage_expiration':
-                                    return 'Expiration (in days) of IP storage, after this delay IP addresses will be removed from database';
-            default: return '';
-        }
     }
 
     public function __construct()
@@ -2972,7 +3354,7 @@ class Fotoo_Hosting_Config
         $this->ip_storage_expiration = 366;
         $this->nb_pictures_by_page = 20;
 
-        $this->allowed_formats = array('PNG', 'JPEG', 'GIF', 'SVG', 'XCF', 'PDF');
+        $this->allowed_formats = ['png', 'jpeg', 'gif', 'svg', 'xcf', 'pdf', 'webp'];
     }
 
     static public function return_bytes ($size_str)
@@ -3001,11 +3383,6 @@ $config_file = __DIR__ . '/config.php';
 if (file_exists($config_file))
 {
     require_once $config_file;
-}
-elseif (isset($_GET['create_config']))
-{
-    file_put_contents($config_file, $config->exportPHP());
-    die("Default configuration created in config.php file, edit it to change default values.");
 }
 
 // Check upload access
@@ -3401,7 +3778,7 @@ elseif (!empty($_GET['a']))
         <article class="browse">
             <h2>'.escape($title).'</h2>
             <p class="info">
-                Uploaded on <time datetime="'.date(DATE_W3C, $album['date']).'">'.strftime('%c', $album['date']).'</time>
+                Uploaded on <time datetime="'.date(DATE_W3C, $album['date']).'">'.@strftime('%c', $album['date']).'</time>
                 | '.(int)$max.' picture'.((int)$max > 1 ? 's' : '').'
             </p>
             <aside class="examples">
@@ -3528,7 +3905,7 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
         <header>
             '.(trim($img['filename']) ? '<h2>' . escape(strtr($img['filename'], '-_.', '   ')) . '</h2>' : '').'
             <p class="info">
-                Uploaded on <time datetime="'.date(DATE_W3C, $img['date']).'">'.strftime('%c', $img['date']).'</time>
+                Uploaded on <time datetime="'.date(DATE_W3C, $img['date']).'">'.@strftime('%c', $img['date']).'</time>
                 | Size: '.$img['width'].' × '.$img['height'].'
             </p>
         </header>
@@ -3537,7 +3914,7 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
         </figure>
         <footer>
             <p>
-                <a href="'.$img_url.'">View full size ('.$img['format'].', '.$size.')</a>
+                <a href="'.$img_url.'">View full size ('.strtoupper($img['format']).', '.$size.')</a>
             </p>
         </footer>';
 
@@ -3687,7 +4064,7 @@ else
                 <h2>Upload a file</h2>
                 <p class="info">
                     Maximum file size: '.round($config->max_file_size / 1024 / 1024, 2).'MB
-                    | Image types accepted: '.implode(', ', $config->allowed_formats).'
+                    | Image types accepted: '.implode(', ', array_map('strtoupper', $config->allowed_formats)).'
                 </p>
             </header>
             <fieldset>
