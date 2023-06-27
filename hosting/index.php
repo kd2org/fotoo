@@ -695,17 +695,46 @@ fieldset {
 	color: #666;
 }
 
-.picture footer {
-	margin: 1em 0;
+div.pic {
+	display: flex;
+	flex-direction: row;
+	justify-content: center;
 }
 
-.picture footer.context {
-	background: rgb(220, 220, 220);
+div.pic div {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	font-size: 2em;
+	width: 2em;
+	text-align: left;
+}
+
+div.pic div a {
+	display: block;
+	overflow: hidden;
+	width: 2em;
+	height: 2em;
+	text-indent: -100em;
 	background: rgba(255, 255, 255, 0.25);
-	border-radius: .5em;
-	padding: 1em;
-	max-width: 650px;
-	margin: 1em auto;
+	border-radius: 100%;
+	background-position: center center;
+	background-repeat: no-repeat;
+	background-size: 80%;
+	opacity: 0.5;
+	transition: opacity .2s;
+}
+
+div.pic div.next a {
+	background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 512 512" fill="%23350" stroke="none" xmlns="http://www.w3.org/2000/svg"><path d="m256 8c137 0 248 111 248 248s-111 248-248 248-248-111-248-248 111-248 248-248zm-28.9 143.6 75.5 72.4h-182.6c-13.3 0-24 10.7-24 24v16c0 13.3 10.7 24 24 24h182.6l-75.5 72.4c-9.7 9.3-9.9 24.8-.4 34.3l11 10.9c9.4 9.4 24.6 9.4 33.9 0l132.7-132.6c9.4-9.4 9.4-24.6 0-33.9l-132.7-132.8c-9.4-9.4-24.6-9.4-33.9 0l-11 10.9c-9.5 9.6-9.3 25.1.4 34.4z"/></svg>');
+}
+
+div.pic div.prev a {
+	background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 512 512" fill="%23350" xmlns="http://www.w3.org/2000/svg"><path d="m256 504c-137 0-248-111-248-248s111-248 248-248 248 111 248 248-111 248-248 248zm28.9-143.6-75.5-72.4h182.6c13.3 0 24-10.7 24-24v-16c0-13.3-10.7-24-24-24h-182.6l75.5-72.4c9.7-9.3 9.9-24.8.4-34.3l-11-10.9c-9.4-9.4-24.6-9.4-33.9 0l-132.7 132.6c-9.4 9.4-9.4 24.6 0 33.9l132.7 132.7c9.4 9.4 24.6 9.4 33.9 0l11-10.9c9.5-9.5 9.3-25-.4-34.3z"/></svg>');
+}
+
+div.pic div a:hover {
+	opacity: 1;
 }
 
 .picture footer.context img {
@@ -729,12 +758,9 @@ fieldset {
 }
 
 .picture footer.context figure a {
-	display: flex;
 	flex-direction: row;
 	height: 180px;
 	margin: 0;
-	justify-content: center;
-	align-items: center;
 }
 
 .picture footer.context figure i {
@@ -941,10 +967,20 @@ article h2 {
 }
 
 .picture figure img {
-	max-width: 95%;
+	max-width: 100%;
 	max-height: 75vh;
 }
-<?php exit; endif; ?><?php
+
+@media screen and (max-width: 800px) {
+	div.pic {
+		flex-direction: column;
+	}
+
+	div.pic div {
+		width: auto;
+		font-size: 1em;
+	}
+}<?php exit; endif; ?><?php
 
 class Fotoo_Hosting
 {
@@ -4116,6 +4152,7 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
     $thumb_url = $fh->getImageThumbUrl($img);
     $short_url = $fh->getShortImageUrl($img);
     $title = $img['filename'] ? $img['filename'] : 'Image';
+    $is_uploader = !empty($_GET['c']) && $fh->checkRemoveId($img['hash'], $_GET['c']);
 
     // Short URL auto discovery
     header('Link: <'.$short_url.'>; rel=shorturl');
@@ -4131,9 +4168,21 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
     else
         $size = $size . ' B';
 
+    $album = null;
+
+    if (!empty($img['album']))
+    {
+        $album = $fh->getAlbum($img['album']);
+        $album = sprintf('<h3>(Album: <a href="%s">%s</a>)</h3>',
+            $fh->getAlbumUrl($album['hash'], $is_uploader),
+            escape($album['title'])
+        );
+    }
+
     $html .= $copy_script;
     $html .= sprintf('<article class="picture">
         <header>
+            %s
             %s
             <p class="info">
                 Uploaded on <time datetime="%s">%s</time>
@@ -4142,6 +4191,7 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
             </p>
         </header>',
         trim($img['filename']) ? '<h2>' . escape(strtr($img['filename'], '-_.', '   ')) . '</h2>' : '',
+        $album,
         date(DATE_W3C, $img['date']),
         date('d/m/Y H:i', $img['date']),
         $img['width'],
@@ -4178,61 +4228,44 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
     }
 
     $examples .= '</aside>';
-
-    $html .= '
-        <figure>
-            <a href="'.$img_url.'">'.($img['private'] ? '<span class="private">Private</span>' : '').'<img src="'.$img_url.'" alt="'.escape($title).'" /></a>
-        </figure>
-        <footer>
-            <p>
-                <a href="'.$img_url.'">View full size ('.strtoupper($img['format']).', '.$size.')</a>
-            </p>
-        </footer>';
+    $prev = $next = null;
 
     if (!empty($img['album']))
     {
         $prev = $fh->getAlbumPrevNext($img['album'], $img['hash'], -1);
         $next = $fh->getAlbumPrevNext($img['album'], $img['hash'], 1);
-        $album = $fh->getAlbum($img['album']);
 
-        $html .= '<footer class="context"><div>';
-
-        if ($prev)
-        {
-            $thumb_url = $fh->getImageThumbUrl($prev);
-            $url = $fh->getUrl($prev);
-
-            $html .= '
-            <figure class="prev">
-                <a href="'.$url.'"><b>◄</b><i><img src="'.$thumb_url.'" title="Previous image" /></i></a>
-            </figure>';
-        }
-        else
-        {
-            $html .= '<figure class="prev"><b>…</b></figure>';
+        if ($prev) {
+            $prev['url'] = $fh->getUrl($prev, $is_uploader);
         }
 
-        if ($next)
-        {
-            $thumb_url = $fh->getImageThumbUrl($next);
-            $url = $fh->getUrl($next);
-
-            $html .= '
-            <figure class="prev">
-                <a href="'.$url.'"><i><img src="'.$thumb_url.'" title="Next image" /></i><b>▶</b></a>
-            </figure>';
+        if ($next) {
+            $next['url'] = $fh->getUrl($next, $is_uploader);
         }
-        else
-        {
-            $html .= '<figure class="next"><b>…</b></figure>';
-        }
-
-        $html .= sprintf('</div>
-                <h2><a href="%s">%s</a></h2></footer>',
-            $config->album_page_url . $album['hash'],
-            escape($album['title'])
-        );
     }
+
+    $html .= sprintf('
+        <div class="pic">
+            <div class="prev">%s</div>
+            <figure>
+                <a href="%s" target="_blank">%s<img src="%s" alt="%s" /></a>
+            </figure>
+            <div class="next">%s</div>
+        </div>
+        <footer>
+            <p>
+                <a href="%2$s" target="_blank">View full size (%s, %s)</a>
+            </p>
+        </footer>',
+        $prev ? sprintf('<a href="%s">Previous</a>', $prev['url']) : '',
+        $img_url,
+        $img['private'] ? '<span class="private">Private</span>' : '',
+        $img_url,
+        escape($title),
+        $next ? sprintf('<a href="%s">Next</a>', $next['url']) : '',
+        strtoupper($img['format']),
+        $size
+    );
 
     $html .= $examples;
 

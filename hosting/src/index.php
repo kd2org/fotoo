@@ -760,6 +760,7 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
     $thumb_url = $fh->getImageThumbUrl($img);
     $short_url = $fh->getShortImageUrl($img);
     $title = $img['filename'] ? $img['filename'] : 'Image';
+    $is_uploader = !empty($_GET['c']) && $fh->checkRemoveId($img['hash'], $_GET['c']);
 
     // Short URL auto discovery
     header('Link: <'.$short_url.'>; rel=shorturl');
@@ -775,9 +776,21 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
     else
         $size = $size . ' B';
 
+    $album = null;
+
+    if (!empty($img['album']))
+    {
+        $album = $fh->getAlbum($img['album']);
+        $album = sprintf('<h3>(Album: <a href="%s">%s</a>)</h3>',
+            $fh->getAlbumUrl($album['hash'], $is_uploader),
+            escape($album['title'])
+        );
+    }
+
     $html .= $copy_script;
     $html .= sprintf('<article class="picture">
         <header>
+            %s
             %s
             <p class="info">
                 Uploaded on <time datetime="%s">%s</time>
@@ -786,6 +799,7 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
             </p>
         </header>',
         trim($img['filename']) ? '<h2>' . escape(strtr($img['filename'], '-_.', '   ')) . '</h2>' : '',
+        $album,
         date(DATE_W3C, $img['date']),
         date('d/m/Y H:i', $img['date']),
         $img['width'],
@@ -822,61 +836,44 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
     }
 
     $examples .= '</aside>';
-
-    $html .= '
-        <figure>
-            <a href="'.$img_url.'">'.($img['private'] ? '<span class="private">Private</span>' : '').'<img src="'.$img_url.'" alt="'.escape($title).'" /></a>
-        </figure>
-        <footer>
-            <p>
-                <a href="'.$img_url.'">View full size ('.strtoupper($img['format']).', '.$size.')</a>
-            </p>
-        </footer>';
+    $prev = $next = null;
 
     if (!empty($img['album']))
     {
         $prev = $fh->getAlbumPrevNext($img['album'], $img['hash'], -1);
         $next = $fh->getAlbumPrevNext($img['album'], $img['hash'], 1);
-        $album = $fh->getAlbum($img['album']);
 
-        $html .= '<footer class="context"><div>';
-
-        if ($prev)
-        {
-            $thumb_url = $fh->getImageThumbUrl($prev);
-            $url = $fh->getUrl($prev);
-
-            $html .= '
-            <figure class="prev">
-                <a href="'.$url.'"><b>◄</b><i><img src="'.$thumb_url.'" title="Previous image" /></i></a>
-            </figure>';
-        }
-        else
-        {
-            $html .= '<figure class="prev"><b>…</b></figure>';
+        if ($prev) {
+            $prev['url'] = $fh->getUrl($prev, $is_uploader);
         }
 
-        if ($next)
-        {
-            $thumb_url = $fh->getImageThumbUrl($next);
-            $url = $fh->getUrl($next);
-
-            $html .= '
-            <figure class="prev">
-                <a href="'.$url.'"><i><img src="'.$thumb_url.'" title="Next image" /></i><b>▶</b></a>
-            </figure>';
+        if ($next) {
+            $next['url'] = $fh->getUrl($next, $is_uploader);
         }
-        else
-        {
-            $html .= '<figure class="next"><b>…</b></figure>';
-        }
-
-        $html .= sprintf('</div>
-                <h2><a href="%s">%s</a></h2></footer>',
-            $config->album_page_url . $album['hash'],
-            escape($album['title'])
-        );
     }
+
+    $html .= sprintf('
+        <div class="pic">
+            <div class="prev">%s</div>
+            <figure>
+                <a href="%s" target="_blank">%s<img src="%s" alt="%s" /></a>
+            </figure>
+            <div class="next">%s</div>
+        </div>
+        <footer>
+            <p>
+                <a href="%2$s" target="_blank">View full size (%s, %s)</a>
+            </p>
+        </footer>',
+        $prev ? sprintf('<a href="%s">Previous</a>', $prev['url']) : '',
+        $img_url,
+        $img['private'] ? '<span class="private">Private</span>' : '',
+        $img_url,
+        escape($title),
+        $next ? sprintf('<a href="%s">Next</a>', $next['url']) : '',
+        strtoupper($img['format']),
+        $size
+    );
 
     $html .= $examples;
 
