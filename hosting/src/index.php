@@ -36,7 +36,9 @@ class FotooException extends Exception {}
 
 require_once __DIR__ . '/ErrorManager.php';
 
-ErrorManager::enable(ErrorManager::DEVELOPMENT);
+if (class_exists('ErrorManager')) {
+    ErrorManager::enable(ErrorManager::DEVELOPMENT);
+}
 
 require_once __DIR__ . '/ZipWriter.php';
 
