@@ -4265,7 +4265,6 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
     }
 
     $html .= '</article>';
-    $html .= '<script type="text/javascript">window.addEventListener(\'DOMContentLoaded\', () => document.querySelector(\'.picture\').scrollIntoView());</script>';
 }
 elseif (!$config->allow_upload)
 {
