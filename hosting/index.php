@@ -49,6 +49,8 @@
 
     function upload(progress, name, filename, file, thumb)
     {
+        progress.innerHTML = "Uploading... <img class=\"loading\" src=\"" + loading_gif + "\" alt=\"\" />";
+
         var params = new FormData;
 
         params.append('name', name);
@@ -112,7 +114,6 @@
 
         var progress = document.createElement('span');
         current.appendChild(progress);
-        progress.innerHTML = "Uploading... <img class=\"loading\" src=\"" + loading_gif + "\" alt=\"\" />";
 
         var thumb = current.querySelector('img').src;
         thumb = thumb.substr(thumb.indexOf(',') + 1);
