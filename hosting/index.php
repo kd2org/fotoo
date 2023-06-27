@@ -573,6 +573,14 @@ body > header, #page, body > footer {
 	text-align: center;
 }
 
+body > header {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: space-between;
+	padding: .5em;
+}
+
 body > header h1 a {
 	text-decoration: none;
 	color: #000;
@@ -588,25 +596,32 @@ body > footer {
 	color: #666;
 }
 
-nav {
+article nav {
 	margin: .5em 0;
 }
 
 nav ul li {
 	display: inline-block;
-	margin: .2em .5em;
 }
 
 nav ul li a {
 	color: #000;
+	margin: .2em;
 	border-radius: .5em;
 	background: rgba(255, 255, 255, 0.5);
-	padding: .2em .4em;
+	padding: .4em .5em;
+	font-size: 1.2em;
+	display: inline-block;
 }
 
 nav ul li a:hover {
 	background: #fff;
 	color: darkred;
+}
+
+nav ul li.current a {
+	box-shadow: 0px 0px 2px 2px #350;
+	font-weight: bold;
 }
 
 [type=submit] {
@@ -693,6 +708,7 @@ fieldset {
 .info {
 	margin: .8em 0;
 	color: #666;
+	font-size: .9em;
 }
 
 div.pic {
@@ -737,53 +753,12 @@ div.pic div a:hover {
 	opacity: 1;
 }
 
-.picture footer.context img {
-	max-width: 200px;
-	max-height: 150px;
+.picture header h3 {
+	color: #666;
 }
 
-.picture footer.context a {
-	text-decoration: none;
-}
-
-.picture footer.context div {
-	display: flex;
-	flex-direction: row;
-	justify-content: space-between;
-	flex-wrap: wrap;
-}
-
-.picture footer.context figure {
-	margin: 0;
-}
-
-.picture footer.context figure a {
-	flex-direction: row;
-	height: 180px;
-	margin: 0;
-}
-
-.picture footer.context figure i {
-	width: 200px;
-	height: 100%;
-	display: flex;
-	justify-content: center;
-	align-items: center;
-}
-
-.picture footer.context figure b {
-	font-size: 50px;
-	line-height: 150px;
-	width: 50px;
-	height: 150px;
-	display: block;
-	color: #999;
-	text-align: center;
-}
-
-.picture footer.context figure a:hover b {
-	text-shadow: 0px 0px 10px #000;
-	color: #fff;
+.picture header h3 a {
+	color: #669;
 }
 
 .examples {
@@ -959,6 +934,7 @@ dl.admin button[type=submit] {
 
 article h2 {
 	margin-bottom: .5em;
+	font-weight: bold;
 }
 
 .error {
@@ -3599,7 +3575,7 @@ function escape($str)
     return htmlspecialchars($str, ENT_QUOTES, 'utf-8', false);
 }
 
-function page(string $html, string $title = '')
+function page(string $html, string $title = '', int $section = 0)
 {
     global $fh, $config;
     $css_url = file_exists(__DIR__ . '/style.css')
@@ -3619,6 +3595,9 @@ function page(string $html, string $title = '')
         $config->base_url
     );
 
+    $a = $section == 1 ? ' class="current"' : '';
+    $b = $section == 2 ? ' class="current"' : '';
+
     echo <<<EOF
     <!DOCTYPE html>
     <html>
@@ -3635,8 +3614,8 @@ function page(string $html, string $title = '')
         {$subtitle}
         <nav>
             <ul>
-                <li><a href="{$config->base_url}">Upload</a></li>
-                <li><a href="{$config->base_url}?list">Browse images</a></li>
+                <li{$a}><a href="{$config->base_url}">Upload</a></li>
+                <li{$b}><a href="{$config->base_url}?list">Browse images</a></li>
             </ul>
         </nav>
     </header>
@@ -3847,6 +3826,8 @@ var copy = (e, c) => {
 };
 </script>';
 
+$current = 0;
+
 if (isset($_GET['logout']))
 {
     $fh->logout();
@@ -3891,6 +3872,7 @@ elseif (isset($_GET['login']))
 }
 elseif (isset($_GET['list']))
 {
+    $current = 2;
     $fh->pruneExpired();
     $title = 'Browse images';
 
@@ -4283,6 +4265,7 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
     }
 
     $html .= '</article>';
+    $html .= '<script type="text/javascript">window.addEventListener(\'DOMContentLoaded\', () => document.querySelector(\'.picture\').scrollIntoView());</script>';
 }
 elseif (!$config->allow_upload)
 {
@@ -4290,6 +4273,7 @@ elseif (!$config->allow_upload)
 }
 else
 {
+    $current = 1;
     $js_url = file_exists(__DIR__ . '/upload.js')
         ? $config->base_url . 'upload.js?2023'
         : $config->base_url . '?js&2023';
@@ -4351,6 +4335,6 @@ else
 EOF;
 }
 
-page($html, $title);
+page($html, $title, $current);
 
 ?>

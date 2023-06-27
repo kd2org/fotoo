@@ -207,7 +207,7 @@ function escape($str)
     return htmlspecialchars($str, ENT_QUOTES, 'utf-8', false);
 }
 
-function page(string $html, string $title = '')
+function page(string $html, string $title = '', int $section = 0)
 {
     global $fh, $config;
     $css_url = file_exists(__DIR__ . '/style.css')
@@ -227,6 +227,9 @@ function page(string $html, string $title = '')
         $config->base_url
     );
 
+    $a = $section == 1 ? ' class="current"' : '';
+    $b = $section == 2 ? ' class="current"' : '';
+
     echo <<<EOF
     <!DOCTYPE html>
     <html>
@@ -243,8 +246,8 @@ function page(string $html, string $title = '')
         {$subtitle}
         <nav>
             <ul>
-                <li><a href="{$config->base_url}">Upload</a></li>
-                <li><a href="{$config->base_url}?list">Browse images</a></li>
+                <li{$a}><a href="{$config->base_url}">Upload</a></li>
+                <li{$b}><a href="{$config->base_url}?list">Browse images</a></li>
             </ul>
         </nav>
     </header>
@@ -455,6 +458,8 @@ var copy = (e, c) => {
 };
 </script>';
 
+$current = 0;
+
 if (isset($_GET['logout']))
 {
     $fh->logout();
@@ -499,6 +504,7 @@ elseif (isset($_GET['login']))
 }
 elseif (isset($_GET['list']))
 {
+    $current = 2;
     $fh->pruneExpired();
     $title = 'Browse images';
 
@@ -891,6 +897,7 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
     }
 
     $html .= '</article>';
+    $html .= '<script type="text/javascript">window.addEventListener(\'DOMContentLoaded\', () => document.querySelector(\'.picture\').scrollIntoView());</script>';
 }
 elseif (!$config->allow_upload)
 {
@@ -898,6 +905,7 @@ elseif (!$config->allow_upload)
 }
 else
 {
+    $current = 1;
     $js_url = file_exists(__DIR__ . '/upload.js')
         ? $config->base_url . 'upload.js?2023'
         : $config->base_url . '?js&2023';
@@ -959,6 +967,6 @@ else
 EOF;
 }
 
-page($html, $title);
+page($html, $title, $current);
 
 ?>
