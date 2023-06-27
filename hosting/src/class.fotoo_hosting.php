@@ -31,25 +31,45 @@ class Fotoo_Hosting
 					private INT NOT NULL DEFAULT 0,
 					size INT NOT NULL DEFAULT 0,
 					album TEXT NULL,
-					ip TEXT NULL
+					ip TEXT NULL,
+					expiry TEXT NULL CHECK (expiry IS NULL OR datetime(expiry) = expiry)
 				);
 
 				CREATE INDEX date ON pictures (private, date);
+				CREATE INDEX p_expiry ON pictures (expiry);
 				CREATE INDEX album ON pictures (album);
 
 				CREATE TABLE albums (
 					hash TEXT PRIMARY KEY NOT NULL,
 					title TEXT NOT NULL,
 					date INT NOT NULL,
-					private INT NOT NULL DEFAULT 0
+					private INT NOT NULL DEFAULT 0,
+					expiry TEXT NULL CHECK (expiry IS NULL OR datetime(expiry) = expiry)
 				);
+
+				CREATE INDEX a_expiry ON albums (expiry);
+
+				PRAGMA user_version = 1;
 			');
 		}
 
 		$this->config =& $config;
 
-		if (!file_exists($config->storage_path))
+		if (!file_exists($config->storage_path)) {
 			mkdir($config->storage_path);
+		}
+
+		$v = $this->querySingleColumn('PRAGMA user_version;');
+
+		if (!$v) {
+			$this->db->exec('
+				ALTER TABLE pictures ADD COLUMN expiry TEXT NULL CHECK (expiry IS NULL OR datetime(expiry) = expiry);
+				ALTER TABLE albums ADD COLUMN expiry TEXT NULL CHECK (expiry IS NULL OR datetime(expiry) = expiry);
+				CREATE INDEX p_expiry ON pictures (expiry);
+				CREATE INDEX a_expiry ON albums (expiry);
+				PRAGMA user_version = 1;
+			');
+		}
 	}
 
     public function isClientBanned()
@@ -316,17 +336,16 @@ class Fotoo_Hosting
 		return true;
 	}
 
-	public function upload($file, $name = '', $private = false, $album = null)
+	public function upload(array $file, string $name = '', bool $private = false, ?string $expiry = null, ?string $album = null): string
 	{
-		if ($this->isClientBanned())
-		{
+		if ($this->isClientBanned()) {
 			throw new FotooException('Upload error: upload not permitted.', -42);
 		}
 
 		$client_resize = false;
+		$file['thumb_path'] = null;
 
-		if (isset($file['content']) && $this->_processEncodedUpload($file))
-		{
+		if (isset($file['content']) && $this->_processEncodedUpload($file)) {
 			$client_resize = true;
 		}
 
@@ -342,22 +361,27 @@ class Fotoo_Hosting
 			throw new FotooException("Upload error.", UPLOAD_ERR_NO_FILE);
 		}
 
-		// Make sure tmp_name is from us
+		// Make sure tmp_name is from us and not injected
 		if (!file_exists($file['tmp_name'])
 			|| !(is_uploaded_file($file['tmp_name']) || $client_resize)) {
 			throw new FotooException("Upload error.", UPLOAD_ERR_NO_FILE);
 		}
 
-		if (!empty($name))
-		{
+		if (!empty($file['thumb'])) {
+			$file['thumb_path'] = tempnam(ini_get('upload_tmp_dir') ?: sys_get_temp_dir(), 'tmp_file_');
+			file_put_contents($file['thumb_path'], base64_decode($file['thumb'], true));
+			unset($file['thumb']);
+		}
+
+		// Clean up name
+		if (!empty($name)) {
 			$name = preg_replace('!\s+!', '-', $name);
 			$name = preg_replace('![^a-z0-9_.-]!i', '', $name);
 			$name = preg_replace('!([_.-]){2,}!', '\\1', $name);
 			$name = substr($name, 0, 30);
 		}
 
-		if (!trim($name))
-		{
+		if (!trim($name)) {
 			$name = '';
 		}
 
@@ -437,10 +461,45 @@ class Fotoo_Hosting
 		}
 
 		$size = filesize($dest . $ext);
+		$has_thumb = false;
+		http_response_code(500);
 
-		// Create thumb when needed
-		if ($width > $this->config->thumb_width || $height > $this->config->thumb_width
-			|| $size > (100 * 1024) || !in_array($format, ['jpeg', 'png', 'webp']))
+		// Process client-side generated thumbnail
+		if (!empty($file['thumb_path'])) {
+			$has_thumb = true;
+			$img = new Image($file['thumb_path']);
+			list($thumb_width, $thumb_height) = $img->getSize();
+
+			if (!in_array($img->format(), ['jpeg', 'webp', 'png'])) {
+				$has_thumb = false;
+			}
+			elseif ($thumb_width > $this->config->thumb_width || $thumb_height > $this->config->thumb_width) {
+				$has_thumb = false;
+			}
+			elseif (filesize($file['thumb_path']) > (50*1024)) {
+				$has_thumb = false;
+			}
+
+			if (!$has_thumb) {
+				@unlink($file['thumb_path']);
+			}
+			else {
+				$thumb_format = $img->format();
+				rename($file['thumb_path'], $dest . '.s.' . $thumb_format);
+			}
+
+			unset($img);
+		}
+
+		// Image is small enough: don't create a thumb
+		if ($width <= $this->config->thumb_width && $height <= $this->config->thumb_width
+			&& $size > (50 * 1024) && in_array($format, ['jpeg', 'png', 'webp'])) {
+			$has_thumb = true;
+			$thumb_format = 0;
+		}
+
+		// Create thumb when required
+		if (!$has_thumb)
 		{
 			$img = new Image($dest . $ext);
 			$img->jpeg_quality = 70;
@@ -448,15 +507,12 @@ class Fotoo_Hosting
 
 			if (in_array('webp', $img->getSupportedFormats())) {
 				$thumb_format = 'webp';
-				$thumb_ext = '.s.webp';
 			}
 			elseif ($format !== 'png') {
 				$thumb_format = 'jpeg';
-				$thumb_ext = '.s.jpeg';
 			}
 			else {
 				$thumb_format = $format;
-				$thumb_ext = '.s.' . $format;
 			}
 
 			$img->resize(
@@ -464,83 +520,93 @@ class Fotoo_Hosting
 				($height > $this->config->thumb_width) ? $this->config->thumb_width : $height
 			);
 
-			$img->save($dest . $thumb_ext, $thumb_format);
-
-			$thumb = true;
-		}
-		else
-		{
-			$thumb = false;
-			$thumb_format = 0;
+			$img->save($dest . '.s.' . $thumb_format, $thumb_format);
 		}
 
 		$hash = substr($hash, -2) . '/' . $base;
 
-		$req = $this->db->prepare('INSERT INTO pictures 
-			(hash, filename, date, format, width, height, thumb, private, size, album, ip)
-			VALUES (:hash, :filename, :date, :format, :width, :height, :thumb, :private, :size, :album, :ip);');
-
-		$req->bindValue(':hash', $hash);
-		$req->bindValue(':filename', $name);
-		$req->bindValue(':date', time());
-		$req->bindValue(':format', strtoupper($format));
-		$req->bindValue(':width', (int)$width);
-		$req->bindValue(':height', (int)$height);
-		$req->bindValue(':thumb', $thumb_format === 0 ? $thumb_format : strtoupper($thumb_format));
-		$req->bindValue(':private', $private ? '1' : '0');
-		$req->bindValue(':size', (int)$size);
-		$req->bindValue(':album', is_null($album) ? NULL : $album);
-		$req->bindValue(':ip', self::getIPAsString());
-
-		$req->execute();
+		$this->insert('pictures', [
+			'hash'     => $hash,
+			'filename' => $name,
+			'date'     => time(),
+			'format'   => strtoupper($format),
+			'width'    => (int)$width,
+			'height'   => (int)$height,
+			'thumb'    => $thumb_format === 0 ? $thumb_format : strtoupper($thumb_format),
+			'private'  => (int)$private,
+			'size'     => (int)$size,
+			'album'    => $album ?: null,
+			'ip'       => self::getIPAsString(),
+			'expiry'   => $this->getExpiry($expiry),
+		]);
 
 		// Automated deletion of IP addresses to comply with local low
 		$expiration = time() - ($this->config->ip_storage_expiration * 24 * 3600);
-		$this->db->query('UPDATE pictures SET ip = "R" WHERE date < ' . (int)$expiration . ';');
+		$this->query('UPDATE pictures SET ip = "R" WHERE date < ?;', (int)$expiration);
 
 		$url = $this->getUrl(['hash' => $hash, 'filename' => $name, 'format' => strtoupper($format)], true);
 
 		return $url;
 	}
 
-	public function get($hash)
+	public function get(string $hash): ?array
 	{
-		$res = $this->db->querySingle(
-			'SELECT * FROM pictures WHERE hash = \''.$this->db->escapeString($hash).'\';',
-			true
-		);
+		$res = $this->querySingle('SELECT * FROM pictures WHERE hash = ?;', $hash);
 
-		if (empty($res))
-			return false;
+		if (empty($res)) {
+			return null;
+		}
 
 		$file = $this->_getPath($res);
 		$th = $this->_getPath($res, 's');
+		$expiry = $res['expiry'] ? strtotime($res['expiry'] . ' UTC') : null;
 
-		if (!file_exists($file))
-		{
-			if (file_exists($th))
-				@unlink($th);
-
-			$this->db->exec('DELETE FROM pictures WHERE hash = \''.$res['hash'].'\';');
-			return false;
+		// Delete image if file does not exists, or if it expired
+		if (!file_exists($file) || ($expiry && $expiry <= time())) {
+			$this->delete($res);
+			return null;
 		}
 
 		return $res;
 	}
 
-	public function remove($hash, $id = null)
+	public function userDeletePicture(array $img, ?string $key = null): bool
 	{
-		if (!$this->logged() && !$this->checkRemoveId($hash, $id))
+		if (!$this->checkRemoveId($img['hash'], $key)) {
 			return false;
+		}
 
+		$this->delete($img);
+		return true;
+	}
+
+	public function deletePicture(string $hash): bool
+	{
 		$img = $this->get($hash);
 
+		if (!$img) {
+			return true;
+		}
+
+		$this->delete($img);
+		return true;
+	}
+
+	protected function delete(array $img): void
+	{
 		$file = $this->_getPath($img);
 
-		if (file_exists($file))
+		if (file_exists($file)) {
 			unlink($file);
+		}
 
-		return $this->get($hash) ? false : true;
+		$th = $this->_getPath($img, 's');
+
+		if (file_exists($th)) {
+			@unlink($th);
+		}
+
+		$this->query('DELETE FROM pictures WHERE hash = ?;', $img['hash']);
 	}
 
 	protected function getListQuery(bool $private = false)
@@ -567,28 +633,17 @@ class Fotoo_Hosting
 		$private = $this->logged();
 
 		$out = [];
-		$res = $this->db->query(sprintf(
-			'SELECT * FROM (%s) ORDER BY date DESC LIMIT %d,%d;',
-			$this->getListQuery($private),
+		return iterator_to_array($this->iterate(sprintf(
+			'SELECT * FROM (%s) ORDER BY date DESC LIMIT ?,?;',
+			$this->getListQuery($private)),
 			$begin,
 			$this->config->nb_pictures_by_page
 		));
-
-		if (!$res) {
-			throw new \RuntimeException($this->db->lastErrorMsg());
-		}
-
-		while ($row = $res->fetchArray(SQLITE3_ASSOC))
-		{
-			$out[] = $row;
-		}
-
-		return $out;
 	}
 
 	public function countList()
 	{
-		return $this->db->querySingle(sprintf('SELECT COUNT(*) FROM (%s);', $this->getListQuery($this->logged())));
+		return $this->querySingleColumn(sprintf('SELECT COUNT(*) FROM (%s);', $this->getListQuery($this->logged())));
 	}
 
 	public function makeRemoveId($hash)
@@ -616,28 +671,39 @@ class Fotoo_Hosting
 		return false;
 	}
 
-	public function getAlbumExtract($hash)
+	public function pruneExpired(): void
 	{
-		$out = array();
-		$res = $this->db->query('SELECT * FROM pictures WHERE album = \''.$this->db->escapeString($hash).'\' ORDER BY RANDOM() LIMIT 2;');
-
-		while ($row = $res->fetchArray(SQLITE3_ASSOC))
-		{
-			$out[] = $row;
+		foreach ($this->iterate('SELECT * FROM pictures WHERE expiry IS NOT NULL AND expiry <= datetime();') as $row) {
+			$this->delete($row);
 		}
 
-		return $out;
+		foreach ($this->iterate('SELECT hash FROM albums WHERE expiry IS NOT NULL AND expiry <= datetime();') as $row) {
+			$this->deleteAlbum($row['hash']);
+		}
 	}
 
-	public function countAlbumList()
+	public function getAlbumUrl(string $hash, bool $with_key = false)
 	{
-		$where = $this->logged() ? '' : 'WHERE private != 1';
-		return $this->db->querySingle('SELECT COUNT(*) FROM albums '.$where.';');
+		return $this->config->album_page_url . $hash . ($with_key ? '&c=' . $this->makeRemoveId($hash) : '');
 	}
 
-	public function getAlbum($hash)
+	public function getAlbum(string $hash): ?array
 	{
-		return $this->db->querySingle('SELECT *, strftime(\'%s\', date) AS date FROM albums WHERE hash = \''.$this->db->escapeString($hash).'\';', true);
+		$a = $this->querySingle('SELECT *, strftime(\'%s\', date) AS date FROM albums WHERE hash = ?;', $hash);
+
+		if (!$a) {
+			return null;
+		}
+
+		$expiry = $a['expiry'] ? strtotime($a['expiry'] . ' UTC') : null;
+
+		// Expire album
+		if ($expiry && $expiry <= time()) {
+			$this->deleteAlbum($a['hash']);
+			return null;
+		}
+
+		return $a;
 	}
 
 	public function getAlbumPictures($hash, $page)
@@ -689,26 +755,56 @@ class Fotoo_Hosting
 		return $this->db->querySingle('SELECT COUNT(*) FROM pictures WHERE album = \''.$this->db->escapeString($hash).'\';');
 	}
 
-	public function removeAlbum($hash, $id = null)
+	public function userDeleteAlbum(string $hash, string $key = null): bool
 	{
-		if (!$this->logged() && !$this->checkRemoveId($hash, $id))
+		if (!$this->checkRemoveId($hash, $key)) {
 			return false;
-
-		$res = $this->db->query('SELECT * FROM pictures WHERE album = \''.$this->db->escapeString($hash).'\';');
-
-		while ($row = $res->fetchArray(SQLITE3_ASSOC))
-		{
-			$file = $this->_getPath($row);
-
-			if (file_exists($file))
-				unlink($file);
-
-			if ($this->get($row['hash']))
-				return false;
 		}
 
-		$this->db->exec('DELETE FROM albums WHERE hash = \''.$this->db->escapeString($hash).'\';');
+		$a = $this->getAlbum($hash);
+
+		if (!$a) {
+			return true;
+		}
+
+		$this->deleteAlbum($a['hash']);
+
 		return true;
+	}
+
+	public function deleteAlbum(string $hash): void
+	{
+		foreach ($this->iterate('SELECT * FROM pictures WHERE album = ?;', $hash) as $img) {
+			$this->delete($img);
+		}
+
+		$this->query('DELETE FROM albums WHERE hash = ?;', $hash);
+	}
+
+	public function createAlbum(string $title, bool $private, ?string $expiry): string
+	{
+		if ($this->isClientBanned())
+		{
+			throw new FotooException('Upload error: upload not permitted.');
+		}
+
+		$hash = self::baseConv(hexdec(uniqid()));
+
+		$this->query('INSERT INTO albums (hash, title, date, private, expiry) VALUES (?, ?, datetime(\'now\'), ?, ?);',
+			$hash, trim($title), (int)$private, $this->getExpiry($expiry));
+
+		return $hash;
+	}
+
+	public function appendToAlbum(string $hash, ?string $name, array $file): string
+	{
+		$album = $this->querySingle('SELECT * FROM albums WHERE hash = ?;', $hash);
+
+		if (!$album) {
+			throw new FotooException('Album not found');
+		}
+
+		return $this->upload($file, $name, $album['private'], $album['expiry'], $album['hash']);
 	}
 
 	protected function _getPath($img, $optional = '')
@@ -804,30 +900,75 @@ class Fotoo_Hosting
 		return true;
 	}
 
-	public function createAlbum($title, $private = false)
+	public function getExpiry(?string $expiry): ?string
 	{
-		if ($this->isClientBanned())
-		{
-			throw new FotooException('Upload error: upload not permitted.');
+		if (!$expiry || (preg_match('/^\d{4}-/', $expiry) && strtotime($expiry))) {
+			return $expiry ?: null;
 		}
 
-		$hash = self::baseConv(hexdec(uniqid()));
-		$this->db->exec('INSERT INTO albums (hash, title, date, private)
-			VALUES (\''.$this->db->escapeString($hash).'\',
-			\''.$this->db->escapeString(trim($title)).'\',
-			datetime(\'now\'), \''.(int)(bool)$private.'\');');
-		return $hash;
+		$expiry = $expiry ? strtotime($expiry) : null;
+		$expiry = $expiry ? gmdate('Y-m-d H:i:s', $expiry) : null;
+		return $expiry;
 	}
 
-	public function appendToAlbum($album, $name, $file)
+	public function query(string $sql, ...$params)
 	{
-		$album = $this->db->querySingle('SELECT * FROM albums WHERE hash = \''.$this->db->escapeString($album).'\';', true);
+		$st = $this->db->prepare($sql);
 
-		if (!$album) {
-			throw new FotooException('ALbum not found');
+		if (!$st) {
+			throw new \RuntimeException($this->db->lastErrorMsg());
 		}
 
-		return $this->upload($file, $name, $album['private'], $album['hash']);
+		foreach ($params as $key => $value) {
+			if (is_int($key)) {
+				$key += 1;
+			}
+			else {
+				$key = ':' . $key;
+			}
+
+			$st->bindValue($key, $value);
+		}
+
+		$res = $st->execute();
+
+		if (!$res) {
+			throw new \RuntimeException($this->db->lastErrorMsg());
+		}
+
+		return $res;
+	}
+
+	public function insert(string $table, array $params)
+	{
+		$sql = sprintf('INSERT INTO %s (%s) VALUES (%s);',
+			$table,
+			implode(', ', array_keys($params)),
+			substr(str_repeat('?, ', count($params)), 0, -2)
+		);
+
+		return $this->query($sql, ...array_values($params));
+	}
+
+	public function querySingle(string $sql, ...$params)
+	{
+		$res = $this->query($sql, ...$params);
+		return $res->fetchArray(SQLITE3_ASSOC);
+	}
+
+	public function iterate(string $sql, ...$params)
+	{
+		$res = $this->query($sql, ...$params);
+
+		while ($row = $res->fetchArray(SQLITE3_ASSOC)) {
+			yield $row;
+		}
+	}
+
+	public function querySingleColumn(string $sql, ...$params)
+	{
+		$res = $this->query($sql, ...$params);
+		return $res->fetchArray(SQLITE3_NUM)[0] ?? null;
 	}
 }
 

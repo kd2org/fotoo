@@ -44,17 +44,63 @@
         return filename;
     }
 
+    function upload(progress, name, filename, file, thumb)
+    {
+        var params = new FormData;
+
+        params.append('name', name);
+        params.append('filename', filename);
+        params.append('thumb', thumb);
+
+        if (typeof file === 'string') {
+            params.append('content', file);
+        }
+        else {
+            params.append('file', file);
+        }
+
+        if (album_hash) {
+            params.append('album', album_hash);
+            params.append('key', album_key);
+        }
+        else {
+            params.append('private', document.getElementById('f_private').checked ? 1 : 0);
+            params.append('expiry', document.getElementById('f_expiry').value);
+        }
+
+        return fetch(config.base_url + '?upload', {
+            'method': 'POST',
+            'mode': 'same-origin',
+            'body': params
+        }).then((r) => {
+            if (!r.ok) {
+                console.error(r);
+                throw Error('Upload failed');
+            }
+
+            progress.innerHTML = "Uploaded <b>&#10003;</b>";
+
+            if (!album_hash) {
+                return r.text().then((url) => location.href = url);
+            }
+
+            return r.text();
+        });
+    }
+
     function uploadPicture(index)
     {
         var file = files[index];
 
-        if (!(/^image\/(?:jpe?g|webp)$/i.test(file.type)))
-        {
-            uploadPicture(index+1);
+        if (!file) {
+            if (album_hash) {
+                location.href = config.album_page_url + album_hash + (config.album_page_url.indexOf('?') ? '&c=' : '?c=') + album_key;
+            }
             return;
         }
 
         var current = document.getElementById('albumParent').querySelectorAll('figure')[index];
+        current.scrollIntoView({behavior: 'smooth'});
         var resized_img = document.createElement('div');
         resized_img.style.display = "none";
 
@@ -63,67 +109,31 @@
 
         var progress = document.createElement('span');
         current.appendChild(progress);
+        progress.innerHTML = "Uploading... <img class=\"loading\" src=\"" + loading_gif + "\" alt=\"\" />";
+
+        var thumb = current.querySelector('img').src;
+        thumb = thumb.substr(thumb.indexOf(',') + 1);
+
+        if (!(/^image\/(?:jpe?g|webp)$/i.test(file.type)))
+        {
+            // Upload SVG/PNG/GIF, etc: no client-side resize
+            upload(progress, name.value, file.name, file, thumb).then(() => uploadPicture(index+1));
+            return;
+        }
 
         resize(
             file,
             -config.max_width,
             resized_img,
             progress,
-            function()
-            {
+            () => {
                 var img = resized_img.firstChild
 
-                progress.innerHTML = "Uploading... <img class=\"loading\" src=\"" + loading_gif + "\" alt=\"\" />";
-
-                var params = new URLSearchParams({
-                    'name': name.value,
-                    'filename': file.name,
-                    'content': img.src.substr(img.src.indexOf(',') + 1)
+                upload(progress, name.value, file.name, img.src.substr(img.src.indexOf(',') + 1), thumb).then(() => {
+                    img.remove();
+                    uploadPicture(index+1);
                 });
-
-                if (album_hash) {
-                    params.append('album', album_hash);
-                    params.append('key', album_key);
-                }
-                else {
-                    params.append('private', document.getElementById('f_private').checked ? 1 : 0);
-                }
-
-                fetch(config.base_url + '?upload', {
-                    'method': 'POST',
-                    'mode': 'same-origin',
-                    'headers': {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    'body': params
-                }).then((r) => {
-                    if (!r.ok) {
-                        console.error(r);
-                        throw Error('Upload failed');
-                    }
-
-                    progress.innerHTML = "Uploaded <b>&#10003;</b>";
-                    img.parentNode.removeChild(img);
-
-                    if (!album_hash) {
-                        r.text().then((url) => location.href = url);
-                        return;
-                    }
-
-                    index++;
-
-                    if (index < files.length)
-                    {
-                        uploadPicture(index);
-                    }
-                    else
-                    {
-                        location.href = config.album_page_url + album_hash + (config.album_page_url.indexOf('?') ? '&c=' : '?c=') + album_key;
-                    }
-                });
-
-                delete params;
-            }
+        }
         );
     }
 
@@ -145,7 +155,7 @@
         var btn = document.createElement('button');
         btn.type = 'button';
         btn.innerText = 'Add files...';
-        btn.className = 'add';
+        btn.className = 'add icon select';
         btn.onclick = () => filesInput.click();
         parent.prepend(btn);
 
@@ -266,6 +276,8 @@
 
             can_submit = false;
             document.querySelectorAll('.submit').forEach((e) => e.style.display = 'none');
+            document.querySelectorAll('#albumParent button').forEach((e) => e.style.display = 'none');
+            document.querySelectorAll('#albumParent input').forEach((e) => e.disabled = true);
 
             var xhr = new XMLHttpRequest;
             var url = config.base_url + '?upload';
@@ -274,7 +286,8 @@
                 var params = new URLSearchParams({
                     'album': 'new',
                     'title': document.getElementById('f_title').value,
-                    'private': document.getElementById('f_private').checked ? 1 : 0
+                    'private': document.getElementById('f_private').checked ? 1 : 0,
+                    'expiry': document.getElementById('f_expiry').value
                 });
 
                 fetch(form.action, {
@@ -451,7 +464,7 @@
             delete img._width;
             delete img._height;
 
-            const dpr = window.devicePixelRatio || 1;
+            const dpr = 1;
             canvas.width = width * dpr;
             canvas.height = height * dpr;
 

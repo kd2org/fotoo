@@ -34,15 +34,9 @@ define('UPLOAD_ERR_INVALID_IMAGE', 42);
 
 class FotooException extends Exception {}
 
-function exception_error_handler($errno, $errstr, $errfile, $errline )
-{
-    return;
-    // For @ ignored errors
-    if (error_reporting() & $errno) return;
-    throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
-}
+require_once __DIR__ . '/ErrorManager.php';
 
-set_error_handler("exception_error_handler");
+ErrorManager::enable(ErrorManager::DEVELOPMENT);
 
 require_once __DIR__ . '/ZipWriter.php';
 
@@ -63,6 +57,7 @@ class Fotoo_Hosting_Config
     private $title = null;
 
     private $max_file_size = null;
+    private $allowed_formats = [];
     private $allow_upload = null;
     private $allow_album_zip = null;
     private $nb_pictures_by_page = null;
@@ -210,6 +205,59 @@ function escape($str)
     return htmlspecialchars($str, ENT_QUOTES, 'utf-8', false);
 }
 
+function page(string $html, string $title = '')
+{
+    global $fh, $config;
+    $css_url = file_exists(__DIR__ . '/style.css')
+        ? $config->base_url . 'style.css?2023'
+        : $config->base_url . '?css&2023';
+
+    $title = escape($title);
+
+    if ($title) {
+        $title .= ' - ';
+    }
+
+    $title .= $config->title;
+    $subtitle = $fh->logged() ? '<h2>(admin mode)</h2>' : '';
+    $login = sprintf(
+        $fh->logged() ? '<a href="%s?logout">Logout</a>' : '<a href="%s?login">Login</a>',
+        $config->base_url
+    );
+
+    echo <<<EOF
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta name="charset" content="utf-8" />
+        <title>{$title}</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, target-densitydpi=device-dpi" />
+        <link rel="stylesheet" type="text/css" href="{$css_url}" />
+    </head>
+
+    <body>
+    <header>
+        <h1><a href="{$config->base_url}">{$config->title}</a></h1>
+        {$subtitle}
+        <nav>
+            <ul>
+                <li><a href="{$config->base_url}">Upload</a></li>
+                <li><a href="{$config->base_url}?list">Browse images</a></li>
+            </ul>
+        </nav>
+    </header>
+    <div id="page">
+        {$html}
+    </div>
+    <footer>
+        Powered by Fotoo Hosting application from <a href="https://kd2.org/">KD2.org</a>
+        | {$login}
+    </footer>
+    </body>
+    </html>
+EOF;
+}
+
 require_once __DIR__ . '/class.fotoo_hosting.php';
 require_once __DIR__ . '/class.image.php';
 
@@ -235,60 +283,54 @@ if ($fh->isClientBanned())
     $fh->setBanCookie();
 }
 
-if (!empty($_GET['delete']))
-{
-    $id = !empty($_GET['c']) ? trim($_GET['c']) : false;
+if (!empty($_POST['delete']) && !empty($_POST['key'])) {
+    if (($img = $fh->get($_POST['delete'])) && $fh->userDeletePicture($img, $_POST['key'])) {
+        if (!$img['album']) {
+            $url = $config->base_url.'?list';
+        }
+        else {
+            $url = $fh->getAlbumUrl($img['album'], true);
+        }
 
-    if ($fh->remove($_GET['delete'], $id))
-    {
-        header('Location: '.$config->base_url.'?list');
+        header('Location: ' . $url);
     }
-    else
-    {
-        echo "Can't delete picture";
+    else {
+        page('<h1 class="error">Cannot delete this image</h1>');
     }
 
     exit;
 }
-elseif (!empty($_GET['deleteAlbum']))
-{
-    $id = !empty($_GET['c']) ? trim($_GET['c']) : false;
-
-    if ($fh->removeAlbum($_GET['deleteAlbum'], $id))
-    {
+elseif (!empty($_POST['deleteAlbum']) && !empty($_POST['key'])) {
+    if ($fh->userDeleteAlbum($_POST['deleteAlbum'], $_POST['key'])) {
         header('Location: ' . $config->base_url . '?list');
     }
-    else
-    {
-        echo "Can't delete album";
+    else {
+        page('<h1 class="error">Cannot delete this album</h1>');
     }
 
     exit;
 }
-elseif (!empty($_POST['delete']) && $fh->logged())
-{
-    foreach ($_POST['pictures'] as $pic)
-    {
-        $fh->remove($pic, null);
+elseif (!empty($_POST['delete']) && $fh->logged()) {
+    foreach ($_POST['pictures'] ?? [] as $pic) {
+        $fh->deletePicture($pic);
     }
 
-    foreach ($_POST['albums'] as $album)
-    {
-        $fh->removeAlbum($album, null);
+    foreach ($_POST['albums'] ?? [] as $album) {
+        $fh->deleteAlbum($album);
     }
 
     header('Location: ' . $config->base_url . '?list');
     exit;
 }
 
-if (isset($_GET['upload'], $_POST['album']) && $_POST['album'] === 'new') {
+if (isset($_GET['upload'], $_POST['album']) && $_POST['album'] === 'new' && $config->allow_upload) {
     if (empty($_POST['title'])) {
         http_response_code(400);
         die("Bad Request");
     }
 
     try {
-        $hash = $fh->createAlbum($_POST['title'], empty($_POST['private']) ? false : true);
+        $hash = $fh->createAlbum($_POST['title'], !empty($_POST['private']), $_POST['expiry'] ?? null);
         $key = $fh->makeRemoveId($hash);
         http_response_code(200);
         echo json_encode(compact('hash', 'key'));
@@ -299,19 +341,26 @@ if (isset($_GET['upload'], $_POST['album']) && $_POST['album'] === 'new') {
         die("Upload not permitted.");
     }
 }
-elseif (isset($_GET['upload'], $_POST['album'])) {
+elseif (isset($_GET['upload'], $_POST['album']) && $config->allow_upload) {
     if (!$fh->checkRemoveId($_POST['album'], $_POST['key'])) {
         http_response_code(401);
         die("Invalid key");
     }
 
-    if (empty($_POST['content']) || !isset($_POST['name'], $_POST['filename'])) {
+    if (!isset($_POST['name'], $_POST['filename'])) {
         http_response_code(400);
         die("Wrong Request");
     }
 
     try {
-        $url = $fh->appendToAlbum($_POST['album'], $_POST['name'], ['content' => $_POST['content'], 'name' => $_POST['filename']]);
+        if (!isset($_FILES['file']) && !isset($_POST['content'])) {
+            throw new FotooException('No file', UPLOAD_ERR_NO_FILE);
+        }
+
+        $file = $_FILES['file'] ?? ['content' => $_POST['content'], 'name' => $_POST['filename']];
+        $file['thumb'] = $_POST['thumb'] ?? null;
+
+        $url = $fh->appendToAlbum($_POST['album'], $_POST['name'], $file);
         http_response_code(201);
     }
     catch (FotooException $e) {
@@ -322,12 +371,16 @@ elseif (isset($_GET['upload'], $_POST['album'])) {
     exit;
 }
 // Single image upload, no album
-elseif (isset($_GET['upload'], $_POST['content'], $_POST['filename'], $_POST['name'], $_POST['private'])) {
+elseif (isset($_GET['upload'], $_POST['filename'], $_POST['name'], $_POST['private']) && $config->allow_upload) {
     try {
-        $url = $fh->upload([
-            'content' => $_POST['content'],
-            'name' => $_POST['filename']
-        ], $_POST['name'], $_POST['private']);
+        if (!isset($_FILES['file']) && !isset($_POST['content'])) {
+            throw new FotooException('No file', UPLOAD_ERR_NO_FILE);
+        }
+
+        $file = $_FILES['file'] ?? ['content' => $_POST['content'], 'name' => $_POST['filename']];
+        $file['thumb'] = $_POST['thumb'] ?? null;
+
+        $url = $fh->upload($file, $_POST['name'], (bool) $_POST['private'], $_POST['expiry'] ?? null);
 
         http_response_code(200);
         echo $url;
@@ -339,9 +392,8 @@ elseif (isset($_GET['upload'], $_POST['content'], $_POST['filename'], $_POST['na
 
     exit;
 }
-
-if (isset($_GET['upload']))
-{
+// Images upload, no JS
+elseif (isset($_GET['upload']) && $config->allow_upload) {
     $error = false;
 
     if (empty($_FILES['upload']) && empty($_POST['upload']))
@@ -353,7 +405,8 @@ if (isset($_GET['upload']))
         try {
             $url = $fh->upload(!empty($_FILES['upload']) ? $_FILES['upload'] : $_POST['upload'],
                 isset($_POST['name']) ? trim($_POST['name']) : '',
-                isset($_POST['private']) ? (bool) $_POST['private'] : false
+                isset($_POST['private']) ? (bool) $_POST['private'] : false,
+                $_POST['expiry'] ?? null
             );
         }
         catch (FotooException $e)
@@ -379,6 +432,26 @@ if (isset($_GET['upload']))
 }
 
 $html = $title = '';
+
+$copy_script = '
+<script type="text/javascript">
+var copy = (e, c) => {
+    if (typeof e === \'string\') {
+        e = document.querySelector(e);
+    }
+
+    e.select();
+    e.setSelectionRange(0, e.value.length);
+    navigator.clipboard.writeText(e.value);
+
+    if (!c) {
+        return;
+    }
+
+    c.value = \'Copied!\';
+    window.setTimeout(() => c.value = \'Copy\', 5000);
+};
+</script>';
 
 if (isset($_GET['logout']))
 {
@@ -424,6 +497,7 @@ elseif (isset($_GET['login']))
 }
 elseif (isset($_GET['list']))
 {
+    $fh->pruneExpired();
     $title = 'Browse images';
 
     if (!empty($_GET['list']) && is_numeric($_GET['list']))
@@ -522,11 +596,8 @@ elseif (!empty($_GET['a']))
 
     if (empty($album))
     {
-        header('HTTP/1.1 404 Not Found', true, 404);
-        echo '
-            <h1>Not Found</h1>
-            <p><a href="'.$config->base_url.'">'.$config->title.'</a></p>
-        ';
+        http_response_code(404);
+        page('<h1 class="error">404 Not Found</h1>');
         exit;
     }
 
@@ -553,75 +624,82 @@ elseif (!empty($_GET['a']))
         $bbcode .= '[url='.$fh->getImageUrl($img).'][img]'.$fh->getImageThumbUrl($img)."[/img][/url] ";
     }
 
-    $html = '
-        <script type="text/javascript">
-        var copy = (e, c) => {
-            if (typeof e === \'string\') {
-                e = document.querySelector(e);
-            }
+    $html .= $copy_script;
 
-            e.select();
-            e.setSelectionRange(0, e.value.length);
-            navigator.clipboard.writeText(e.value);
+    $is_uploader = !empty($_GET['c']) && $fh->checkRemoveId($album['hash'], $_GET['c']);
 
-            if (!c) {
-                return;
-            }
-
-            c.value = \'Copied!\';
-            window.setTimeout(() => c.value = \'Copy\', 5000);
-        };
-        </script>
-        <article class="browse">
-            <h2>'.escape($title).'</h2>
+    $html .= sprintf(
+        '<article class="browse">
+            <h2>%s</h2>
             <p class="info">
-                Uploaded on <time datetime="'.date(DATE_W3C, $album['date']).'">'.@strftime('%c', $album['date']).'</time>
-                | '.(int)$max.' picture'.((int)$max > 1 ? 's' : '').'
+                Uploaded on <time datetime="%s">%s</time>
+                | <strong>%d picture%s</strong>
+                | Expires: %s
             </p>
             <aside class="examples">
+            <dl>
                 <dt>Share this album using this URL: <input type="button" onclick="copy(\'#url\', this);" value="Copy" /></dt>
-                <dd><input type="text" id="url" onclick="this.select();" value="'.escape($config->album_page_url . $album['hash']).'" /></dd>
+                <dd><input type="text" id="url" onclick="this.select();" value="%s" /></dd>
                 <dt>All pictures for a forum (BBCode): <input type="button" onclick="copy(\'#all\', this);" value="Copy" /></dt>
-                <dd><textarea id="all" cols="70" rows="3" onclick="this.select(); this.setSelectionRange(0, this.value.length); navigator.clipboard.writeText(this.value);">'.escape($bbcode).'</textarea></dd>
+                <dd><textarea id="all" cols="70" rows="3" onclick="this.select(); this.setSelectionRange(0, this.value.length); navigator.clipboard.writeText(this.value);">%s</textarea></dd>
                 <dd></dd>
-            </aside>';
+            </dl>',
+        escape($title),
+        date(DATE_W3C, $album['date']),
+        date('d/m/Y H:i', $album['date']),
+        $max,
+        $max > 1 ? 's' : '',
+        $album['expiry'] ? date('d/m/Y H:i', strtotime($album['expiry'])) : 'never',
+        escape($config->album_page_url . $album['hash']),
+        escape($bbcode)
+    );
+
+
+    if (!$fh->logged() && !empty($_GET['c'])) {
+        $hash = $album['hash'];
+        $key = $fh->makeRemoveId($album['hash']);
+        $url = $config->album_page_url . $hash
+            . (strpos($config->album_page_url, '?') !== false ? '&c=' : '?c=')
+            . $key;
+
+        $html .= sprintf('
+            <dl class="admin">
+                <dt>
+                    Bookmark this URL to be able to delete this album later:
+                    <input type="button" onclick="copy(\'#admin\', this);" value="Copy" />
+                </dt>
+                <dd><input type="text" id="admin" onclick="this.select();" value="%s" />
+                <dd><form method="post"><button class="icon delete" type="submit" name="deleteAlbum" value="%s" onclick="return confirm(\'Really?\');">Delete this album now</button><input type="hidden" name="key" value="%s" /></form></dd>
+            </dl>',
+            $url,
+            $hash,
+            $key
+        );
+    }
+
+    $html .= '</aside>';
 
     if ($config->allow_album_zip) {
         $html .= '
         <form method="post" action="">
         <p>
-            <input type="submit" name="download" value="Download full album as a ZIP file" />
+            <input type="submit" name="download" value="Download all images in a ZIP file" class="icon zip" />
         </p>
         </form>';
     }
 
     if ($fh->logged())
     {
-        $html .= '
-        <p class="admin">
-            <a href="?deleteAlbum='.rawurlencode($album['hash']).'" onclick="return confirm(\'Really?\');">Delete album</a>
-        </p>';
-    }
-    elseif (!empty($_GET['c']))
-    {
-        $url = $config->album_page_url . $album['hash'] 
-            . (strpos($config->album_page_url, '?') !== false ? '&c=' : '?c=') 
-            . $fh->makeRemoveId($album['hash']);
-
-        $html .= '
-        <p class="admin">
-            <a href="?deleteAlbum='.rawurlencode($album['hash']).'&amp;c='.rawurldecode($_GET['c']).'" onclick="return confirm(\'Really?\');">Delete album</a>
-        </p>
-        <p class="admin">
-            Keep this URL in your favorites to be able to delete this album later:<br />
-            <input type="text" onclick="this.select();" value="'.escape($url).'" />
-        </p>';
+        $html .= sprintf(
+            '<form class="admin" method="post"><button class="icon delete" type="submit" name="delete" value="1" onclick="return confirm(\'Really?\');">Delete this album now</button><input type="hidden" name="albums[]" value="%s" /></form>',
+            $album['hash']
+        );
     }
 
     foreach ($list as &$img)
     {
         $thumb_url = $fh->getImageThumbUrl($img);
-        $url = $fh->getUrl($img);
+        $url = $fh->getUrl($img, $is_uploader);
 
         $label = $img['filename'] ? escape(preg_replace('![_-]!', ' ', $img['filename'])) : 'View image';
 
@@ -663,11 +741,8 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
 
     if (empty($img))
     {
-        header('HTTP/1.1 404 Not Found', true, 404);
-        echo '
-            <h1>Not Found</h1>
-            <p><a href="'.$config->base_url.'">'.$config->title.'</a></p>
-        ';
+        http_response_code(404);
+        page('<h1 class="error">404 Not Found</h1>');
         exit;
     }
 
@@ -698,17 +773,57 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
     else
         $size = $size . ' B';
 
-    $html = '
-    <article class="picture">
+    $html .= $copy_script;
+    $html .= sprintf('<article class="picture">
         <header>
-            '.(trim($img['filename']) ? '<h2>' . escape(strtr($img['filename'], '-_.', '   ')) . '</h2>' : '').'
+            %s
             <p class="info">
-                Uploaded on <time datetime="'.date(DATE_W3C, $img['date']).'">'.@strftime('%c', $img['date']).'</time>
-                | Size: '.$img['width'].' × '.$img['height'].'
+                Uploaded on <time datetime="%s">%s</time>
+                | Size: %d × %d
+                | Expires: %s
             </p>
-        </header>
+        </header>',
+        trim($img['filename']) ? '<h2>' . escape(strtr($img['filename'], '-_.', '   ')) . '</h2>' : '',
+        date(DATE_W3C, $img['date']),
+        date('d/m/Y H:i', $img['date']),
+        $img['width'],
+        $img['height'],
+        $img['expiry'] ? date('d/m/Y H:i', strtotime($img['expiry'])) : 'never'
+    );
+
+    $examples = '
+        <aside class="examples">
+            <dl>
+                <dt>Short URL for full size <input type="button" onclick="copy(\'#url\', this);" value="Copy" /></dt>
+                <dd><input type="text" onclick="this.select();" value="'.escape($short_url).'" id="url" /></dd>
+                <dt>BBCode <input type="button" onclick="copy(\'#bbcode\', this);" value="Copy" /></dt>
+                <dd><textarea cols="70" rows="3" onclick="this.select();" id="bbcode">'.escape($bbcode).'</textarea></dd>
+                <dt>HTML code <input type="button" onclick="copy(\'#html\', this);" value="Copy" /></dt>
+                <dd><textarea cols="70" rows="3" onclick="this.select();" id="html">'.escape($html_code).'</textarea></dd>
+            </dl>';
+
+    if (!empty($_GET['c']))
+    {
+        $examples .= sprintf('
+            <dl class="admin">
+                <dt>
+                    Bookmark this URL to be able to delete this picture later:
+                    <input type="button" onclick="copy(\'#admin\', this);" value="Copy" />
+                </dt>
+                <dd><input type="text" id="admin" onclick="this.select();" value="%s" />
+                <dd><form method="post"><button class="icon delete" type="submit" name="delete" value="%s" onclick="return confirm(\'Really?\');">Delete this picture now</button><input type="hidden" name="key" value="%s" /></form></dd>
+            </dl>',
+            $fh->getUrl($img, true),
+            $img['hash'],
+            escape($_GET['c'])
+        );
+    }
+
+    $examples .= '</aside>';
+
+    $html .= '
         <figure>
-            <a href="'.$img_url.'">'.($img['private'] ? '<span class="private">Private</span>' : '').'<img src="'.$thumb_url.'" alt="'.escape($title).'" /></a>
+            <a href="'.$img_url.'">'.($img['private'] ? '<span class="private">Private</span>' : '').'<img src="'.$img_url.'" alt="'.escape($title).'" /></a>
         </figure>
         <footer>
             <p>
@@ -722,19 +837,16 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
         $next = $fh->getAlbumPrevNext($img['album'], $img['hash'], 1);
         $album = $fh->getAlbum($img['album']);
 
-        $html .= '
-        <footer class="context">';
+        $html .= '<footer class="context"><div>';
 
         if ($prev)
         {
             $thumb_url = $fh->getImageThumbUrl($prev);
             $url = $fh->getUrl($prev);
-            $label = $prev['filename'] ? escape(preg_replace('![_-]!', ' ', $prev['filename'])) : 'View image';
 
             $html .= '
             <figure class="prev">
-                <a href="'.$url.'"><b>&larr;</b><img src="'.$thumb_url.'" alt="'.$label.'" /></a>
-                <figcaption><a href="'.$url.'">'.$label.'</a></figcaption>
+                <a href="'.$url.'"><b>◄</b><i><img src="'.$thumb_url.'" title="Previous image" /></i></a>
             </figure>';
         }
         else
@@ -742,22 +854,14 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
             $html .= '<figure class="prev"><b>…</b></figure>';
         }
 
-        $html .= '
-            <figure>
-                <h3>Album:</h3>
-                <h2><a href="' . $config->album_page_url . $album['hash'] . '"> ' . escape($album['title']) .'</a></h2></figure
-            </figure>';
-
         if ($next)
         {
             $thumb_url = $fh->getImageThumbUrl($next);
             $url = $fh->getUrl($next);
-            $label = $next['filename'] ? escape(preg_replace('![_-]!', ' ', $next['filename'])) : 'View image';
 
             $html .= '
             <figure class="prev">
-                <a href="'.$url.'"><img src="'.$thumb_url.'" alt="'.$label.'" /><b>&rarr;</b></a>
-                <figcaption><a href="'.$url.'">'.$label.'</a></figcaption>
+                <a href="'.$url.'"><i><img src="'.$thumb_url.'" title="Next image" /></i><b>▶</b></a>
             </figure>';
         }
         else
@@ -765,43 +869,29 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
             $html .= '<figure class="next"><b>…</b></figure>';
         }
 
-        $html .= '
-            </footer>';
+        $html .= sprintf('</div>
+                <h2><a href="%s">%s</a></h2></footer>',
+            $config->album_page_url . $album['hash'],
+            escape($album['title'])
+        );
     }
+
+    $html .= $examples;
 
     if ($fh->logged())
     {
-        $html .= '
-        <p class="admin">
-            IP address: ' . escape(is_null($img['ip']) ? 'Not available' : ($img['ip'] == 'R' ? 'Automatically removed from database' : $img['ip'])) . '
-        </p>
-        <p class="admin">
-            <a href="?delete='.rawurlencode($img['hash']).'" onclick="return confirm(\'Really?\');">Delete picture</a>
-        </p>';
-    }
-    elseif (!empty($_GET['c']))
-    {
-        $html .= '
-        <p class="admin">
-            <a href="?delete='.rawurlencode($img['hash']).'&amp;c='.rawurldecode($_GET['c']).'" onclick="return confirm(\'Really?\');">Delete picture</a>
-        </p>
-        <p class="admin">
-            Keep this URL in your favorites to be able to delete this picture later:<br />
-            <input type="text" onclick="this.select();" value="'.$fh->getUrl($img, true).'" />
-        </p>';
+        $ip = !$img['ip'] ? 'Not available' : ($img['ip'] == 'R' ? 'Automatically removed from database' : $img['ip']);
+        $html .= sprintf('
+            <form class="admin" method="post" action="">
+                <dl class="admin"><dt>IP address:</dt><dd>%s</dd></dl>
+                <p><button class="icon delete" type="submit" name="delete" value="1" onclick="return confirm(\'Really?\');">Delete this picture</button><input type="hidden" name="pictures[]" value="%s" /></p>
+            </form>',
+            escape($ip),
+            $img['hash']
+        );
     }
 
-    $html .= '
-        <aside class="examples">
-            <dt>Short URL for full size <input type="button" onclick="copy(\'#url\', this);" value="Copy" /></dt>
-            <dd><input type="text" onclick="this.select();" value="'.escape($short_url).'" id="url" /></dd>
-            <dt>BBCode <input type="button" onclick="copy(\'#bbcode\', this);" value="Copy" /></dt>
-            <dd><textarea cols="70" rows="3" onclick="this.select();" id="bbcode">'.escape($bbcode).'</textarea></dd>
-            <dt>HTML code <input type="button" onclick="copy(\'#html\', this);" value="Copy" /></dt>
-            <dd><textarea cols="70" rows="3" onclick="this.select();" id="html">'.escape($html_code).'</textarea></dd>
-        </aside>
-    </article>
-    ';
+    $html .= '</article>';
 }
 elseif (!$config->allow_upload)
 {
@@ -827,6 +917,14 @@ else
     $max_file_size_human = round($config->max_file_size / 1024 / 1024, 2);
     $formats = implode(', ', array_map('strtoupper', $config->allowed_formats));
 
+    $expiry_list = ['+1 minute' => '1 hour', '+1 day' => '24 hours', '+1 week' => '1 week', '+2 weeks' => '2 weeks', '+1 month' => '1 month', '+3 month' => '3 months', '+6 months' => '6 months', '+1 year' => '1 year', null => 'Never expires'];
+    $expiry_options = '';
+    $default_expiry = null;
+
+    foreach ($expiry_list as $a => $b) {
+        $expiry_options .= sprintf('<option value="%s"%s>%s</option>', $a, $a == $default_expiry ? ' selected="selected"' : '', $b);
+    }
+
     $html .= <<<EOF
     <form method="post" enctype="multipart/form-data" action="{$config->base_url}?upload" id="f_upload">
     <input type="hidden" name="MAX_FILE_SIZE" value="{$max_file_size}" />
@@ -842,59 +940,26 @@ else
             <dl>
                 <dt><label for="f_title">Title:</label></dt>
                 <dd><input type="text" name="title" id="f_title" maxlength="100" required="required" /></dd>
-                <dt><label for="f_private">Private</label></dt>
-                <dd class="private"><label><input type="checkbox" name="private" id="f_private" value="1" />
-                    (If checked, the pictures won't be listed in &quot;browse images&quot;)</label></dd>
-                <dd id="f_file_container"><input type="file" name="upload" id="f_files" multiple="multiple" accept="image/jpeg,image/webp,image/png,image/gif,image/svg+xml" required="required" /></dd>
+                <dd><label><input type="checkbox" name="private" id="f_private" value="1" />
+                    <strong>Private</strong><br />
+                    <small>(If checked, the pictures won't be listed in &quot;browse images&quot;)</small></label></dd>
+                <dd><label for="f_expiry"><strong>Expiry:</strong></label> <select name="expiry" id="f_expiry">{$expiry_options}</select><br /><small>(The images will be deleted after this time)</small></dd>
+                <dd id="f_file_container"><input type="file" name="upload" id="f_files" multiple="multiple" accept="image/jpeg,image/webp,image/png,image/gif,image/svg+xml" /></dd>
             </dl>
             <p class="submit">
-                <input type="submit" value="Upload" />
+                <input type="submit" value="Upload images" class="icon upload" />
             </p>
         </fieldset>
         <div id="albumParent"></div>
         <p class="submit">
-            <input type="submit" value="Upload" />
+            <input type="submit" value="Upload images" class="icon upload" />
         </p>
     </article>
     </form>
     <script type="text/javascript" src="{$js_url}"></script>
 EOF;
-
 }
 
-$css_url = file_exists(__DIR__ . '/style.css')
-    ? $config->base_url . 'style.css?2023'
-    : $config->base_url . '?css&2023';
-
-echo '<!DOCTYPE html>
-<html>
-<head>
-    <meta name="charset" content="utf-8" />
-    <title>'.($title ? escape($title) . ' - ' : '').$config->title.'</title>
-    <meta name="viewport" content="width=device-width" />
-    <link rel="stylesheet" type="text/css" href="'.$css_url.'" />
-</head>
-
-<body>
-<header>
-    <h1><a href="'.$config->base_url.'">'.$config->title.'</a></h1>
-    '.($fh->logged() ? '<h2>(admin mode)</h2>' : '').'
-    <nav>
-        <ul>
-            <li><a href="'.$config->base_url.'">Upload</a></li>
-            <li><a href="'.$config->base_url.'?list">Browse images</a></li>
-        </ul>
-    </nav>
-</header>
-<div id="page">
-    '.$html.'
-</div>
-<footer>
-    Powered by Fotoo Hosting application from <a href="http://kd2.org/">KD2.org</a>
-    | '.($fh->logged() ? '<a href="'.$config->base_url.'?logout">Logout</a>' : '<a href="'.$config->base_url.'?login">Login</a>').'
-</footer>
-</body>
-</html>';
-
+page($html, $title);
 
 ?>
