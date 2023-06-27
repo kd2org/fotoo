@@ -1,5 +1,5 @@
 <?php
-// Fotoo Hosting single-file release version 3.0.0
+// Fotoo Hosting single-file release version 3.1.0
 ?><?php if (isset($_GET["js"])): header("Content-Type: text/javascript"); ?>
 (function () {
     if (!Array.prototype.indexOf)
@@ -47,17 +47,63 @@
         return filename;
     }
 
+    function upload(progress, name, filename, file, thumb)
+    {
+        var params = new FormData;
+
+        params.append('name', name);
+        params.append('filename', filename);
+        params.append('thumb', thumb);
+
+        if (typeof file === 'string') {
+            params.append('content', file);
+        }
+        else {
+            params.append('file', file);
+        }
+
+        if (album_hash) {
+            params.append('album', album_hash);
+            params.append('key', album_key);
+        }
+        else {
+            params.append('private', document.getElementById('f_private').checked ? 1 : 0);
+            params.append('expiry', document.getElementById('f_expiry').value);
+        }
+
+        return fetch(config.base_url + '?upload', {
+            'method': 'POST',
+            'mode': 'same-origin',
+            'body': params
+        }).then((r) => {
+            if (!r.ok) {
+                console.error(r);
+                throw Error('Upload failed');
+            }
+
+            progress.innerHTML = "Uploaded <b>&#10003;</b>";
+
+            if (!album_hash) {
+                return r.text().then((url) => location.href = url);
+            }
+
+            return r.text();
+        });
+    }
+
     function uploadPicture(index)
     {
         var file = files[index];
 
-        if (!(/^image\/(?:jpe?g|webp)$/i.test(file.type)))
-        {
-            uploadPicture(index+1);
+        if (!file) {
+            if (album_hash) {
+                location.href = config.album_page_url + album_hash + (config.album_page_url.indexOf('?') ? '&c=' : '?c=') + album_key;
+            }
             return;
         }
 
         var current = document.getElementById('albumParent').querySelectorAll('figure')[index];
+        current.scrollIntoView({behavior: 'smooth'});
         var resized_img = document.createElement('div');
         resized_img.style.display = "none";
 
@@ -66,67 +112,31 @@
 
         var progress = document.createElement('span');
         current.appendChild(progress);
+        progress.innerHTML = "Uploading... <img class=\"loading\" src=\"" + loading_gif + "\" alt=\"\" />";
+
+        var thumb = current.querySelector('img').src;
+        thumb = thumb.substr(thumb.indexOf(',') + 1);
+
+        if (!(/^image\/(?:jpe?g|webp)$/i.test(file.type)))
+        {
+            // Upload SVG/PNG/GIF, etc: no client-side resize
+            upload(progress, name.value, file.name, file, thumb).then(() => uploadPicture(index+1));
+            return;
+        }
 
         resize(
             file,
             -config.max_width,
             resized_img,
             progress,
-            function()
-            {
+            () => {
                 var img = resized_img.firstChild
 
-                progress.innerHTML = "Uploading... <img class=\"loading\" src=\"" + loading_gif + "\" alt=\"\" />";
-
-                var params = new URLSearchParams({
-                    'name': name.value,
-                    'filename': file.name,
-                    'content': img.src.substr(img.src.indexOf(',') + 1)
+                upload(progress, name.value, file.name, img.src.substr(img.src.indexOf(',') + 1), thumb).then(() => {
+                    img.remove();
+                    uploadPicture(index+1);
                 });
-
-                if (album_hash) {
-                    params.append('album', album_hash);
-                    params.append('key', album_key);
-                }
-                else {
-                    params.append('private', document.getElementById('f_private').checked ? 1 : 0);
-                }
-
-                fetch(config.base_url + '?upload', {
-                    'method': 'POST',
-                    'mode': 'same-origin',
-                    'headers': {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    'body': params
-                }).then((r) => {
-                    if (!r.ok) {
-                        console.error(r);
-                        throw Error('Upload failed');
-                    }
-
-                    progress.innerHTML = "Uploaded <b>&#10003;</b>";
-                    img.parentNode.removeChild(img);
-
-                    if (!album_hash) {
-                        r.text().then((url) => location.href = url);
-                        return;
-                    }
-
-                    index++;
-
-                    if (index < files.length)
-                    {
-                        uploadPicture(index);
-                    }
-                    else
-                    {
-                        location.href = config.album_page_url + album_hash + (config.album_page_url.indexOf('?') ? '&c=' : '?c=') + album_key;
-                    }
-                });
-
-                delete params;
-            }
+        }
         );
     }
 
@@ -148,7 +158,7 @@
         var btn = document.createElement('button');
         btn.type = 'button';
         btn.innerText = 'Add files...';
-        btn.className = 'add';
+        btn.className = 'add icon select';
         btn.onclick = () => filesInput.click();
         parent.prepend(btn);
 
@@ -269,6 +279,8 @@
 
             can_submit = false;
             document.querySelectorAll('.submit').forEach((e) => e.style.display = 'none');
+            document.querySelectorAll('#albumParent button').forEach((e) => e.style.display = 'none');
+            document.querySelectorAll('#albumParent input').forEach((e) => e.disabled = true);
 
             var xhr = new XMLHttpRequest;
             var url = config.base_url + '?upload';
@@ -277,7 +289,8 @@
                 var params = new URLSearchParams({
                     'album': 'new',
                     'title': document.getElementById('f_title').value,
-                    'private': document.getElementById('f_private').checked ? 1 : 0
+                    'private': document.getElementById('f_private').checked ? 1 : 0,
+                    'expiry': document.getElementById('f_expiry').value
                 });
 
                 fetch(form.action, {
@@ -454,7 +467,7 @@
             delete img._width;
             delete img._height;
 
-            const dpr = window.devicePixelRatio || 1;
+            const dpr = 1;
             canvas.width = width * dpr;
             canvas.height = height * dpr;
 
@@ -595,22 +608,72 @@ nav ul li a:hover {
 	color: darkred;
 }
 
-input[type=submit] {
+[type=submit] {
 	font-size: 112.5%;
-	padding: .3em;
-	cursor: pointer;
 }
+
+[type=submit], [type=button] {
+	box-shadow: 2px 2px 5px #666;
+}
+
+[type=submit], [type=button], input[type=text], input[type=password], select {
+	padding: .3em .5em;
+	background: rgba(255, 255, 255, 0.5);
+	border: none;
+	border-radius: .3em;
+	cursor: pointer;
+	transition: color .2s, box-shadow .2s;
+}
+
+dl select {
+	width: auto;
+}
+
+[type=submit]:hover, [type=button]:hover, input[type=submit]:focus, input[type=button]:focus  {
+	color: darkred;
+	box-shadow: 0px 0px 5px 2px orange;
+	outline: none;
+}
+
+
 
 label {
 	cursor: pointer;
+	display: block;
+	padding: .3em .5em;
 }
 label:hover {
-	border-bottom: 1px dashed #fff;
+	background: rgba(255, 255, 255, 0.5);
+	border-radius: .3em;
 }
 
-input[type=text], input[type=file], input[type=password] {
-	padding: .3em;
+dd label {
+	display: inline-block;
+}
+
+label strong {
+	font-weight: bold;
+}
+
+small {
+	color: #666;
+	font-size: .9em;
+	font-weight: normal;
+	margin: .5rem 0;
+	display: block;
+}
+
+input[type=text], input[type=password], select {
 	width: 95%;
+	font-size: 1.2em;
+	cursor: unset;
+	border: 2px solid #fff;
+}
+
+input[type=text]:focus, input[type=password]:focus, select:focus {
+	box-shadow: 0px 0px 5px 2px orange;
+	outline: none;
+
 }
 
 fieldset dl dt {
@@ -649,25 +712,51 @@ fieldset {
 	max-height: 150px;
 }
 
+.picture footer.context a {
+	text-decoration: none;
+}
+
+.picture footer.context div {
+	display: flex;
+	flex-direction: row;
+	justify-content: space-between;
+	flex-wrap: wrap;
+}
+
 .picture footer.context figure {
-	position: relative;
-	width: 200px;
-	height: 180px;
 	margin: 0;
 }
 
-.picture footer.context figure b {
-	font-size: 100px;
-	line-height: 150px;
+.picture footer.context figure a {
+	display: flex;
+	flex-direction: row;
+	height: 180px;
+	margin: 0;
+	justify-content: center;
+	align-items: center;
+}
+
+.picture footer.context figure i {
 	width: 200px;
+	height: 100%;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
+
+.picture footer.context figure b {
+	font-size: 50px;
+	line-height: 150px;
+	width: 50px;
 	height: 150px;
-	position: absolute;
 	display: block;
-	top: 0;
-	left: 0;
-	color: rgb(255, 255, 255);
-	color: rgba(255, 255, 255, 0.5);
+	color: #999;
+	text-align: center;
+}
+
+.picture footer.context figure a:hover b {
 	text-shadow: 0px 0px 10px #000;
+	color: #fff;
 }
 
 .examples {
@@ -675,24 +764,21 @@ fieldset {
 	max-width: 40em;
 }
 
-.examples dt {
+.examples dl {
 	margin: .8rem 0;
+}
+
+.examples dd, .examples dt {
+	margin-bottom: .8rem;
+}
+
+.examples dt {
 	font-weight: bold;
 	text-align: left;
 }
 
 .examples input[type=button] {
 	float: right;
-	padding: .3em .5em;
-	background: rgba(255, 255, 255, 0.5);
-	border: none;
-	border-radius: .3em;
-	cursor: pointer;
-}
-
-.examples input[type=button]:hover {
-	color: darkred;
-	box-shadow: 0px 0px 5px orange;
 }
 
 .examples input[type=text], .admin input[type=text], .examples textarea {
@@ -701,7 +787,7 @@ fieldset {
 	border-radius: .5em;
 	font-family: "Courier New", Courier, monospace;
 	width: calc(100% - 1em);
-	font-size: 10pt;
+	font-size: 8pt;
 	padding: .5em;
 }
 
@@ -732,6 +818,10 @@ figure figcaption {
 	margin-left: .2em;
 }
 
+#albumParent img {
+	max-width: 100%;
+}
+
 figure a:hover img {
 	box-shadow: 0px 0px 10px #000;
 	background: #fff;
@@ -760,14 +850,54 @@ figure span.private {
 	font-size: 125%;
 }
 
-p.admin, #albumParent {
-	background: rgb(100, 100, 100);
+form.admin, #albumParent {
 	background: rgba(0, 0, 0, 0.25);
 	padding: 1em;
 	width: 50%;
 	margin: .8em auto;
 	border-radius: .8em;
 	color: #fff;
+}
+
+dl.admin {
+	background: rgba(0, 0, 0, 0.25);
+	padding: .8em;
+	border-radius: .8em;
+	margin: .8em auto;
+}
+
+dl.admin button[type=submit] {
+	border: 2px solid orange;
+}
+
+.admin p:nth-child(2n) {
+	margin-top: 1rem;
+}
+
+.icon {
+	background-position: .5em center;
+	background-repeat: no-repeat;
+	padding-left: 2.5em;
+	background-size: 24px 24px;
+}
+
+.icon.upload {
+	background-image: url('data:image/svg+xml;utf8,<svg height="64" viewBox="0 0 64 64" width="64" xmlns="http://www.w3.org/2000/svg"><g fill="none" fill-rule="evenodd"><path d="m15 51c-8.28427125 0-15-6.7157288-15-15s6.71572875-15 15-15c2.1706646 0 4.2336397.4610733 6.0963309 1.2906254.8484446-7.4793433 7.197408-13.2906254 14.9036691-13.2906254 8.2842712 0 15 6.7157288 15 15 0 1.0287036-.1035536 2.0332209-.3008052 3.0036966.0999699-.0024596.2002431-.0036966.3008052-.0036966 6.627417 0 12 5.372583 12 12s-5.372583 12-12 12z" fill="%23b4dffb"/><path d="m15 25c-6.07513225 0-11 4.9248678-11 11" stroke="%23fff" stroke-linecap="round" stroke-width="2"/><g fill="%235daf38" transform="matrix(-1 0 0 -1 43 60)"><path d="m6 1.99700466c0-1.10291522.88670635-1.99700466 1.99810135-1.99700466h4.00379725c1.103521 0 1.9981014.89497885 1.9981014 1.99700466v24.00299534h-8z"/><path d="m9.41913411 20.8132122c.32080337-.4491247.83810749-.453074 1.16173179 0l8.8382682 12.3735756c.3208034.4491247.1255603.8132122-.4109372.8132122h-18.01639379c-.54775773 0-.73456153-.3601382-.41093722-.8132122z" transform="matrix(1 0 0 -1 0 54)"/></g></g></svg>');
+	background-size: 32px 32px;
+	font-size: 2em;
+	padding-left: 2em;
+}
+
+.icon.delete {
+	background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36"><path fill="%23F4900C" d="M35 19c0-2.062-.367-4.039-1.04-5.868-.46 5.389-3.333 8.157-6.335 6.868-2.812-1.208-.917-5.917-.777-8.164.236-3.809-.012-8.169-6.931-11.794 2.875 5.5.333 8.917-2.333 9.125-2.958.231-5.667-2.542-4.667-7.042-3.238 2.386-3.332 6.402-2.333 9 1.042 2.708-.042 4.958-2.583 5.208-2.84.28-4.418-3.041-2.963-8.333C2.52 10.965 1 14.805 1 19c0 9.389 7.611 17 17 17s17-7.611 17-17z"/><path fill="%23FFCC4D" d="M28.394 23.999c.148 3.084-2.561 4.293-4.019 3.709-2.106-.843-1.541-2.291-2.083-5.291s-2.625-5.083-5.708-6c2.25 6.333-1.247 8.667-3.08 9.084-1.872.426-3.753-.001-3.968-4.007C7.352 23.668 6 26.676 6 30c0 .368.023.73.055 1.09C9.125 34.124 13.342 36 18 36s8.875-1.876 11.945-4.91c.032-.36.055-.722.055-1.09 0-2.187-.584-4.236-1.606-6.001z"/></svg>');
+}
+
+.icon.select {
+	background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><g fill="%230072ff"><path d="m39.87 48h-21.87a2 2 0 1 0 0 4h23.21a10.79 10.79 0 0 0 10.79-10.79v-23.31a2 2 0 0 0 -2.34-2 2.08 2.08 0 0 0 -1.66 2.1v21.87a8.13 8.13 0 0 1 -8.13 8.13z"/><path d="m43.71 56h-13.71a2 2 0 1 0 0 4h14.56a15.43 15.43 0 0 0 15.44-15.44v-2.56a2 2 0 0 0 -2.34-2 2.08 2.08 0 0 0 -1.66 2.11v1.6a12.29 12.29 0 0 1 -12.29 12.29z"/><path d="m12.24 44h23.52a8.24 8.24 0 0 0 8.24-8.24v-23.52a8.24 8.24 0 0 0 -8.24-8.24h-23.52a8.24 8.24 0 0 0 -8.24 8.24v23.52a8.24 8.24 0 0 0 8.24 8.24zm11.76-32a6 6 0 1 1 -6 6 6 6 0 0 1 6-6zm-8.18 13.61a1.51 1.51 0 0 1 1.82.09 10 10 0 0 0 12.73 0 1.51 1.51 0 0 1 1.82-.09 8.89 8.89 0 0 1 3.81 7.3 3.09 3.09 0 0 1 -3.09 3.09h-17.82a3.09 3.09 0 0 1 -3.09-3.09 8.89 8.89 0 0 1 3.82-7.3z"/><path d="m58 24a2 2 0 0 0 -2 2v8a2 2 0 0 0 4 0v-8a2 2 0 0 0 -2-2z"/></g></svg>');
+}
+
+.icon.zip {
+	background-image: url('data:image/svg+xml;utf8,<svg height="64" viewBox="0 0 56 64" width="56" xmlns="http://www.w3.org/2000/svg"><path clip-rule="evenodd" d="m5.113-.026c-2.803 0-5.074 2.272-5.074 5.074v53.841c0 2.803 2.271 5.074 5.074 5.074h45.773c2.801 0 5.074-2.271 5.074-5.074v-38.605l-18.901-20.31h-31.946z" fill="%238199af" fill-rule="evenodd"/><g clip-rule="evenodd" fill-rule="evenodd"><path d="m55.977 20.352v1h-12.799s-6.312-1.26-6.129-6.707c0 0 .208 5.707 6.004 5.707z" fill="%23617f9b"/><path d="m37.074 0v14.561c0 1.656 1.104 5.791 6.104 5.791h12.799z" fill="%23fff" opacity=".5"/></g><path d="m18.438 53.906h-7.581c-.378 0-.756-.342-.756-.828 0-.18.054-.36.162-.504l6.68-9.345h-6.212c-.36 0-.648-.288-.648-.684 0-.36.288-.648.648-.648h7.454c.378 0 .756.342.756.829 0 .18-.054.36-.162.504l-6.68 9.345h6.338c.36 0 .648.288.648.648.001.395-.287.683-.647.683zm4.012.108c-.414 0-.738-.324-.738-.738v-10.767c0-.396.324-.721.774-.721.396 0 .72.324.72.721v10.767c0 .413-.324.738-.756.738zm8.839-4.879h-3.331v4.141c0 .414-.324.738-.756.738-.414 0-.738-.324-.738-.738v-10.299c0-.594.486-1.081 1.081-1.081h3.745c2.413 0 3.763 1.657 3.763 3.619s-1.387 3.62-3.764 3.62zm-.18-5.906h-3.151v4.573h3.151c1.422 0 2.395-.936 2.395-2.287-.001-1.35-.973-2.286-2.395-2.286z" fill="%23fff"/></svg>');
 }
 
 #albumParent {
@@ -781,19 +911,9 @@ p.admin, #albumParent {
 	display: block;
 	padding: .2em;
 	padding-left: 2em;
-	font-size: 2em;
+	font-size: 1.7em;
 	margin: .5rem auto;
-	background: no-repeat .5em center rgba(0, 0, 0, 0.2);
-	box-shadow: 0px 0px 5px #fff;
-	background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg"><path d="m296 384h-80c-13.3 0-24-10.7-24-24v-168h-87.7c-17.8 0-26.7-21.5-14.1-34.1l152.1-152.2c7.5-7.5 19.8-7.5 27.3 0l152.2 152.2c12.6 12.6 3.7 34.1-14.1 34.1h-87.7v168c0 13.3-10.7 24-24 24zm216-8v112c0 13.3-10.7 24-24 24h-464c-13.3 0-24-10.7-24-24v-112c0-13.3 10.7-24 24-24h136v8c0 30.9 25.1 56 56 56h80c30.9 0 56-25.1 56-56v-8h136c13.3 0 24 10.7 24 24zm-124 88c0-11-9-20-20-20s-20 9-20 20 9 20 20 20 20-9 20-20zm64 0c0-11-9-20-20-20s-20 9-20 20 9 20 20 20 20-9 20-20z"/></svg>');
 	background-size: 32px 32px;
-	transition: background-color .2s, color .2s, box-shadow .2s;
-}
-
-#albumParent .add:hover {
-	color: #fff;
-	box-shadow: 0px 0px 5px orange;
-	background-color: rgba(0, 0, 0, 0.5)
 }
 
 #albumParent img.loading, #albumParent span b {
@@ -814,31 +934,15 @@ article h2 {
 	margin-bottom: .5em;
 }
 
-p.error {
+.error {
 	color: red;
 	margin: .8em;
 }
 
-p.admin a {
-	color: darkred;
+.picture figure img {
+	max-width: 90%;
 }
-
-.albums figure {
-	display: block;
-}
-
-.albums figure img {
-	vertical-align: middle;
-	margin: .5em;
-}
-
-.albums figure span {
-	margin: 0 auto;
-	left: 0px;
-	right: 0px;
-	bottom: 40%;
-	top: auto;
-}<?php exit; endif; ?><?php
+<?php exit; endif; ?><?php
 
 class Fotoo_Hosting
 {
@@ -871,25 +975,45 @@ class Fotoo_Hosting
 					private INT NOT NULL DEFAULT 0,
 					size INT NOT NULL DEFAULT 0,
 					album TEXT NULL,
-					ip TEXT NULL
+					ip TEXT NULL,
+					expiry TEXT NULL CHECK (expiry IS NULL OR datetime(expiry) = expiry)
 				);
 
 				CREATE INDEX date ON pictures (private, date);
+				CREATE INDEX p_expiry ON pictures (expiry);
 				CREATE INDEX album ON pictures (album);
 
 				CREATE TABLE albums (
 					hash TEXT PRIMARY KEY NOT NULL,
 					title TEXT NOT NULL,
 					date INT NOT NULL,
-					private INT NOT NULL DEFAULT 0
+					private INT NOT NULL DEFAULT 0,
+					expiry TEXT NULL CHECK (expiry IS NULL OR datetime(expiry) = expiry)
 				);
+
+				CREATE INDEX a_expiry ON albums (expiry);
+
+				PRAGMA user_version = 1;
 			');
 		}
 
 		$this->config =& $config;
 
-		if (!file_exists($config->storage_path))
+		if (!file_exists($config->storage_path)) {
 			mkdir($config->storage_path);
+		}
+
+		$v = $this->querySingleColumn('PRAGMA user_version;');
+
+		if (!$v) {
+			$this->db->exec('
+				ALTER TABLE pictures ADD COLUMN expiry TEXT NULL CHECK (expiry IS NULL OR datetime(expiry) = expiry);
+				ALTER TABLE albums ADD COLUMN expiry TEXT NULL CHECK (expiry IS NULL OR datetime(expiry) = expiry);
+				CREATE INDEX p_expiry ON pictures (expiry);
+				CREATE INDEX a_expiry ON albums (expiry);
+				PRAGMA user_version = 1;
+			');
+		}
 	}
 
     public function isClientBanned()
@@ -1156,17 +1280,16 @@ class Fotoo_Hosting
 		return true;
 	}
 
-	public function upload($file, $name = '', $private = false, $album = null)
+	public function upload(array $file, string $name = '', bool $private = false, ?string $expiry = null, ?string $album = null): string
 	{
-		if ($this->isClientBanned())
-		{
+		if ($this->isClientBanned()) {
 			throw new FotooException('Upload error: upload not permitted.', -42);
 		}
 
 		$client_resize = false;
+		$file['thumb_path'] = null;
 
-		if (isset($file['content']) && $this->_processEncodedUpload($file))
-		{
+		if (isset($file['content']) && $this->_processEncodedUpload($file)) {
 			$client_resize = true;
 		}
 
@@ -1182,22 +1305,27 @@ class Fotoo_Hosting
 			throw new FotooException("Upload error.", UPLOAD_ERR_NO_FILE);
 		}
 
-		// Make sure tmp_name is from us
+		// Make sure tmp_name is from us and not injected
 		if (!file_exists($file['tmp_name'])
 			|| !(is_uploaded_file($file['tmp_name']) || $client_resize)) {
 			throw new FotooException("Upload error.", UPLOAD_ERR_NO_FILE);
 		}
 
-		if (!empty($name))
-		{
+		if (!empty($file['thumb'])) {
+			$file['thumb_path'] = tempnam(ini_get('upload_tmp_dir') ?: sys_get_temp_dir(), 'tmp_file_');
+			file_put_contents($file['thumb_path'], base64_decode($file['thumb'], true));
+			unset($file['thumb']);
+		}
+
+		// Clean up name
+		if (!empty($name)) {
 			$name = preg_replace('!\s+!', '-', $name);
 			$name = preg_replace('![^a-z0-9_.-]!i', '', $name);
 			$name = preg_replace('!([_.-]){2,}!', '\\1', $name);
 			$name = substr($name, 0, 30);
 		}
 
-		if (!trim($name))
-		{
+		if (!trim($name)) {
 			$name = '';
 		}
 
@@ -1277,10 +1405,45 @@ class Fotoo_Hosting
 		}
 
 		$size = filesize($dest . $ext);
+		$has_thumb = false;
+		http_response_code(500);
 
-		// Create thumb when needed
-		if ($width > $this->config->thumb_width || $height > $this->config->thumb_width
-			|| $size > (100 * 1024) || !in_array($format, ['jpeg', 'png', 'webp']))
+		// Process client-side generated thumbnail
+		if (!empty($file['thumb_path'])) {
+			$has_thumb = true;
+			$img = new Image($file['thumb_path']);
+			list($thumb_width, $thumb_height) = $img->getSize();
+
+			if (!in_array($img->format(), ['jpeg', 'webp', 'png'])) {
+				$has_thumb = false;
+			}
+			elseif ($thumb_width > $this->config->thumb_width || $thumb_height > $this->config->thumb_width) {
+				$has_thumb = false;
+			}
+			elseif (filesize($file['thumb_path']) > (50*1024)) {
+				$has_thumb = false;
+			}
+
+			if (!$has_thumb) {
+				@unlink($file['thumb_path']);
+			}
+			else {
+				$thumb_format = $img->format();
+				rename($file['thumb_path'], $dest . '.s.' . $thumb_format);
+			}
+
+			unset($img);
+		}
+
+		// Image is small enough: don't create a thumb
+		if ($width <= $this->config->thumb_width && $height <= $this->config->thumb_width
+			&& $size > (50 * 1024) && in_array($format, ['jpeg', 'png', 'webp'])) {
+			$has_thumb = true;
+			$thumb_format = 0;
+		}
+
+		// Create thumb when required
+		if (!$has_thumb)
 		{
 			$img = new Image($dest . $ext);
 			$img->jpeg_quality = 70;
@@ -1288,15 +1451,12 @@ class Fotoo_Hosting
 
 			if (in_array('webp', $img->getSupportedFormats())) {
 				$thumb_format = 'webp';
-				$thumb_ext = '.s.webp';
 			}
 			elseif ($format !== 'png') {
 				$thumb_format = 'jpeg';
-				$thumb_ext = '.s.jpeg';
 			}
 			else {
 				$thumb_format = $format;
-				$thumb_ext = '.s.' . $format;
 			}
 
 			$img->resize(
@@ -1304,83 +1464,93 @@ class Fotoo_Hosting
 				($height > $this->config->thumb_width) ? $this->config->thumb_width : $height
 			);
 
-			$img->save($dest . $thumb_ext, $thumb_format);
-
-			$thumb = true;
-		}
-		else
-		{
-			$thumb = false;
-			$thumb_format = 0;
+			$img->save($dest . '.s.' . $thumb_format, $thumb_format);
 		}
 
 		$hash = substr($hash, -2) . '/' . $base;
 
-		$req = $this->db->prepare('INSERT INTO pictures 
-			(hash, filename, date, format, width, height, thumb, private, size, album, ip)
-			VALUES (:hash, :filename, :date, :format, :width, :height, :thumb, :private, :size, :album, :ip);');
-
-		$req->bindValue(':hash', $hash);
-		$req->bindValue(':filename', $name);
-		$req->bindValue(':date', time());
-		$req->bindValue(':format', strtoupper($format));
-		$req->bindValue(':width', (int)$width);
-		$req->bindValue(':height', (int)$height);
-		$req->bindValue(':thumb', $thumb_format === 0 ? $thumb_format : strtoupper($thumb_format));
-		$req->bindValue(':private', $private ? '1' : '0');
-		$req->bindValue(':size', (int)$size);
-		$req->bindValue(':album', is_null($album) ? NULL : $album);
-		$req->bindValue(':ip', self::getIPAsString());
-
-		$req->execute();
+		$this->insert('pictures', [
+			'hash'     => $hash,
+			'filename' => $name,
+			'date'     => time(),
+			'format'   => strtoupper($format),
+			'width'    => (int)$width,
+			'height'   => (int)$height,
+			'thumb'    => $thumb_format === 0 ? $thumb_format : strtoupper($thumb_format),
+			'private'  => (int)$private,
+			'size'     => (int)$size,
+			'album'    => $album ?: null,
+			'ip'       => self::getIPAsString(),
+			'expiry'   => $this->getExpiry($expiry),
+		]);
 
 		// Automated deletion of IP addresses to comply with local low
 		$expiration = time() - ($this->config->ip_storage_expiration * 24 * 3600);
-		$this->db->query('UPDATE pictures SET ip = "R" WHERE date < ' . (int)$expiration . ';');
+		$this->query('UPDATE pictures SET ip = "R" WHERE date < ?;', (int)$expiration);
 
 		$url = $this->getUrl(['hash' => $hash, 'filename' => $name, 'format' => strtoupper($format)], true);
 
 		return $url;
 	}
 
-	public function get($hash)
+	public function get(string $hash): ?array
 	{
-		$res = $this->db->querySingle(
-			'SELECT * FROM pictures WHERE hash = \''.$this->db->escapeString($hash).'\';',
-			true
-		);
+		$res = $this->querySingle('SELECT * FROM pictures WHERE hash = ?;', $hash);
 
-		if (empty($res))
-			return false;
+		if (empty($res)) {
+			return null;
+		}
 
 		$file = $this->_getPath($res);
 		$th = $this->_getPath($res, 's');
+		$expiry = $res['expiry'] ? strtotime($res['expiry'] . ' UTC') : null;
 
-		if (!file_exists($file))
-		{
-			if (file_exists($th))
-				@unlink($th);
-
-			$this->db->exec('DELETE FROM pictures WHERE hash = \''.$res['hash'].'\';');
-			return false;
+		// Delete image if file does not exists, or if it expired
+		if (!file_exists($file) || ($expiry && $expiry <= time())) {
+			$this->delete($res);
+			return null;
 		}
 
 		return $res;
 	}
 
-	public function remove($hash, $id = null)
+	public function userDeletePicture(array $img, ?string $key = null): bool
 	{
-		if (!$this->logged() && !$this->checkRemoveId($hash, $id))
+		if (!$this->checkRemoveId($img['hash'], $key)) {
 			return false;
+		}
 
+		$this->delete($img);
+		return true;
+	}
+
+	public function deletePicture(string $hash): bool
+	{
 		$img = $this->get($hash);
 
+		if (!$img) {
+			return true;
+		}
+
+		$this->delete($img);
+		return true;
+	}
+
+	protected function delete(array $img): void
+	{
 		$file = $this->_getPath($img);
 
-		if (file_exists($file))
+		if (file_exists($file)) {
 			unlink($file);
+		}
 
-		return $this->get($hash) ? false : true;
+		$th = $this->_getPath($img, 's');
+
+		if (file_exists($th)) {
+			@unlink($th);
+		}
+
+		$this->query('DELETE FROM pictures WHERE hash = ?;', $img['hash']);
 	}
 
 	protected function getListQuery(bool $private = false)
@@ -1407,28 +1577,17 @@ class Fotoo_Hosting
 		$private = $this->logged();
 
 		$out = [];
-		$res = $this->db->query(sprintf(
-			'SELECT * FROM (%s) ORDER BY date DESC LIMIT %d,%d;',
-			$this->getListQuery($private),
+		return iterator_to_array($this->iterate(sprintf(
+			'SELECT * FROM (%s) ORDER BY date DESC LIMIT ?,?;',
+			$this->getListQuery($private)),
 			$begin,
 			$this->config->nb_pictures_by_page
 		));
-
-		if (!$res) {
-			throw new \RuntimeException($this->db->lastErrorMsg());
-		}
-
-		while ($row = $res->fetchArray(SQLITE3_ASSOC))
-		{
-			$out[] = $row;
-		}
-
-		return $out;
 	}
 
 	public function countList()
 	{
-		return $this->db->querySingle(sprintf('SELECT COUNT(*) FROM (%s);', $this->getListQuery($this->logged())));
+		return $this->querySingleColumn(sprintf('SELECT COUNT(*) FROM (%s);', $this->getListQuery($this->logged())));
 	}
 
 	public function makeRemoveId($hash)
@@ -1456,28 +1615,39 @@ class Fotoo_Hosting
 		return false;
 	}
 
-	public function getAlbumExtract($hash)
+	public function pruneExpired(): void
 	{
-		$out = array();
-		$res = $this->db->query('SELECT * FROM pictures WHERE album = \''.$this->db->escapeString($hash).'\' ORDER BY RANDOM() LIMIT 2;');
-
-		while ($row = $res->fetchArray(SQLITE3_ASSOC))
-		{
-			$out[] = $row;
+		foreach ($this->iterate('SELECT * FROM pictures WHERE expiry IS NOT NULL AND expiry <= datetime();') as $row) {
+			$this->delete($row);
 		}
 
-		return $out;
+		foreach ($this->iterate('SELECT hash FROM albums WHERE expiry IS NOT NULL AND expiry <= datetime();') as $row) {
+			$this->deleteAlbum($row['hash']);
+		}
 	}
 
-	public function countAlbumList()
+	public function getAlbumUrl(string $hash, bool $with_key = false)
 	{
-		$where = $this->logged() ? '' : 'WHERE private != 1';
-		return $this->db->querySingle('SELECT COUNT(*) FROM albums '.$where.';');
+		return $this->config->album_page_url . $hash . ($with_key ? '&c=' . $this->makeRemoveId($hash) : '');
 	}
 
-	public function getAlbum($hash)
+	public function getAlbum(string $hash): ?array
 	{
-		return $this->db->querySingle('SELECT *, strftime(\'%s\', date) AS date FROM albums WHERE hash = \''.$this->db->escapeString($hash).'\';', true);
+		$a = $this->querySingle('SELECT *, strftime(\'%s\', date) AS date FROM albums WHERE hash = ?;', $hash);
+
+		if (!$a) {
+			return null;
+		}
+
+		$expiry = $a['expiry'] ? strtotime($a['expiry'] . ' UTC') : null;
+
+		// Expire album
+		if ($expiry && $expiry <= time()) {
+			$this->deleteAlbum($a['hash']);
+			return null;
+		}
+
+		return $a;
 	}
 
 	public function getAlbumPictures($hash, $page)
@@ -1529,26 +1699,56 @@ class Fotoo_Hosting
 		return $this->db->querySingle('SELECT COUNT(*) FROM pictures WHERE album = \''.$this->db->escapeString($hash).'\';');
 	}
 
-	public function removeAlbum($hash, $id = null)
+	public function userDeleteAlbum(string $hash, string $key = null): bool
 	{
-		if (!$this->logged() && !$this->checkRemoveId($hash, $id))
+		if (!$this->checkRemoveId($hash, $key)) {
 			return false;
-
-		$res = $this->db->query('SELECT * FROM pictures WHERE album = \''.$this->db->escapeString($hash).'\';');
-
-		while ($row = $res->fetchArray(SQLITE3_ASSOC))
-		{
-			$file = $this->_getPath($row);
-
-			if (file_exists($file))
-				unlink($file);
-
-			if ($this->get($row['hash']))
-				return false;
 		}
 
-		$this->db->exec('DELETE FROM albums WHERE hash = \''.$this->db->escapeString($hash).'\';');
+		$a = $this->getAlbum($hash);
+
+		if (!$a) {
+			return true;
+		}
+
+		$this->deleteAlbum($a['hash']);
+
 		return true;
+	}
+
+	public function deleteAlbum(string $hash): void
+	{
+		foreach ($this->iterate('SELECT * FROM pictures WHERE album = ?;', $hash) as $img) {
+			$this->delete($img);
+		}
+
+		$this->query('DELETE FROM albums WHERE hash = ?;', $hash);
+	}
+
+	public function createAlbum(string $title, bool $private, ?string $expiry): string
+	{
+		if ($this->isClientBanned())
+		{
+			throw new FotooException('Upload error: upload not permitted.');
+		}
+
+		$hash = self::baseConv(hexdec(uniqid()));
+
+		$this->query('INSERT INTO albums (hash, title, date, private, expiry) VALUES (?, ?, datetime(\'now\'), ?, ?);',
+			$hash, trim($title), (int)$private, $this->getExpiry($expiry));
+
+		return $hash;
+	}
+
+	public function appendToAlbum(string $hash, ?string $name, array $file): string
+	{
+		$album = $this->querySingle('SELECT * FROM albums WHERE hash = ?;', $hash);
+
+		if (!$album) {
+			throw new FotooException('Album not found');
+		}
+
+		return $this->upload($file, $name, $album['private'], $album['expiry'], $album['hash']);
 	}
 
 	protected function _getPath($img, $optional = '')
@@ -1644,30 +1844,75 @@ class Fotoo_Hosting
 		return true;
 	}
 
-	public function createAlbum($title, $private = false)
+	public function getExpiry(?string $expiry): ?string
 	{
-		if ($this->isClientBanned())
-		{
-			throw new FotooException('Upload error: upload not permitted.');
+		if (!$expiry || (preg_match('/^\d{4}-/', $expiry) && strtotime($expiry))) {
+			return $expiry ?: null;
 		}
 
-		$hash = self::baseConv(hexdec(uniqid()));
-		$this->db->exec('INSERT INTO albums (hash, title, date, private)
-			VALUES (\''.$this->db->escapeString($hash).'\',
-			\''.$this->db->escapeString(trim($title)).'\',
-			datetime(\'now\'), \''.(int)(bool)$private.'\');');
-		return $hash;
+		$expiry = $expiry ? strtotime($expiry) : null;
+		$expiry = $expiry ? gmdate('Y-m-d H:i:s', $expiry) : null;
+		return $expiry;
 	}
 
-	public function appendToAlbum($album, $name, $file)
+	public function query(string $sql, ...$params)
 	{
-		$album = $this->db->querySingle('SELECT * FROM albums WHERE hash = \''.$this->db->escapeString($album).'\';', true);
+		$st = $this->db->prepare($sql);
 
-		if (!$album) {
-			throw new FotooException('ALbum not found');
+		if (!$st) {
+			throw new \RuntimeException($this->db->lastErrorMsg());
 		}
 
-		return $this->upload($file, $name, $album['private'], $album['hash']);
+		foreach ($params as $key => $value) {
+			if (is_int($key)) {
+				$key += 1;
+			}
+			else {
+				$key = ':' . $key;
+			}
+
+			$st->bindValue($key, $value);
+		}
+
+		$res = $st->execute();
+
+		if (!$res) {
+			throw new \RuntimeException($this->db->lastErrorMsg());
+		}
+
+		return $res;
+	}
+
+	public function insert(string $table, array $params)
+	{
+		$sql = sprintf('INSERT INTO %s (%s) VALUES (%s);',
+			$table,
+			implode(', ', array_keys($params)),
+			substr(str_repeat('?, ', count($params)), 0, -2)
+		);
+
+		return $this->query($sql, ...array_values($params));
+	}
+
+	public function querySingle(string $sql, ...$params)
+	{
+		$res = $this->query($sql, ...$params);
+		return $res->fetchArray(SQLITE3_ASSOC);
+	}
+
+	public function iterate(string $sql, ...$params)
+	{
+		$res = $this->query($sql, ...$params);
+
+		while ($row = $res->fetchArray(SQLITE3_ASSOC)) {
+			yield $row;
+		}
+	}
+
+	public function querySingleColumn(string $sql, ...$params)
+	{
+		$res = $this->query($sql, ...$params);
+		return $res->fetchArray(SQLITE3_NUM)[0] ?? null;
 	}
 }
 
@@ -3143,15 +3388,9 @@ define('UPLOAD_ERR_INVALID_IMAGE', 42);
 
 class FotooException extends Exception {}
 
-function exception_error_handler($errno, $errstr, $errfile, $errline )
-{
-    return;
-    // For @ ignored errors
-    if (error_reporting() & $errno) return;
-    throw new ErrorException($errstr, 0, $errno, $errfile, $errline);
-}
+//require_once __DIR__ . '/ErrorManager.php';
 
-set_error_handler("exception_error_handler");
+ErrorManager::enable(ErrorManager::DEVELOPMENT);
 
 //require_once __DIR__ . '/ZipWriter.php';
 
@@ -3172,6 +3411,7 @@ class Fotoo_Hosting_Config
     private $title = null;
 
     private $max_file_size = null;
+    private $allowed_formats = [];
     private $allow_upload = null;
     private $allow_album_zip = null;
     private $nb_pictures_by_page = null;
@@ -3319,6 +3559,59 @@ function escape($str)
     return htmlspecialchars($str, ENT_QUOTES, 'utf-8', false);
 }
 
+function page(string $html, string $title = '')
+{
+    global $fh, $config;
+    $css_url = file_exists(__DIR__ . '/style.css')
+        ? $config->base_url . 'style.css?2023'
+        : $config->base_url . '?css&2023';
+
+    $title = escape($title);
+
+    if ($title) {
+        $title .= ' - ';
+    }
+
+    $title .= $config->title;
+    $subtitle = $fh->logged() ? '<h2>(admin mode)</h2>' : '';
+    $login = sprintf(
+        $fh->logged() ? '<a href="%s?logout">Logout</a>' : '<a href="%s?login">Login</a>',
+        $config->base_url
+    );
+
+    echo <<<EOF
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta name="charset" content="utf-8" />
+        <title>{$title}</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, target-densitydpi=device-dpi" />
+        <link rel="stylesheet" type="text/css" href="{$css_url}" />
+    </head>
+
+    <body>
+    <header>
+        <h1><a href="{$config->base_url}">{$config->title}</a></h1>
+        {$subtitle}
+        <nav>
+            <ul>
+                <li><a href="{$config->base_url}">Upload</a></li>
+                <li><a href="{$config->base_url}?list">Browse images</a></li>
+            </ul>
+        </nav>
+    </header>
+    <div id="page">
+        {$html}
+    </div>
+    <footer>
+        Powered by Fotoo Hosting application from <a href="https://kd2.org/">KD2.org</a>
+        | {$login}
+    </footer>
+    </body>
+    </html>
+EOF;
+}
+
 //require_once __DIR__ . '/class.fotoo_hosting.php';
 //require_once __DIR__ . '/class.image.php';
 
@@ -3344,60 +3637,54 @@ if ($fh->isClientBanned())
     $fh->setBanCookie();
 }
 
-if (!empty($_GET['delete']))
-{
-    $id = !empty($_GET['c']) ? trim($_GET['c']) : false;
+if (!empty($_POST['delete']) && !empty($_POST['key'])) {
+    if (($img = $fh->get($_POST['delete'])) && $fh->userDeletePicture($img, $_POST['key'])) {
+        if (!$img['album']) {
+            $url = $config->base_url.'?list';
+        }
+        else {
+            $url = $fh->getAlbumUrl($img['album'], true);
+        }
 
-    if ($fh->remove($_GET['delete'], $id))
-    {
-        header('Location: '.$config->base_url.'?list');
+        header('Location: ' . $url);
     }
-    else
-    {
-        echo "Can't delete picture";
+    else {
+        page('<h1 class="error">Cannot delete this image</h1>');
     }
 
     exit;
 }
-elseif (!empty($_GET['deleteAlbum']))
-{
-    $id = !empty($_GET['c']) ? trim($_GET['c']) : false;
-
-    if ($fh->removeAlbum($_GET['deleteAlbum'], $id))
-    {
+elseif (!empty($_POST['deleteAlbum']) && !empty($_POST['key'])) {
+    if ($fh->userDeleteAlbum($_POST['deleteAlbum'], $_POST['key'])) {
         header('Location: ' . $config->base_url . '?list');
     }
-    else
-    {
-        echo "Can't delete album";
+    else {
+        page('<h1 class="error">Cannot delete this album</h1>');
     }
 
     exit;
 }
-elseif (!empty($_POST['delete']) && $fh->logged())
-{
-    foreach ($_POST['pictures'] as $pic)
-    {
-        $fh->remove($pic, null);
+elseif (!empty($_POST['delete']) && $fh->logged()) {
+    foreach ($_POST['pictures'] ?? [] as $pic) {
+        $fh->deletePicture($pic);
     }
 
-    foreach ($_POST['albums'] as $album)
-    {
-        $fh->removeAlbum($album, null);
+    foreach ($_POST['albums'] ?? [] as $album) {
+        $fh->deleteAlbum($album);
     }
 
     header('Location: ' . $config->base_url . '?list');
     exit;
 }
 
-if (isset($_GET['upload'], $_POST['album']) && $_POST['album'] === 'new') {
+if (isset($_GET['upload'], $_POST['album']) && $_POST['album'] === 'new' && $config->allow_upload) {
     if (empty($_POST['title'])) {
         http_response_code(400);
         die("Bad Request");
     }
 
     try {
-        $hash = $fh->createAlbum($_POST['title'], empty($_POST['private']) ? false : true);
+        $hash = $fh->createAlbum($_POST['title'], !empty($_POST['private']), $_POST['expiry'] ?? null);
         $key = $fh->makeRemoveId($hash);
         http_response_code(200);
         echo json_encode(compact('hash', 'key'));
@@ -3408,19 +3695,26 @@ if (isset($_GET['upload'], $_POST['album']) && $_POST['album'] === 'new') {
         die("Upload not permitted.");
     }
 }
-elseif (isset($_GET['upload'], $_POST['album'])) {
+elseif (isset($_GET['upload'], $_POST['album']) && $config->allow_upload) {
     if (!$fh->checkRemoveId($_POST['album'], $_POST['key'])) {
         http_response_code(401);
         die("Invalid key");
     }
 
-    if (empty($_POST['content']) || !isset($_POST['name'], $_POST['filename'])) {
+    if (!isset($_POST['name'], $_POST['filename'])) {
         http_response_code(400);
         die("Wrong Request");
     }
 
     try {
-        $url = $fh->appendToAlbum($_POST['album'], $_POST['name'], ['content' => $_POST['content'], 'name' => $_POST['filename']]);
+        if (!isset($_FILES['file']) && !isset($_POST['content'])) {
+            throw new FotooException('No file', UPLOAD_ERR_NO_FILE);
+        }
+
+        $file = $_FILES['file'] ?? ['content' => $_POST['content'], 'name' => $_POST['filename']];
+        $file['thumb'] = $_POST['thumb'] ?? null;
+
+        $url = $fh->appendToAlbum($_POST['album'], $_POST['name'], $file);
         http_response_code(201);
     }
     catch (FotooException $e) {
@@ -3431,12 +3725,16 @@ elseif (isset($_GET['upload'], $_POST['album'])) {
     exit;
 }
 // Single image upload, no album
-elseif (isset($_GET['upload'], $_POST['content'], $_POST['filename'], $_POST['name'], $_POST['private'])) {
+elseif (isset($_GET['upload'], $_POST['filename'], $_POST['name'], $_POST['private']) && $config->allow_upload) {
     try {
-        $url = $fh->upload([
-            'content' => $_POST['content'],
-            'name' => $_POST['filename']
-        ], $_POST['name'], $_POST['private']);
+        if (!isset($_FILES['file']) && !isset($_POST['content'])) {
+            throw new FotooException('No file', UPLOAD_ERR_NO_FILE);
+        }
+
+        $file = $_FILES['file'] ?? ['content' => $_POST['content'], 'name' => $_POST['filename']];
+        $file['thumb'] = $_POST['thumb'] ?? null;
+
+        $url = $fh->upload($file, $_POST['name'], (bool) $_POST['private'], $_POST['expiry'] ?? null);
 
         http_response_code(200);
         echo $url;
@@ -3448,9 +3746,8 @@ elseif (isset($_GET['upload'], $_POST['content'], $_POST['filename'], $_POST['na
 
     exit;
 }
-
-if (isset($_GET['upload']))
-{
+// Images upload, no JS
+elseif (isset($_GET['upload']) && $config->allow_upload) {
     $error = false;
 
     if (empty($_FILES['upload']) && empty($_POST['upload']))
@@ -3462,7 +3759,8 @@ if (isset($_GET['upload']))
         try {
             $url = $fh->upload(!empty($_FILES['upload']) ? $_FILES['upload'] : $_POST['upload'],
                 isset($_POST['name']) ? trim($_POST['name']) : '',
-                isset($_POST['private']) ? (bool) $_POST['private'] : false
+                isset($_POST['private']) ? (bool) $_POST['private'] : false,
+                $_POST['expiry'] ?? null
             );
         }
         catch (FotooException $e)
@@ -3488,6 +3786,26 @@ if (isset($_GET['upload']))
 }
 
 $html = $title = '';
+
+$copy_script = '
+<script type="text/javascript">
+var copy = (e, c) => {
+    if (typeof e === \'string\') {
+        e = document.querySelector(e);
+    }
+
+    e.select();
+    e.setSelectionRange(0, e.value.length);
+    navigator.clipboard.writeText(e.value);
+
+    if (!c) {
+        return;
+    }
+
+    c.value = \'Copied!\';
+    window.setTimeout(() => c.value = \'Copy\', 5000);
+};
+</script>';
 
 if (isset($_GET['logout']))
 {
@@ -3533,6 +3851,7 @@ elseif (isset($_GET['login']))
 }
 elseif (isset($_GET['list']))
 {
+    $fh->pruneExpired();
     $title = 'Browse images';
 
     if (!empty($_GET['list']) && is_numeric($_GET['list']))
@@ -3631,11 +3950,8 @@ elseif (!empty($_GET['a']))
 
     if (empty($album))
     {
-        header('HTTP/1.1 404 Not Found', true, 404);
-        echo '
-            <h1>Not Found</h1>
-            <p><a href="'.$config->base_url.'">'.$config->title.'</a></p>
-        ';
+        http_response_code(404);
+        page('<h1 class="error">404 Not Found</h1>');
         exit;
     }
 
@@ -3662,75 +3978,82 @@ elseif (!empty($_GET['a']))
         $bbcode .= '[url='.$fh->getImageUrl($img).'][img]'.$fh->getImageThumbUrl($img)."[/img][/url] ";
     }
 
-    $html = '
-        <script type="text/javascript">
-        var copy = (e, c) => {
-            if (typeof e === \'string\') {
-                e = document.querySelector(e);
-            }
+    $html .= $copy_script;
 
-            e.select();
-            e.setSelectionRange(0, e.value.length);
-            navigator.clipboard.writeText(e.value);
+    $is_uploader = !empty($_GET['c']) && $fh->checkRemoveId($album['hash'], $_GET['c']);
 
-            if (!c) {
-                return;
-            }
-
-            c.value = \'Copied!\';
-            window.setTimeout(() => c.value = \'Copy\', 5000);
-        };
-        </script>
-        <article class="browse">
-            <h2>'.escape($title).'</h2>
+    $html .= sprintf(
+        '<article class="browse">
+            <h2>%s</h2>
             <p class="info">
-                Uploaded on <time datetime="'.date(DATE_W3C, $album['date']).'">'.@strftime('%c', $album['date']).'</time>
-                | '.(int)$max.' picture'.((int)$max > 1 ? 's' : '').'
+                Uploaded on <time datetime="%s">%s</time>
+                | <strong>%d picture%s</strong>
+                | Expires: %s
             </p>
             <aside class="examples">
+            <dl>
                 <dt>Share this album using this URL: <input type="button" onclick="copy(\'#url\', this);" value="Copy" /></dt>
-                <dd><input type="text" id="url" onclick="this.select();" value="'.escape($config->album_page_url . $album['hash']).'" /></dd>
+                <dd><input type="text" id="url" onclick="this.select();" value="%s" /></dd>
                 <dt>All pictures for a forum (BBCode): <input type="button" onclick="copy(\'#all\', this);" value="Copy" /></dt>
-                <dd><textarea id="all" cols="70" rows="3" onclick="this.select(); this.setSelectionRange(0, this.value.length); navigator.clipboard.writeText(this.value);">'.escape($bbcode).'</textarea></dd>
+                <dd><textarea id="all" cols="70" rows="3" onclick="this.select(); this.setSelectionRange(0, this.value.length); navigator.clipboard.writeText(this.value);">%s</textarea></dd>
                 <dd></dd>
-            </aside>';
+            </dl>',
+        escape($title),
+        date(DATE_W3C, $album['date']),
+        date('d/m/Y H:i', $album['date']),
+        $max,
+        $max > 1 ? 's' : '',
+        $album['expiry'] ? date('d/m/Y H:i', strtotime($album['expiry'])) : 'never',
+        escape($config->album_page_url . $album['hash']),
+        escape($bbcode)
+    );
+
+
+    if (!$fh->logged() && !empty($_GET['c'])) {
+        $hash = $album['hash'];
+        $key = $fh->makeRemoveId($album['hash']);
+        $url = $config->album_page_url . $hash
+            . (strpos($config->album_page_url, '?') !== false ? '&c=' : '?c=')
+            . $key;
+
+        $html .= sprintf('
+            <dl class="admin">
+                <dt>
+                    Bookmark this URL to be able to delete this album later:
+                    <input type="button" onclick="copy(\'#admin\', this);" value="Copy" />
+                </dt>
+                <dd><input type="text" id="admin" onclick="this.select();" value="%s" />
+                <dd><form method="post"><button class="icon delete" type="submit" name="deleteAlbum" value="%s" onclick="return confirm(\'Really?\');">Delete this album now</button><input type="hidden" name="key" value="%s" /></form></dd>
+            </dl>',
+            $url,
+            $hash,
+            $key
+        );
+    }
+
+    $html .= '</aside>';
 
     if ($config->allow_album_zip) {
         $html .= '
         <form method="post" action="">
         <p>
-            <input type="submit" name="download" value="Download full album as a ZIP file" />
+            <input type="submit" name="download" value="Download all images in a ZIP file" class="icon zip" />
         </p>
         </form>';
     }
 
     if ($fh->logged())
     {
-        $html .= '
-        <p class="admin">
-            <a href="?deleteAlbum='.rawurlencode($album['hash']).'" onclick="return confirm(\'Really?\');">Delete album</a>
-        </p>';
-    }
-    elseif (!empty($_GET['c']))
-    {
-        $url = $config->album_page_url . $album['hash'] 
-            . (strpos($config->album_page_url, '?') !== false ? '&c=' : '?c=') 
-            . $fh->makeRemoveId($album['hash']);
-
-        $html .= '
-        <p class="admin">
-            <a href="?deleteAlbum='.rawurlencode($album['hash']).'&amp;c='.rawurldecode($_GET['c']).'" onclick="return confirm(\'Really?\');">Delete album</a>
-        </p>
-        <p class="admin">
-            Keep this URL in your favorites to be able to delete this album later:<br />
-            <input type="text" onclick="this.select();" value="'.escape($url).'" />
-        </p>';
+        $html .= sprintf(
+            '<form class="admin" method="post"><button class="icon delete" type="submit" name="delete" value="1" onclick="return confirm(\'Really?\');">Delete this album now</button><input type="hidden" name="albums[]" value="%s" /></form>',
+            $album['hash']
+        );
     }
 
     foreach ($list as &$img)
     {
         $thumb_url = $fh->getImageThumbUrl($img);
-        $url = $fh->getUrl($img);
+        $url = $fh->getUrl($img, $is_uploader);
 
         $label = $img['filename'] ? escape(preg_replace('![_-]!', ' ', $img['filename'])) : 'View image';
 
@@ -3772,11 +4095,8 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
 
     if (empty($img))
     {
-        header('HTTP/1.1 404 Not Found', true, 404);
-        echo '
-            <h1>Not Found</h1>
-            <p><a href="'.$config->base_url.'">'.$config->title.'</a></p>
-        ';
+        http_response_code(404);
+        page('<h1 class="error">404 Not Found</h1>');
         exit;
     }
 
@@ -3807,17 +4127,57 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
     else
         $size = $size . ' B';
 
-    $html = '
-    <article class="picture">
+    $html .= $copy_script;
+    $html .= sprintf('<article class="picture">
         <header>
-            '.(trim($img['filename']) ? '<h2>' . escape(strtr($img['filename'], '-_.', '   ')) . '</h2>' : '').'
+            %s
             <p class="info">
-                Uploaded on <time datetime="'.date(DATE_W3C, $img['date']).'">'.@strftime('%c', $img['date']).'</time>
-                | Size: '.$img['width'].' × '.$img['height'].'
+                Uploaded on <time datetime="%s">%s</time>
+                | Size: %d × %d
+                | Expires: %s
             </p>
-        </header>
+        </header>',
+        trim($img['filename']) ? '<h2>' . escape(strtr($img['filename'], '-_.', '   ')) . '</h2>' : '',
+        date(DATE_W3C, $img['date']),
+        date('d/m/Y H:i', $img['date']),
+        $img['width'],
+        $img['height'],
+        $img['expiry'] ? date('d/m/Y H:i', strtotime($img['expiry'])) : 'never'
+    );
+
+    $examples = '
+        <aside class="examples">
+            <dl>
+                <dt>Short URL for full size <input type="button" onclick="copy(\'#url\', this);" value="Copy" /></dt>
+                <dd><input type="text" onclick="this.select();" value="'.escape($short_url).'" id="url" /></dd>
+                <dt>BBCode <input type="button" onclick="copy(\'#bbcode\', this);" value="Copy" /></dt>
+                <dd><textarea cols="70" rows="3" onclick="this.select();" id="bbcode">'.escape($bbcode).'</textarea></dd>
+                <dt>HTML code <input type="button" onclick="copy(\'#html\', this);" value="Copy" /></dt>
+                <dd><textarea cols="70" rows="3" onclick="this.select();" id="html">'.escape($html_code).'</textarea></dd>
+            </dl>';
+
+    if (!empty($_GET['c']))
+    {
+        $examples .= sprintf('
+            <dl class="admin">
+                <dt>
+                    Bookmark this URL to be able to delete this picture later:
+                    <input type="button" onclick="copy(\'#admin\', this);" value="Copy" />
+                </dt>
+                <dd><input type="text" id="admin" onclick="this.select();" value="%s" />
+                <dd><form method="post"><button class="icon delete" type="submit" name="delete" value="%s" onclick="return confirm(\'Really?\');">Delete this picture now</button><input type="hidden" name="key" value="%s" /></form></dd>
+            </dl>',
+            $fh->getUrl($img, true),
+            $img['hash'],
+            escape($_GET['c'])
+        );
+    }
+
+    $examples .= '</aside>';
+
+    $html .= '
         <figure>
-            <a href="'.$img_url.'">'.($img['private'] ? '<span class="private">Private</span>' : '').'<img src="'.$thumb_url.'" alt="'.escape($title).'" /></a>
+            <a href="'.$img_url.'">'.($img['private'] ? '<span class="private">Private</span>' : '').'<img src="'.$img_url.'" alt="'.escape($title).'" /></a>
         </figure>
         <footer>
             <p>
@@ -3831,19 +4191,16 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
         $next = $fh->getAlbumPrevNext($img['album'], $img['hash'], 1);
         $album = $fh->getAlbum($img['album']);
 
-        $html .= '
-        <footer class="context">';
+        $html .= '<footer class="context"><div>';
 
         if ($prev)
         {
             $thumb_url = $fh->getImageThumbUrl($prev);
             $url = $fh->getUrl($prev);
-            $label = $prev['filename'] ? escape(preg_replace('![_-]!', ' ', $prev['filename'])) : 'View image';
 
             $html .= '
             <figure class="prev">
-                <a href="'.$url.'"><b>&larr;</b><img src="'.$thumb_url.'" alt="'.$label.'" /></a>
-                <figcaption><a href="'.$url.'">'.$label.'</a></figcaption>
+                <a href="'.$url.'"><b>◄</b><i><img src="'.$thumb_url.'" title="Previous image" /></i></a>
             </figure>';
         }
         else
@@ -3851,22 +4208,14 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
             $html .= '<figure class="prev"><b>…</b></figure>';
         }
 
-        $html .= '
-            <figure>
-                <h3>Album:</h3>
-                <h2><a href="' . $config->album_page_url . $album['hash'] . '"> ' . escape($album['title']) .'</a></h2></figure
-            </figure>';
-
         if ($next)
         {
             $thumb_url = $fh->getImageThumbUrl($next);
             $url = $fh->getUrl($next);
-            $label = $next['filename'] ? escape(preg_replace('![_-]!', ' ', $next['filename'])) : 'View image';
 
             $html .= '
             <figure class="prev">
-                <a href="'.$url.'"><img src="'.$thumb_url.'" alt="'.$label.'" /><b>&rarr;</b></a>
-                <figcaption><a href="'.$url.'">'.$label.'</a></figcaption>
+                <a href="'.$url.'"><i><img src="'.$thumb_url.'" title="Next image" /></i><b>▶</b></a>
             </figure>';
         }
         else
@@ -3874,43 +4223,29 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
             $html .= '<figure class="next"><b>…</b></figure>';
         }
 
-        $html .= '
-            </footer>';
+        $html .= sprintf('</div>
+                <h2><a href="%s">%s</a></h2></footer>',
+            $config->album_page_url . $album['hash'],
+            escape($album['title'])
+        );
     }
+
+    $html .= $examples;
 
     if ($fh->logged())
     {
-        $html .= '
-        <p class="admin">
-            IP address: ' . escape(is_null($img['ip']) ? 'Not available' : ($img['ip'] == 'R' ? 'Automatically removed from database' : $img['ip'])) . '
-        </p>
-        <p class="admin">
-            <a href="?delete='.rawurlencode($img['hash']).'" onclick="return confirm(\'Really?\');">Delete picture</a>
-        </p>';
-    }
-    elseif (!empty($_GET['c']))
-    {
-        $html .= '
-        <p class="admin">
-            <a href="?delete='.rawurlencode($img['hash']).'&amp;c='.rawurldecode($_GET['c']).'" onclick="return confirm(\'Really?\');">Delete picture</a>
-        </p>
-        <p class="admin">
-            Keep this URL in your favorites to be able to delete this picture later:<br />
-            <input type="text" onclick="this.select();" value="'.$fh->getUrl($img, true).'" />
-        </p>';
+        $ip = !$img['ip'] ? 'Not available' : ($img['ip'] == 'R' ? 'Automatically removed from database' : $img['ip']);
+        $html .= sprintf('
+            <form class="admin" method="post" action="">
+                <dl class="admin"><dt>IP address:</dt><dd>%s</dd></dl>
+                <p><button class="icon delete" type="submit" name="delete" value="1" onclick="return confirm(\'Really?\');">Delete this picture</button><input type="hidden" name="pictures[]" value="%s" /></p>
+            </form>',
+            escape($ip),
+            $img['hash']
+        );
     }
 
-    $html .= '
-        <aside class="examples">
-            <dt>Short URL for full size <input type="button" onclick="copy(\'#url\', this);" value="Copy" /></dt>
-            <dd><input type="text" onclick="this.select();" value="'.escape($short_url).'" id="url" /></dd>
-            <dt>BBCode <input type="button" onclick="copy(\'#bbcode\', this);" value="Copy" /></dt>
-            <dd><textarea cols="70" rows="3" onclick="this.select();" id="bbcode">'.escape($bbcode).'</textarea></dd>
-            <dt>HTML code <input type="button" onclick="copy(\'#html\', this);" value="Copy" /></dt>
-            <dd><textarea cols="70" rows="3" onclick="this.select();" id="html">'.escape($html_code).'</textarea></dd>
-        </aside>
-    </article>
-    ';
+    $html .= '</article>';
 }
 elseif (!$config->allow_upload)
 {
@@ -3936,6 +4271,14 @@ else
     $max_file_size_human = round($config->max_file_size / 1024 / 1024, 2);
     $formats = implode(', ', array_map('strtoupper', $config->allowed_formats));
 
+    $expiry_list = ['+1 minute' => '1 hour', '+1 day' => '24 hours', '+1 week' => '1 week', '+2 weeks' => '2 weeks', '+1 month' => '1 month', '+3 month' => '3 months', '+6 months' => '6 months', '+1 year' => '1 year', null => 'Never expires'];
+    $expiry_options = '';
+    $default_expiry = null;
+
+    foreach ($expiry_list as $a => $b) {
+        $expiry_options .= sprintf('<option value="%s"%s>%s</option>', $a, $a == $default_expiry ? ' selected="selected"' : '', $b);
+    }
+
     $html .= <<<EOF
     <form method="post" enctype="multipart/form-data" action="{$config->base_url}?upload" id="f_upload">
     <input type="hidden" name="MAX_FILE_SIZE" value="{$max_file_size}" />
@@ -3951,59 +4294,26 @@ else
             <dl>
                 <dt><label for="f_title">Title:</label></dt>
                 <dd><input type="text" name="title" id="f_title" maxlength="100" required="required" /></dd>
-                <dt><label for="f_private">Private</label></dt>
-                <dd class="private"><label><input type="checkbox" name="private" id="f_private" value="1" />
-                    (If checked, the pictures won't be listed in &quot;browse images&quot;)</label></dd>
-                <dd id="f_file_container"><input type="file" name="upload" id="f_files" multiple="multiple" accept="image/jpeg,image/webp,image/png,image/gif,image/svg+xml" required="required" /></dd>
+                <dd><label><input type="checkbox" name="private" id="f_private" value="1" />
+                    <strong>Private</strong><br />
+                    <small>(If checked, the pictures won't be listed in &quot;browse images&quot;)</small></label></dd>
+                <dd><label for="f_expiry"><strong>Expiry:</strong></label> <select name="expiry" id="f_expiry">{$expiry_options}</select><br /><small>(The images will be deleted after this time)</small></dd>
+                <dd id="f_file_container"><input type="file" name="upload" id="f_files" multiple="multiple" accept="image/jpeg,image/webp,image/png,image/gif,image/svg+xml" /></dd>
             </dl>
             <p class="submit">
-                <input type="submit" value="Upload" />
+                <input type="submit" value="Upload images" class="icon upload" />
             </p>
         </fieldset>
         <div id="albumParent"></div>
         <p class="submit">
-            <input type="submit" value="Upload" />
+            <input type="submit" value="Upload images" class="icon upload" />
         </p>
     </article>
     </form>
     <script type="text/javascript" src="{$js_url}"></script>
 EOF;
-
 }
 
-$css_url = file_exists(__DIR__ . '/style.css')
-    ? $config->base_url . 'style.css?2023'
-    : $config->base_url . '?css&2023';
-
-echo '<!DOCTYPE html>
-<html>
-<head>
-    <meta name="charset" content="utf-8" />
-    <title>'.($title ? escape($title) . ' - ' : '').$config->title.'</title>
-    <meta name="viewport" content="width=device-width" />
-    <link rel="stylesheet" type="text/css" href="'.$css_url.'" />
-</head>
-
-<body>
-<header>
-    <h1><a href="'.$config->base_url.'">'.$config->title.'</a></h1>
-    '.($fh->logged() ? '<h2>(admin mode)</h2>' : '').'
-    <nav>
-        <ul>
-            <li><a href="'.$config->base_url.'">Upload</a></li>
-            <li><a href="'.$config->base_url.'?list">Browse images</a></li>
-        </ul>
-    </nav>
-</header>
-<div id="page">
-    '.$html.'
-</div>
-<footer>
-    Powered by Fotoo Hosting application from <a href="http://kd2.org/">KD2.org</a>
-    | '.($fh->logged() ? '<a href="'.$config->base_url.'?logout">Logout</a>' : '<a href="'.$config->base_url.'?login">Login</a>').'
-</footer>
-</body>
-</html>';
-
+page($html, $title);
 
 ?>
