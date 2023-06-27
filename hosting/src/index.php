@@ -917,7 +917,7 @@ else
     $max_file_size_human = round($config->max_file_size / 1024 / 1024, 2);
     $formats = implode(', ', array_map('strtoupper', $config->allowed_formats));
 
-    $expiry_list = ['+1 minute' => '1 hour', '+1 day' => '24 hours', '+1 week' => '1 week', '+2 weeks' => '2 weeks', '+1 month' => '1 month', '+3 month' => '3 months', '+6 months' => '6 months', '+1 year' => '1 year', null => 'Never expires'];
+    $expiry_list = ['+1 hour' => '1 hour', '+1 day' => '24 hours', '+1 week' => '1 week', '+2 weeks' => '2 weeks', '+1 month' => '1 month', '+3 month' => '3 months', '+6 months' => '6 months', '+1 year' => '1 year', null => 'Never expires'];
     $expiry_options = '';
     $default_expiry = null;
 
