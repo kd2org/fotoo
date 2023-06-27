@@ -941,7 +941,8 @@ article h2 {
 }
 
 .picture figure img {
-	max-width: 90%;
+	max-width: 95%;
+	max-height: 75vh;
 }
 <?php exit; endif; ?><?php
 
