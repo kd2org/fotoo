@@ -412,7 +412,6 @@ class Fotoo_Hosting
 
 		$base = self::baseConv(hexdec(uniqid()));
 		$dest .= '/' . $base;
-		$ext = '.' . strtolower($format);
 
 		if (trim($name) && !empty($name)) {
 			$dest .= '.' . $name;
@@ -441,7 +440,10 @@ class Fotoo_Hosting
 		}
 		elseif (($format == 'gif' || $format == 'png') && $file['size'] > (1024 * 1024)) {
 			$resize = true;
+			$format = 'webp';
 		}
+
+		$ext = '.' . strtolower($format);
 
 		if ($resize)
 		{
