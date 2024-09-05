@@ -1,4 +1,4 @@
-DEST="../index.php"
+DEST="fotoo.php"
 
 all : fotoo
 
