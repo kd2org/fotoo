@@ -211,8 +211,8 @@ function page(string $html, string $title = '', int $section = 0)
 {
     global $fh, $config;
     $css_url = file_exists(__DIR__ . '/style.css')
-        ? $config->base_url . 'style.css?2023'
-        : $config->base_url . '?css&2023';
+        ? $config->base_url . 'style.css?2024'
+        : $config->base_url . '?css&2024';
 
     $title = escape($title);
 
@@ -871,12 +871,12 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
                 <a href="%2$s" target="_blank">View full size (%s, %s)</a>
             </p>
         </footer>',
-        $prev ? sprintf('<a href="%s">Previous</a>', $prev['url']) : '',
+        $prev ? sprintf('<a href="%s"><span>Previous</span></a>', $prev['url']) : '<p></p>',
         $img_url,
         $img['private'] ? '<span class="private">Private</span>' : '',
         $img_url,
         escape($title),
-        $next ? sprintf('<a href="%s">Next</a>', $next['url']) : '',
+        $next ? sprintf('<a href="%s"><span>Next</span></a>', $next['url']) : '<p></p>',
         strtoupper($img['format']),
         $size
     );
@@ -906,8 +906,8 @@ else
 {
     $current = 1;
     $js_url = file_exists(__DIR__ . '/upload.js')
-        ? $config->base_url . 'upload.js?2023'
-        : $config->base_url . '?js&2023';
+        ? $config->base_url . 'upload.js?2024'
+        : $config->base_url . '?js&2024';
 
     $html = '
         <script type="text/javascript">
