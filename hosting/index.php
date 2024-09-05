@@ -26,6 +26,9 @@
         };
     }
 
+    var parent, filesInput;
+    var found = [];
+    var to_resize = [];
     var files = [];
     var can_submit = true;
     var last_filename = '';
@@ -137,125 +140,213 @@
                     img.remove();
                     uploadPicture(index+1);
                 });
-        }
+            }
         );
+    }
+
+    // Detect directories to dismiss them
+    // see https://web.dev/patterns/files/drag-and-drop-directories/
+    const supportsFileSystemAccessAPI = 'getAsFileSystemHandle' in DataTransferItem.prototype;
+    const supportsWebkitGetAsEntry = 'webkitGetAsEntry' in DataTransferItem.prototype;
+
+    function isItemFile(item) {
+        if (item.kind !== 'file') {
+            return false;
+        }
+        else if (supportsFileSystemAccessAPI && item.getAsFileSystemHandle().kind == 'directory') {
+            return false;
+        }
+        else if (supportsWebkitGetAsEntry && (entry = item.webkitGetAsEntry()) && entry.isDirectory) {
+            return false;
+        }
+        else {
+            return true;
+        }
+    }
+
+    function resizeFromList()
+    {
+        if (to_resize.length < 1) {
+            can_submit = true;
+            document.querySelectorAll('.submit').forEach((e) => e.style.display = 'block');
+            return;
+        }
+        else {
+            document.querySelectorAll('.submit').forEach((e) => e.style.display = 'none');
+        }
+
+        var current = to_resize[0];
+        resize(
+            current[0], // file
+            config.thumb_width, // size
+            current[1], // image resized
+            current[2], // progress element
+            function () {
+                current[2].parentNode.removeChild(current[2]);
+                resizeFromList();
+            }
+        );
+
+        to_resize.splice(0, 1);
+    }
+
+    function addFiles(files)
+    {
+        if (files.length < 1) {
+            return;
+        }
+
+        for (var i = 0; i < files.length; i++) {
+            addFile(files[i]);
+        }
+
+        resizeFromList();
+    }
+
+    function addFile(file)
+    {
+        if (!(/^image\/(?:jpe?g|webp|png|gif|svg)/i.test(file.type))) {
+            return;
+        }
+
+        let file_name = file.name === 'image.png' ? file.name.replace(/\./, '-' + (+(new Date)) + '.') : file.name;
+        var t = document.getElementById('f_title');
+
+        if (!t.value) {
+            t.value = cleanFileName(file_name);
+        }
+
+        var id = encodeURIComponent(file_name + file.type + file.size);
+
+        if (found.indexOf(id) != -1) {
+            return;
+        }
+
+        var fig = document.createElement('figure');
+        fig.id = id;
+        var caption = document.createElement('figcaption');
+        var name = document.createElement('input');
+        name.type = 'text';
+        name.value = cleanFileName(file_name);
+
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.innerText = '✖';
+        btn.onclick = function () {
+            var f = this.parentNode.parentNode;
+            var i = found.indexOf(f.id);
+            found.splice(i, 1);
+            files.splice(i, 1)
+            f.remove();
+        };
+
+        var thumb = document.createElement('div');
+        thumb.className = 'thumb';
+
+        var progress = document.createElement('p');
+
+        caption.appendChild(name);
+        caption.appendChild(btn);
+        fig.appendChild(thumb);
+        fig.appendChild(progress);
+        fig.appendChild(caption);
+        parent.appendChild(fig);
+
+        to_resize.push([file, thumb, progress]);
+        found.push(id);
+        files.push(file);
     }
 
     window.onload = function ()
     {
-        if (!FileReader && !window.URL)
+        if (!FileReader && !window.URL) {
             return false;
+        }
 
         document.querySelectorAll('.submit').forEach((e) => e.style.display = 'none');
 
-        var parent = document.getElementById('albumParent');
-        var found = new Array;
-        var to_resize = new Array;
-
-        var filesInput = document.getElementById("f_files");
+        parent = document.getElementById('albumParent');
+        filesInput = document.getElementById("f_files");
 
         filesInput.style.display = 'none';
 
         var btn = document.createElement('button');
         btn.type = 'button';
-        btn.innerText = 'Add files...';
+        btn.innerText = 'Add images…';
         btn.className = 'add icon select';
         btn.onclick = () => filesInput.click();
         parent.prepend(btn);
 
+        var help = document.createElement('p');
+        help.innerText = 'Drag and drop, copy/paste, or click this button to add images.';
+        help.className = 'help';
+        parent.prepend(help);
+
+        // Paste image directly
+        window.addEventListener('paste', (e) => {
+            e.preventDefault();
+
+            const files = [...e.clipboardData.items]
+                .filter(isItemFile)
+                .map(item => item.getAsFile());
+
+            addFiles(files);
+        });
+
         // Mode album
-        filesInput.onchange = function ()
-        {
-            if (this.files.length < 1)
-            {
-                return false;
-            }
-
-            for (var i = 0; i < this.files.length; i++)
-            {
-                var file = this.files[i];
-
-                if (!(/^image\/(?:jpe?g|webp|png|gif|svg)/i.test(file.type))) {
-                    continue;
-                }
-
-                var t = document.getElementById('f_title');
-
-                if (!t.value) {
-                    t.value = cleanFileName(file.name);
-                }
-
-                var id = encodeURIComponent(file.name + file.type + file.size);
-
-                if (found.indexOf(id) != -1)
-                {
-                    continue;
-                }
-
-                var fig = document.createElement('figure');
-                fig.id = id;
-                var caption = document.createElement('figcaption');
-                var name = document.createElement('input');
-                name.type = 'text';
-                name.value = cleanFileName(file.name);
-
-                var btn = document.createElement('button');
-                btn.type = 'button';
-                btn.innerText = '✖';
-                btn.onclick = function () {
-                    var f = this.parentNode.parentNode;
-                    var i = found.indexOf(f.id);
-                    found.splice(i, 1);
-                    files.splice(i, 1)
-                    f.remove();
-                };
-
-                var thumb = document.createElement('div');
-                thumb.className = 'thumb';
-
-                var progress = document.createElement('p');
-
-                caption.appendChild(name);
-                caption.appendChild(btn);
-                fig.appendChild(thumb);
-                fig.appendChild(progress);
-                fig.appendChild(caption);
-                parent.appendChild(fig);
-
-                to_resize.push(new Array(file, thumb, progress));
-                found.push(id);
-                files.push(file);
-            }
-
-            function resizeFromList()
-            {
-                if (to_resize.length < 1)
-                {
-                    can_submit = true;
-                    document.querySelectorAll('.submit').forEach((e) => e.style.display = 'block');
-                    return;
-                }
-                else {
-                    document.querySelectorAll('.submit').forEach((e) => e.style.display = 'none');
-                }
-
-                var current = to_resize[0];
-                resize(
-                    current[0], // file
-                    config.thumb_width, // size
-                    current[1], // image resized
-                    current[2], // progress element
-                    function () {
-                        current[2].parentNode.removeChild(current[2]);
-                        resizeFromList();
-                    }
-                );
-
-                to_resize.splice(0, 1);
-            }
-
-            resizeFromList();
+        filesInput.onchange = (e) => {
+            e.preventDefault();
+            addFiles(filesInput.files);
         };
+
+        var drag_elements = [];
+
+        document.body.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+
+        document.body.addEventListener('dragenter', (e) => {
+            drag_elements.push(e.target);
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (drag_elements.length == 1) {
+                document.body.classList.add('dropping');
+            }
+        });
+
+        document.body.addEventListener('dragleave', (e) => {
+            var idx = drag_elements.indexOf(e.target);
+
+            if (idx === -1) {
+                return;
+            }
+
+            drag_elements.splice(idx, 1);
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (drag_elements.length === 0) {
+                document.body.classList.remove('dropping');
+            }
+        });
+
+        document.body.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            document.body.classList.remove('dropping');
+
+            drag_elements = [];
+
+            const files = [...e.dataTransfer.items]
+                .filter(isItemFile)
+                .map(item => item.getAsFile());
+
+            addFiles(files);
+        });
 
         var form = document.getElementById("f_upload");
         form.onsubmit = function (e)
@@ -272,8 +363,7 @@
                 return false;
             }
 
-            if (files.length < 1)
-            {
+            if (files.length < 1) {
                 alert('No file is selected.');
                 return false;
             }
@@ -283,7 +373,6 @@
             document.querySelectorAll('#albumParent button').forEach((e) => e.style.display = 'none');
             document.querySelectorAll('#albumParent input').forEach((e) => e.disabled = true);
 
-            var xhr = new XMLHttpRequest;
             var url = config.base_url + '?upload';
 
             if (files.length > 1) {
@@ -714,7 +803,8 @@ fieldset {
 div.pic {
 	display: flex;
 	flex-direction: row;
-	justify-content: center;
+	justify-content: stretch;
+	width: 100%;
 }
 
 div.pic div {
@@ -722,11 +812,24 @@ div.pic div {
 	justify-content: center;
 	align-items: center;
 	font-size: 2em;
+	text-align: center;
+	flex-grow: 1;
+}
+
+/* Empty, just to make the image centered even if button is not there */
+div.pic p {
 	width: 2em;
-	text-align: left;
 }
 
 div.pic div a {
+	display: flex;
+	justify-content: center;
+	height: 100%;
+	width: 100%;
+	padding-top: 2em;
+}
+
+div.pic div a span {
 	display: block;
 	overflow: hidden;
 	width: 2em;
@@ -741,16 +844,17 @@ div.pic div a {
 	transition: opacity .2s;
 }
 
-div.pic div.next a {
+div.pic div.next a span {
 	background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 512 512" fill="%23350" stroke="none" xmlns="http://www.w3.org/2000/svg"><path d="m256 8c137 0 248 111 248 248s-111 248-248 248-248-111-248-248 111-248 248-248zm-28.9 143.6 75.5 72.4h-182.6c-13.3 0-24 10.7-24 24v16c0 13.3 10.7 24 24 24h182.6l-75.5 72.4c-9.7 9.3-9.9 24.8-.4 34.3l11 10.9c9.4 9.4 24.6 9.4 33.9 0l132.7-132.6c9.4-9.4 9.4-24.6 0-33.9l-132.7-132.8c-9.4-9.4-24.6-9.4-33.9 0l-11 10.9c-9.5 9.6-9.3 25.1.4 34.4z"/></svg>');
 }
 
-div.pic div.prev a {
+div.pic div.prev a span {
 	background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 512 512" fill="%23350" xmlns="http://www.w3.org/2000/svg"><path d="m256 504c-137 0-248-111-248-248s111-248 248-248 248 111 248 248-111 248-248 248zm28.9-143.6-75.5-72.4h182.6c13.3 0 24-10.7 24-24v-16c0-13.3-10.7-24-24-24h-182.6l75.5-72.4c9.7-9.3 9.9-24.8.4-34.3l-11-10.9c-9.4-9.4-24.6-9.4-33.9 0l-132.7 132.6c-9.4 9.4-9.4 24.6 0 33.9l132.7 132.7c9.4 9.4 24.6 9.4 33.9 0l11-10.9c9.5-9.5 9.3-25-.4-34.3z"/></svg>');
 }
 
-div.pic div a:hover {
+div.pic div a:hover span {
 	opacity: 1;
+	box-shadow: 0px 0px 5px #000;
 }
 
 .picture header h3 {
@@ -954,8 +1058,40 @@ article h2 {
 
 	div.pic div {
 		width: auto;
-		font-size: 1em;
 	}
+
+	div.pic div a {
+		padding: 0;
+	}
+}
+
+
+.dropping::after {
+    display: block;
+    content: "";
+    backdrop-filter: blur(5px);
+    background-color: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    position: fixed;
+    border-radius: .5em;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    margin: 0;
+    padding: 0;
+    border: none;
+    z-index: 10000;
+}
+
+p.help {
+	font-size: .9em;
+	color: #eee;
+	font-style: italic;
+	text-shadow: 0px 0px 5px #000;
 }<?php exit; endif; ?><?php
 
 class Fotoo_Hosting
@@ -3459,9 +3595,9 @@ class ZipWriter
 
 error_reporting(E_ALL);
 
-if (!version_compare(phpversion(), '5.3', '>='))
+if (!version_compare(phpversion(), '7.4', '>='))
 {
-    die("You need at least PHP 5.2 to use this application.");
+    die("You need at least PHP 7.4 to use this application.");
 }
 
 if (!class_exists('SQLite3'))
@@ -3650,8 +3786,8 @@ function page(string $html, string $title = '', int $section = 0)
 {
     global $fh, $config;
     $css_url = file_exists(__DIR__ . '/style.css')
-        ? $config->base_url . 'style.css?2023'
-        : $config->base_url . '?css&2023';
+        ? $config->base_url . 'style.css?2024'
+        : $config->base_url . '?css&2024';
 
     $title = escape($title);
 
@@ -4086,9 +4222,9 @@ elseif (!empty($_GET['a']))
             <aside class="examples">
             <dl>
                 <dt>Share this album using this URL: <input type="button" onclick="copy(\'#url\', this);" value="Copy" /></dt>
-                <dd><input type="text" id="url" onclick="this.select();" value="%s" /></dd>
+                <dd><input readonly="readonly" type="text" id="url" onclick="this.select();" value="%s" /></dd>
                 <dt>All pictures for a forum (BBCode): <input type="button" onclick="copy(\'#all\', this);" value="Copy" /></dt>
-                <dd><textarea id="all" cols="70" rows="3" onclick="this.select(); this.setSelectionRange(0, this.value.length); navigator.clipboard.writeText(this.value);">%s</textarea></dd>
+                <dd><textarea readonly="readonly" id="all" cols="70" rows="3" onclick="this.select(); this.setSelectionRange(0, this.value.length); navigator.clipboard.writeText(this.value);">%s</textarea></dd>
                 <dd></dd>
             </dl>',
         escape($title),
@@ -4256,11 +4392,11 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
         <aside class="examples">
             <dl>
                 <dt>Short URL for full size <input type="button" onclick="copy(\'#url\', this);" value="Copy" /></dt>
-                <dd><input type="text" onclick="this.select();" value="'.escape($short_url).'" id="url" /></dd>
+                <dd><input type="text" readonly="readonly" onclick="this.select();" value="'.escape($short_url).'" id="url" /></dd>
                 <dt>BBCode <input type="button" onclick="copy(\'#bbcode\', this);" value="Copy" /></dt>
-                <dd><textarea cols="70" rows="3" onclick="this.select();" id="bbcode">'.escape($bbcode).'</textarea></dd>
+                <dd><textarea readonly="readonly" cols="70" rows="3" onclick="this.select();" id="bbcode">'.escape($bbcode).'</textarea></dd>
                 <dt>HTML code <input type="button" onclick="copy(\'#html\', this);" value="Copy" /></dt>
-                <dd><textarea cols="70" rows="3" onclick="this.select();" id="html">'.escape($html_code).'</textarea></dd>
+                <dd><textarea readonly="readonly" cols="70" rows="3" onclick="this.select();" id="html">'.escape($html_code).'</textarea></dd>
             </dl>';
 
     if (!empty($_GET['c']))
@@ -4271,7 +4407,7 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
                     Bookmark this URL to be able to delete this picture later:
                     <input type="button" onclick="copy(\'#admin\', this);" value="Copy" />
                 </dt>
-                <dd><input type="text" id="admin" onclick="this.select();" value="%s" />
+                <dd><input type="text" readonly="readonly" id="admin" onclick="this.select();" value="%s" />
                 <dd><form method="post"><button class="icon delete" type="submit" name="delete" value="%s" onclick="return confirm(\'Really?\');">Delete this picture now</button><input type="hidden" name="key" value="%s" /></form></dd>
             </dl>',
             $fh->getUrl($img, true),
@@ -4310,12 +4446,12 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
                 <a href="%2$s" target="_blank">View full size (%s, %s)</a>
             </p>
         </footer>',
-        $prev ? sprintf('<a href="%s">Previous</a>', $prev['url']) : '',
+        $prev ? sprintf('<a href="%s"><span>Previous</span></a>', $prev['url']) : '<p></p>',
         $img_url,
         $img['private'] ? '<span class="private">Private</span>' : '',
         $img_url,
         escape($title),
-        $next ? sprintf('<a href="%s">Next</a>', $next['url']) : '',
+        $next ? sprintf('<a href="%s"><span>Next</span></a>', $next['url']) : '<p></p>',
         strtoupper($img['format']),
         $size
     );
@@ -4345,8 +4481,8 @@ else
 {
     $current = 1;
     $js_url = file_exists(__DIR__ . '/upload.js')
-        ? $config->base_url . 'upload.js?2023'
-        : $config->base_url . '?js&2023';
+        ? $config->base_url . 'upload.js?2024'
+        : $config->base_url . '?js&2024';
 
     $html = '
         <script type="text/javascript">
