@@ -31,7 +31,7 @@ Fotoo (previously Fotoo Hosting) is a script aimed to be used as a image hosting
 
 Demo: [i.kd2.org](https://i.kd2.org/) (upload is disabled)
 
-![Screenshot](screeshot.jpg)
+![Screenshot](screenshot.jpg)
 
 ## Install guide
 
