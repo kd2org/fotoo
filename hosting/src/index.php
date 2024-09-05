@@ -20,9 +20,9 @@
 
 error_reporting(E_ALL);
 
-if (!version_compare(phpversion(), '5.3', '>='))
+if (!version_compare(phpversion(), '7.4', '>='))
 {
-    die("You need at least PHP 5.2 to use this application.");
+    die("You need at least PHP 7.4 to use this application.");
 }
 
 if (!class_exists('SQLite3'))
@@ -647,9 +647,9 @@ elseif (!empty($_GET['a']))
             <aside class="examples">
             <dl>
                 <dt>Share this album using this URL: <input type="button" onclick="copy(\'#url\', this);" value="Copy" /></dt>
-                <dd><input type="text" id="url" onclick="this.select();" value="%s" /></dd>
+                <dd><input readonly="readonly" type="text" id="url" onclick="this.select();" value="%s" /></dd>
                 <dt>All pictures for a forum (BBCode): <input type="button" onclick="copy(\'#all\', this);" value="Copy" /></dt>
-                <dd><textarea id="all" cols="70" rows="3" onclick="this.select(); this.setSelectionRange(0, this.value.length); navigator.clipboard.writeText(this.value);">%s</textarea></dd>
+                <dd><textarea readonly="readonly" id="all" cols="70" rows="3" onclick="this.select(); this.setSelectionRange(0, this.value.length); navigator.clipboard.writeText(this.value);">%s</textarea></dd>
                 <dd></dd>
             </dl>',
         escape($title),
@@ -817,11 +817,11 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
         <aside class="examples">
             <dl>
                 <dt>Short URL for full size <input type="button" onclick="copy(\'#url\', this);" value="Copy" /></dt>
-                <dd><input type="text" onclick="this.select();" value="'.escape($short_url).'" id="url" /></dd>
+                <dd><input type="text" readonly="readonly" onclick="this.select();" value="'.escape($short_url).'" id="url" /></dd>
                 <dt>BBCode <input type="button" onclick="copy(\'#bbcode\', this);" value="Copy" /></dt>
-                <dd><textarea cols="70" rows="3" onclick="this.select();" id="bbcode">'.escape($bbcode).'</textarea></dd>
+                <dd><textarea readonly="readonly" cols="70" rows="3" onclick="this.select();" id="bbcode">'.escape($bbcode).'</textarea></dd>
                 <dt>HTML code <input type="button" onclick="copy(\'#html\', this);" value="Copy" /></dt>
-                <dd><textarea cols="70" rows="3" onclick="this.select();" id="html">'.escape($html_code).'</textarea></dd>
+                <dd><textarea readonly="readonly" cols="70" rows="3" onclick="this.select();" id="html">'.escape($html_code).'</textarea></dd>
             </dl>';
 
     if (!empty($_GET['c']))
@@ -832,7 +832,7 @@ elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUE
                     Bookmark this URL to be able to delete this picture later:
                     <input type="button" onclick="copy(\'#admin\', this);" value="Copy" />
                 </dt>
-                <dd><input type="text" id="admin" onclick="this.select();" value="%s" />
+                <dd><input type="text" readonly="readonly" id="admin" onclick="this.select();" value="%s" />
                 <dd><form method="post"><button class="icon delete" type="submit" name="delete" value="%s" onclick="return confirm(\'Really?\');">Delete this picture now</button><input type="hidden" name="key" value="%s" /></form></dd>
             </dl>',
             $fh->getUrl($img, true),

@@ -23,6 +23,9 @@
         };
     }
 
+    var parent, filesInput;
+    var found = [];
+    var to_resize = [];
     var files = [];
     var can_submit = true;
     var last_filename = '';
@@ -134,125 +137,213 @@
                     img.remove();
                     uploadPicture(index+1);
                 });
-        }
+            }
         );
+    }
+
+    // Detect directories to dismiss them
+    // see https://web.dev/patterns/files/drag-and-drop-directories/
+    const supportsFileSystemAccessAPI = 'getAsFileSystemHandle' in DataTransferItem.prototype;
+    const supportsWebkitGetAsEntry = 'webkitGetAsEntry' in DataTransferItem.prototype;
+
+    function isItemFile(item) {
+        if (item.kind !== 'file') {
+            return false;
+        }
+        else if (supportsFileSystemAccessAPI && item.getAsFileSystemHandle().kind == 'directory') {
+            return false;
+        }
+        else if (supportsWebkitGetAsEntry && (entry = item.webkitGetAsEntry()) && entry.isDirectory) {
+            return false;
+        }
+        else {
+            return true;
+        }
+    }
+
+    function resizeFromList()
+    {
+        if (to_resize.length < 1) {
+            can_submit = true;
+            document.querySelectorAll('.submit').forEach((e) => e.style.display = 'block');
+            return;
+        }
+        else {
+            document.querySelectorAll('.submit').forEach((e) => e.style.display = 'none');
+        }
+
+        var current = to_resize[0];
+        resize(
+            current[0], // file
+            config.thumb_width, // size
+            current[1], // image resized
+            current[2], // progress element
+            function () {
+                current[2].parentNode.removeChild(current[2]);
+                resizeFromList();
+            }
+        );
+
+        to_resize.splice(0, 1);
+    }
+
+    function addFiles(files)
+    {
+        if (files.length < 1) {
+            return;
+        }
+
+        for (var i = 0; i < files.length; i++) {
+            addFile(files[i]);
+        }
+
+        resizeFromList();
+    }
+
+    function addFile(file)
+    {
+        if (!(/^image\/(?:jpe?g|webp|png|gif|svg)/i.test(file.type))) {
+            return;
+        }
+
+        let file_name = file.name === 'image.png' ? file.name.replace(/\./, '-' + (+(new Date)) + '.') : file.name;
+        var t = document.getElementById('f_title');
+
+        if (!t.value) {
+            t.value = cleanFileName(file_name);
+        }
+
+        var id = encodeURIComponent(file_name + file.type + file.size);
+
+        if (found.indexOf(id) != -1) {
+            return;
+        }
+
+        var fig = document.createElement('figure');
+        fig.id = id;
+        var caption = document.createElement('figcaption');
+        var name = document.createElement('input');
+        name.type = 'text';
+        name.value = cleanFileName(file_name);
+
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.innerText = '✖';
+        btn.onclick = function () {
+            var f = this.parentNode.parentNode;
+            var i = found.indexOf(f.id);
+            found.splice(i, 1);
+            files.splice(i, 1)
+            f.remove();
+        };
+
+        var thumb = document.createElement('div');
+        thumb.className = 'thumb';
+
+        var progress = document.createElement('p');
+
+        caption.appendChild(name);
+        caption.appendChild(btn);
+        fig.appendChild(thumb);
+        fig.appendChild(progress);
+        fig.appendChild(caption);
+        parent.appendChild(fig);
+
+        to_resize.push([file, thumb, progress]);
+        found.push(id);
+        files.push(file);
     }
 
     window.onload = function ()
     {
-        if (!FileReader && !window.URL)
+        if (!FileReader && !window.URL) {
             return false;
+        }
 
         document.querySelectorAll('.submit').forEach((e) => e.style.display = 'none');
 
-        var parent = document.getElementById('albumParent');
-        var found = new Array;
-        var to_resize = new Array;
-
-        var filesInput = document.getElementById("f_files");
+        parent = document.getElementById('albumParent');
+        filesInput = document.getElementById("f_files");
 
         filesInput.style.display = 'none';
 
         var btn = document.createElement('button');
         btn.type = 'button';
-        btn.innerText = 'Add files...';
+        btn.innerText = 'Add images…';
         btn.className = 'add icon select';
         btn.onclick = () => filesInput.click();
         parent.prepend(btn);
 
+        var help = document.createElement('p');
+        help.innerText = 'Drag and drop, copy/paste, or click this button to add images.';
+        help.className = 'help';
+        parent.prepend(help);
+
+        // Paste image directly
+        window.addEventListener('paste', (e) => {
+            e.preventDefault();
+
+            const files = [...e.clipboardData.items]
+                .filter(isItemFile)
+                .map(item => item.getAsFile());
+
+            addFiles(files);
+        });
+
         // Mode album
-        filesInput.onchange = function ()
-        {
-            if (this.files.length < 1)
-            {
-                return false;
-            }
-
-            for (var i = 0; i < this.files.length; i++)
-            {
-                var file = this.files[i];
-
-                if (!(/^image\/(?:jpe?g|webp|png|gif|svg)/i.test(file.type))) {
-                    continue;
-                }
-
-                var t = document.getElementById('f_title');
-
-                if (!t.value) {
-                    t.value = cleanFileName(file.name);
-                }
-
-                var id = encodeURIComponent(file.name + file.type + file.size);
-
-                if (found.indexOf(id) != -1)
-                {
-                    continue;
-                }
-
-                var fig = document.createElement('figure');
-                fig.id = id;
-                var caption = document.createElement('figcaption');
-                var name = document.createElement('input');
-                name.type = 'text';
-                name.value = cleanFileName(file.name);
-
-                var btn = document.createElement('button');
-                btn.type = 'button';
-                btn.innerText = '✖';
-                btn.onclick = function () {
-                    var f = this.parentNode.parentNode;
-                    var i = found.indexOf(f.id);
-                    found.splice(i, 1);
-                    files.splice(i, 1)
-                    f.remove();
-                };
-
-                var thumb = document.createElement('div');
-                thumb.className = 'thumb';
-
-                var progress = document.createElement('p');
-
-                caption.appendChild(name);
-                caption.appendChild(btn);
-                fig.appendChild(thumb);
-                fig.appendChild(progress);
-                fig.appendChild(caption);
-                parent.appendChild(fig);
-
-                to_resize.push(new Array(file, thumb, progress));
-                found.push(id);
-                files.push(file);
-            }
-
-            function resizeFromList()
-            {
-                if (to_resize.length < 1)
-                {
-                    can_submit = true;
-                    document.querySelectorAll('.submit').forEach((e) => e.style.display = 'block');
-                    return;
-                }
-                else {
-                    document.querySelectorAll('.submit').forEach((e) => e.style.display = 'none');
-                }
-
-                var current = to_resize[0];
-                resize(
-                    current[0], // file
-                    config.thumb_width, // size
-                    current[1], // image resized
-                    current[2], // progress element
-                    function () {
-                        current[2].parentNode.removeChild(current[2]);
-                        resizeFromList();
-                    }
-                );
-
-                to_resize.splice(0, 1);
-            }
-
-            resizeFromList();
+        filesInput.onchange = (e) => {
+            e.preventDefault();
+            addFiles(filesInput.files);
         };
+
+        var drag_elements = [];
+
+        document.body.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+
+        document.body.addEventListener('dragenter', (e) => {
+            drag_elements.push(e.target);
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (drag_elements.length == 1) {
+                document.body.classList.add('dropping');
+            }
+        });
+
+        document.body.addEventListener('dragleave', (e) => {
+            var idx = drag_elements.indexOf(e.target);
+
+            if (idx === -1) {
+                return;
+            }
+
+            drag_elements.splice(idx, 1);
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (drag_elements.length === 0) {
+                document.body.classList.remove('dropping');
+            }
+        });
+
+        document.body.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            document.body.classList.remove('dropping');
+
+            drag_elements = [];
+
+            const files = [...e.dataTransfer.items]
+                .filter(isItemFile)
+                .map(item => item.getAsFile());
+
+            addFiles(files);
+        });
 
         var form = document.getElementById("f_upload");
         form.onsubmit = function (e)
@@ -269,8 +360,7 @@
                 return false;
             }
 
-            if (files.length < 1)
-            {
+            if (files.length < 1) {
                 alert('No file is selected.');
                 return false;
             }
@@ -280,7 +370,6 @@
             document.querySelectorAll('#albumParent button').forEach((e) => e.style.display = 'none');
             document.querySelectorAll('#albumParent input').forEach((e) => e.disabled = true);
 
-            var xhr = new XMLHttpRequest;
             var url = config.base_url + '?upload';
 
             if (files.length > 1) {
