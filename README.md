@@ -27,7 +27,11 @@ Fotoo (previously Fotoo Hosting) is a script aimed to be used as a image hosting
 * Intelligent image resize for GIF and PNG files (if created thumb is too big (>50KB) then the thumb will be made in JPEG to keep small image size)
 * Supports IP address banning to protect from spammers
 
+## Demo
+
 Demo: [i.kd2.org](https://i.kd2.org/) (upload is disabled)
+
+![Screenshot](screeshot.jpg)
 
 ## Install guide
 
