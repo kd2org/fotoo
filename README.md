@@ -4,8 +4,8 @@ Fotoo (previously Fotoo Hosting) is a script aimed to be used as a image hosting
 
 ## Features
 
+* Tech: PHP 7.4+ (tested with 7.4 to 8.3), SQLite3, HTML, CSS, vanilla Javascript
 * Lightweight, fast
-* Using SQLite3 database, nothing to install
 * Images are resized in the browser before upload:
   * zero computing resource taken on server
   * image upload is faster for the user
