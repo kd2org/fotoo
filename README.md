@@ -35,7 +35,7 @@ Demo: [i.kd2.org](https://i.kd2.org/) (upload is disabled)
 
 ## Install guide
 
-Just download the [fotoo.php](/file?name=fotoo.php&ci=tip) file, rename it to `index.php`, and place it in an empty directory of your web server, and open it in your web browser.
+Just download the [fotoo.php](/doc/trunk/fotoo.php) file, rename it to `index.php`, and place it in an empty directory of your web server, and open it in your web browser.
 
 You will need php7.4-sqlite3 for the database and php7.4-imagick for the image resizing, but you can also use php7.4-gd (slower).
 
