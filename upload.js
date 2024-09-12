@@ -509,37 +509,31 @@
             ;
 
             // Calculate max image size by counting number of pixels
-            if (height === null && width < 0)
-            {
+            // use the best aspect ratio to use as much of the available pixels
+            if (height === null && width < 0) {
                 var max_mp = Math.abs(width) * Math.abs(width);
                 var img_mp = img.width * img.height;
 
-                if (img_mp > max_mp)
-                {
-                    var ratio = img_mp / max_mp;
-                    height = round(img.height / ratio);
-                    width = round(img.width / ratio);
+                if (img_mp > max_mp) {
+                    var ratio = Math.min(Math.sqrt(max_mp / img_mp), width / img.width , width / img.height);
+                    height = Math.round(img.height * ratio);
+                    width = Math.round(img.width * ratio);
                 }
-                else
-                {
+                else {
                     width = img.width;
                     height = img.height;
                 }
             }
-            else if (height === null)
-            {
-                if (img.width > img.height)
-                {
-                    height = round(img.height * width / img.width)
+            else if (height === null) {
+                if (img.width > img.height) {
+                    height = Math.round(img.height * width / img.width)
                 }
-                else if (img.width == img.height)
-                {
+                else if (img.width == img.height) {
                     height = width;
                 }
-                else
-                {
+                else {
                     height = width;
-                    width = round(img.width * height / img.height);
+                    width = Math.round(img.width * height / img.height);
                 }
 
                 if (img.width < width && img.height < height)
@@ -581,8 +575,7 @@
             context.clearRect(0, 0, canvas.width, canvas.height);
         }
 
-        var context = canvas.getContext("2d"),
-            round = Math.round;
+        var context = canvas.getContext("2d");
 
         return Resample;
     }
