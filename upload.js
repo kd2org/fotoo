@@ -508,7 +508,8 @@
                 onresample = img._onresample
             ;
 
-            if (height == null && width < 0)
+            // Calculate max image size by counting number of pixels
+            if (height === null && width < 0)
             {
                 var max_mp = Math.abs(width) * Math.abs(width);
                 var img_mp = img.width * img.height;
@@ -525,7 +526,7 @@
                     height = img.height;
                 }
             }
-            else if (height == null)
+            else if (height === null)
             {
                 if (img.width > img.height)
                 {

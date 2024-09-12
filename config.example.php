@@ -67,5 +67,3 @@ function check_upload_access()
 
 // Number of images to display on each page in the pictures list.
 #$config->nb_pictures_by_page = 20;
-
-?>
