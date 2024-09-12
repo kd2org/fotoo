@@ -127,13 +127,13 @@ to the password you like the most.
 
 ### How can I change the configuration of the software?
 
-Just go on the service URL and add `?create_config` to the URL. This way the default config will be written in the `config.php` file. You'll just have to edit this file, and comment out the lines you want to change.
+Download the [`config.example.php` file](/doc/trunk/config.example.php), rename it to `config.php`, and edit it to suit your needs, by un-commenting the lines you want to change.
 
 ### How can I change the style?
 
 Just create a file named style.css in the same directory as the application.
 
-### How can I change the size of allowed pictures?
+### How can I change the maximum file size?
 
 The best way to do this is to edit the .htaccess in the directory where you installed the software and add this:
 
