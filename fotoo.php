@@ -1,5 +1,5 @@
 <?php
-// Fotoo Hosting single-file release version 3.2.0
+// Fotoo Hosting single-file release version 3.2.1
 ?><?php if (isset($_GET["js"])): header("Content-Type: text/javascript"); ?>
 (function () {
     if (!Array.prototype.indexOf)
@@ -511,37 +511,32 @@
                 onresample = img._onresample
             ;
 
-            if (height == null && width < 0)
-            {
+            // Calculate max image size by counting number of pixels
+            // use the best aspect ratio to use as much of the available pixels
+            if (height === null && width < 0) {
                 var max_mp = Math.abs(width) * Math.abs(width);
                 var img_mp = img.width * img.height;
 
-                if (img_mp > max_mp)
-                {
-                    var ratio = img_mp / max_mp;
-                    height = round(img.height / ratio);
-                    width = round(img.width / ratio);
+                if (img_mp > max_mp) {
+                    var ratio = Math.min(Math.sqrt(max_mp / img_mp), width / img.width , width / img.height);
+                    height = Math.round(img.height * ratio);
+                    width = Math.round(img.width * ratio);
                 }
-                else
-                {
+                else {
                     width = img.width;
                     height = img.height;
                 }
             }
-            else if (height == null)
-            {
-                if (img.width > img.height)
-                {
-                    height = round(img.height * width / img.width)
+            else if (height === null) {
+                if (img.width > img.height) {
+                    height = Math.round(img.height * width / img.width)
                 }
-                else if (img.width == img.height)
-                {
+                else if (img.width == img.height) {
                     height = width;
                 }
-                else
-                {
+                else {
                     height = width;
-                    width = round(img.width * height / img.height);
+                    width = Math.round(img.width * height / img.height);
                 }
 
                 if (img.width < width && img.height < height)
@@ -583,8 +578,7 @@
             context.clearRect(0, 0, canvas.width, canvas.height);
         }
 
-        var context = canvas.getContext("2d"),
-            round = Math.round;
+        var context = canvas.getContext("2d");
 
         return Resample;
     }
@@ -3619,29 +3613,29 @@ if (class_exists('ErrorManager')) {
 
 class Fotoo_Hosting_Config
 {
-    private $db_file = null;
-    private $storage_path = null;
+    private string $db_file = __DIR__ . '/datas.db';
+    private string $storage_path = __DIR__ . '/i/';
 
-    private $base_url = null;
-    private $storage_url = null;
-    private $image_page_url = null;
-    private $album_page_url = null;
+    private string $base_url;
+    private string $storage_url;
+    private string $image_page_url;
+    private string $album_page_url;
 
-    private $max_width = null;
+    private int $max_width = 1920;
+    private int $thumb_width = 320;
+    private int $quality = 75;
 
-    private $thumb_width = null;
+    private string $title = 'Fotoo Image Hosting service';
 
-    private $title = null;
+    private int $max_file_size;
+    private array $allowed_formats = ['png', 'jpeg', 'gif', 'svg', 'webp'];
+    private bool $allow_upload = true;
+    private bool $allow_album_zip = false;
+    private int $nb_pictures_by_page = 20;
 
-    private $max_file_size = null;
-    private $allowed_formats = [];
-    private $allow_upload = null;
-    private $allow_album_zip = null;
-    private $nb_pictures_by_page = null;
-
-    private $admin_password = null;
-    private $banned_ips = null;
-    private $ip_storage_expiration = null;
+    private string $admin_password = 'fotoo';
+    private array $banned_ips = [];
+    private int $ip_storage_expiration = 366;
 
     public function __set($key, $value)
     {
@@ -3649,6 +3643,7 @@ class Fotoo_Hosting_Config
         {
             case 'max_width':
             case 'thumb_width':
+            case 'quality':
             case 'max_file_size':
             case 'nb_pictures_by_page':
             case 'ip_storage_expiration':
@@ -3703,10 +3698,12 @@ class Fotoo_Hosting_Config
 
     public function __get($key)
     {
-        if (isset($this->$key))
+        if (property_exists($this, $key)) {
             return $this->$key;
-        else
+        }
+        else {
             throw new FotooException("Unknown configuration property $key");
+        }
     }
 
     public function exportJSON()
@@ -3723,46 +3720,35 @@ class Fotoo_Hosting_Config
     public function __construct()
     {
         // Defaults
-        $this->db_file = dirname(__FILE__) . '/datas.db';
-        $this->storage_path = dirname(__FILE__) . '/i/';
         $proto = !empty($_SERVER['HTTPS']) ? 'https' : 'http';
         $this->base_url = $proto . '://'. $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']);
 
-        if ($this->base_url[strlen($this->base_url) - 1] != '/')
+        if ($this->base_url[strlen($this->base_url) - 1] != '/') {
             $this->base_url .= '/';
+        }
 
         $this->storage_url = $this->base_url . str_replace(dirname(__FILE__) . '/', '', $this->storage_path);
         $this->image_page_url = $this->base_url . '?';
         $this->album_page_url = $this->base_url . '?a=';
 
-        if (substr(basename($_SERVER['PHP_SELF']), 0, 5) != 'index')
+        if (substr(basename($_SERVER['PHP_SELF']), 0, 5) != 'index') {
             $this->base_url .= basename($_SERVER['PHP_SELF']);
-
-        $this->max_width = 1920;
-        $this->thumb_width = 320;
-
-        $this->title = 'Fotoo Image Hosting service';
+        }
 
         $size = self::return_bytes(ini_get('upload_max_filesize'));
         $post = self::return_bytes(ini_get('post_max_size'));
 
-        if ($post < $size)
+        if ($post < $size) {
             $size = $post;
+        }
 
         $memory = self::return_bytes(ini_get('memory_limit'));
 
-        if ($memory > 0 && $memory < $size)
+        if ($memory > 0 && $memory < $size) {
             $size = $memory;
+        }
 
         $this->max_file_size = $size;
-        $this->allow_upload = true;
-        $this->allow_album_zip = false;
-        $this->admin_password = 'fotoo';
-        $this->banned_ips = [];
-        $this->ip_storage_expiration = 366;
-        $this->nb_pictures_by_page = 20;
-
-        $this->allowed_formats = ['png', 'jpeg', 'gif', 'svg', 'webp'];
     }
 
     static public function return_bytes ($size_str)

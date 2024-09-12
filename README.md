@@ -47,6 +47,10 @@ Other versions don't require anything.
 
 ## ChangeLog
 
+### 3.2.1 (September 2024)
+
+* Fix resize using max_width (thanks @Opitux)
+
 ### 3.2.0 (September 2024)
 
 * Add support for copy/pasting images directly
