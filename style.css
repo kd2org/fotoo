@@ -333,6 +333,10 @@ figure figcaption {
 	max-width: 100%;
 }
 
+#albumImages figure:only-child figcaption input {
+	visibility: hidden;
+}
+
 figure a:hover img {
 	box-shadow: 0px 0px 10px #000;
 	background: #fff;
