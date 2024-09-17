@@ -26,7 +26,7 @@
         };
     }
 
-    var parent, filesInput;
+    var parent, filesInput, container;
     var found = [];
     var to_resize = [];
     var files = [];
@@ -107,7 +107,7 @@
             return;
         }
 
-        var current = document.getElementById('albumParent').querySelectorAll('figure')[index];
+        var current = document.getElementById('albumImages').querySelectorAll('figure')[index];
         current.scrollIntoView({behavior: 'smooth'});
         var resized_img = document.createElement('div');
         resized_img.style.display = "none";
@@ -128,6 +128,8 @@
             return;
         }
 
+        var title = files.length === 1 ? document.getElementById('f_title').value : name.value;
+
         resize(
             file,
             -config.max_width,
@@ -136,7 +138,7 @@
             () => {
                 var img = resized_img.firstChild
 
-                upload(progress, name.value, file.name, img.src.substr(img.src.indexOf(',') + 1), thumb).then(() => {
+                upload(progress, title, file.name, img.src.substr(img.src.indexOf(',') + 1), thumb).then(() => {
                     img.remove();
                     uploadPicture(index+1);
                 });
@@ -250,7 +252,7 @@
         fig.appendChild(thumb);
         fig.appendChild(progress);
         fig.appendChild(caption);
-        parent.appendChild(fig);
+        container.appendChild(fig);
 
         to_resize.push([file, thumb, progress]);
         found.push(id);
@@ -281,6 +283,10 @@
         help.innerText = 'Drag and drop, copy/paste, or click this button to add images.';
         help.className = 'help';
         parent.prepend(help);
+
+        container = document.createElement('div');
+        container.id = 'albumImages';
+        parent.appendChild(container);
 
         // Paste image directly
         window.addEventListener('paste', (e) => {
@@ -357,8 +363,7 @@
                 return false;
             }
 
-            if (document.getElementById('f_title').value.replace('/[\s]/g', '') == '')
-            {
+            if (document.getElementById('f_title').value.replace('/\s+/g', '') == '') {
                 alert('Title is mandatory.');
                 return false;
             }
@@ -920,6 +925,10 @@ figure figcaption {
 
 #albumParent img {
 	max-width: 100%;
+}
+
+#albumImages figure:only-child figcaption input {
+	visibility: hidden;
 }
 
 figure a:hover img {
