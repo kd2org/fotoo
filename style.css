@@ -333,7 +333,7 @@ figure figcaption {
 	max-width: 100%;
 }
 
-#albumImages figure:only-child figcaption input {
+form.new #albumImages figure:only-child figcaption input {
 	visibility: hidden;
 }
 

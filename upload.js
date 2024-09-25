@@ -125,7 +125,9 @@
             return;
         }
 
-        var title = files.length === 1 ? document.getElementById('f_title').value : name.value;
+        var t = document.getElementById('f_title');
+
+        var title = files.length === 1 && t ? t.value : name.value;
 
         resize(
             file,
@@ -211,7 +213,7 @@
         let file_name = file.name === 'image.png' ? file.name.replace(/\./, '-' + (+(new Date)) + '.') : file.name;
         var t = document.getElementById('f_title');
 
-        if (!t.value) {
+        if (t && !t.value) {
             t.value = cleanFileName(file_name);
         }
 
@@ -360,14 +362,21 @@
                 return false;
             }
 
-            if (document.getElementById('f_title').value.replace('/\s+/g', '') == '') {
-                alert('Title is mandatory.');
-                return false;
-            }
-
             if (files.length < 1) {
                 alert('No file is selected.');
                 return false;
+            }
+
+            if (a = document.querySelector('input[type="hidden"][name="append"]')) {
+                album_hash = a.value;
+                album_key = document.querySelector('input[type="hidden"][name="append_key"]').value;
+            }
+
+            if (!album_hash) {
+                if (document.getElementById('f_title').value.replace('/\s+/g', '') == '') {
+                    alert('Title is mandatory.');
+                    return false;
+                }
             }
 
             can_submit = false;
@@ -377,7 +386,7 @@
 
             var url = config.base_url + '?upload';
 
-            if (files.length > 1) {
+            if (!album_hash && files.length > 1) {
                 var params = new URLSearchParams({
                     'album': 'new',
                     'title': document.getElementById('f_title').value,

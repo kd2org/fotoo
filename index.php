@@ -676,7 +676,14 @@ elseif (!empty($_GET['a']))
                 </dt>
                 <dd><input type="text" id="admin" onclick="this.select();" value="%s" />
                 <dd><form method="post"><button class="icon delete" type="submit" name="deleteAlbum" value="%s" onclick="return confirm(\'Really?\');">Delete this album now</button><input type="hidden" name="key" value="%s" /></form></dd>
-            </dl>',
+            </dl>
+            <form method="post" action="?append=%2$s">
+            <p>
+                <input type="hidden" name="key" value="%3$s" />
+                <input type="submit" value="Add images to this album" class="icon select" />
+            </p>
+            </form>
+            ',
             $url,
             $hash,
             $key
@@ -739,7 +746,7 @@ elseif (!empty($_GET['a']))
         </nav>';
     }
 }
-elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUERY_STRING']))
+elseif (!isset($_GET['album']) && !isset($_GET['error']) && !isset($_GET['append']) && !empty($_SERVER['QUERY_STRING']))
 {
     $query = explode('.', $_SERVER['QUERY_STRING']);
     $hash = ($query[0] == 'r') ? $query[1] : $query[0];
@@ -902,6 +909,8 @@ elseif (!$config->allow_upload)
 }
 else
 {
+    $append = $_GET['append'] ?? null;
+    $append_key = $_POST['key'] ?? null;
     $current = 1;
     $js_url = file_exists(__DIR__ . '/upload.js')
         ? $config->base_url . 'upload.js?2024'
@@ -929,26 +938,38 @@ else
         $expiry_options .= sprintf('<option value="%s"%s>%s</option>', $a, $a == $default_expiry ? ' selected="selected"' : '', $b);
     }
 
-    $html .= <<<EOF
-    <form method="post" enctype="multipart/form-data" action="{$config->base_url}?upload" id="f_upload">
-    <input type="hidden" name="MAX_FILE_SIZE" value="{$max_file_size}" />
-    <article class="upload">
-        <header>
-            <h2>Upload images</h2>
-            <p class="info">
-                Maximum file size: {$max_file_size_human} MB
-                | Image types accepted: {$formats}
-            </p>
-        </header>
-        <fieldset>
-            <dl>
-                <dt><label for="f_title">Title:</label></dt>
+    $html .= sprintf('<form method="post" enctype="multipart/form-data" action="%s?upload" id="f_upload" class="%s">
+        <input type="hidden" name="MAX_FILE_SIZE" value="%d" />
+        <article class="upload"><header><h2>%s</h2>
+        <p class="info">
+            Maximum file size: %s MB
+            | Image types accepted: %s
+        </p>
+        </header><fieldset><dl>',
+        $config->base_url,
+        $append ? 'append' : 'new',
+        $max_file_size,
+        $append ? 'Add images to album' : 'Upload images',
+        $max_file_size_human,
+        $formats
+    );
+
+    if (!$append) {
+        $html .= '<dt><label for="f_title">Title:</label></dt>
                 <dd><input type="text" name="title" id="f_title" maxlength="100" required="required" /></dd>
                 <dd><label><input type="checkbox" name="private" id="f_private" value="1" />
                     <strong>Private</strong><br />
-                    <small>(If checked, the pictures won't be listed in &quot;browse images&quot;)</small></label></dd>
-                <dd><label for="f_expiry"><strong>Expiry:</strong></label> <select name="expiry" id="f_expiry">{$expiry_options}</select><br /><small>(The images will be deleted after this time)</small></dd>
-                <dd id="f_file_container"><input type="file" name="upload" id="f_files" multiple="multiple" accept="image/jpeg,image/webp,image/png,image/gif,image/svg+xml" /></dd>
+                    <small>(If checked, the pictures won\'t be listed in &quot;browse images&quot;)</small></label></dd>
+                <dd><label for="f_expiry"><strong>Expiry:</strong></label> <select name="expiry" id="f_expiry">' . $expiry_options . '</select><br /><small>(The images will be deleted after this time)</small></dd>';
+    }
+    else {
+        $html .= sprintf('<input type="hidden" name="append" value="%s" /><input type="hidden" name="append_key" value="%s" />',
+            htmlspecialchars($append),
+            htmlspecialchars($append_key)
+        );
+    }
+
+    $html .= '<dd id="f_file_container"><input type="file" name="upload" id="f_files" multiple="multiple" accept="image/jpeg,image/webp,image/png,image/gif,image/svg+xml" /></dd>
             </dl>
             <p class="submit">
                 <input type="submit" value="Upload images" class="icon upload" />
@@ -960,8 +981,7 @@ else
         </p>
     </article>
     </form>
-    <script type="text/javascript" src="{$js_url}"></script>
-EOF;
+    <script type="text/javascript" src="' . $js_url . '"></script>';
 }
 
 page($html, $title, $current);

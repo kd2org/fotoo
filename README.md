@@ -47,6 +47,11 @@ Other versions don't require anything.
 
 ## ChangeLog
 
+### 3.2.2 (September 2024)
+
+* Delete album when all images in album have been deleted
+* Allow to add new images to an album
+
 ### 3.2.1 (September 2024)
 
 * Fix resize using max_width (thanks @Opitux)
