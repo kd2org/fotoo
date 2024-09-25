@@ -1,5 +1,5 @@
 <?php
-// Fotoo Hosting single-file release version 3.2.1
+// Fotoo Hosting single-file release version 3.2.2
 ?><?php if (isset($_GET["js"])): header("Content-Type: text/javascript"); ?>
 (function () {
     if (!Array.prototype.indexOf)
@@ -128,7 +128,9 @@
             return;
         }
 
-        var title = files.length === 1 ? document.getElementById('f_title').value : name.value;
+        var t = document.getElementById('f_title');
+
+        var title = files.length === 1 && t ? t.value : name.value;
 
         resize(
             file,
@@ -214,7 +216,7 @@
         let file_name = file.name === 'image.png' ? file.name.replace(/\./, '-' + (+(new Date)) + '.') : file.name;
         var t = document.getElementById('f_title');
 
-        if (!t.value) {
+        if (t && !t.value) {
             t.value = cleanFileName(file_name);
         }
 
@@ -363,14 +365,21 @@
                 return false;
             }
 
-            if (document.getElementById('f_title').value.replace('/\s+/g', '') == '') {
-                alert('Title is mandatory.');
-                return false;
-            }
-
             if (files.length < 1) {
                 alert('No file is selected.');
                 return false;
+            }
+
+            if (a = document.querySelector('input[type="hidden"][name="append"]')) {
+                album_hash = a.value;
+                album_key = document.querySelector('input[type="hidden"][name="append_key"]').value;
+            }
+
+            if (!album_hash) {
+                if (document.getElementById('f_title').value.replace('/\s+/g', '') == '') {
+                    alert('Title is mandatory.');
+                    return false;
+                }
             }
 
             can_submit = false;
@@ -380,7 +389,7 @@
 
             var url = config.base_url + '?upload';
 
-            if (files.length > 1) {
+            if (!album_hash && files.length > 1) {
                 var params = new URLSearchParams({
                     'album': 'new',
                     'title': document.getElementById('f_title').value,
@@ -927,7 +936,7 @@ figure figcaption {
 	max-width: 100%;
 }
 
-#albumImages figure:only-child figcaption input {
+form.new #albumImages figure:only-child figcaption input {
 	visibility: hidden;
 }
 
@@ -1669,14 +1678,13 @@ class Fotoo_Hosting
 		return $res;
 	}
 
-	public function userDeletePicture(array $img, ?string $key = null): bool
+	public function userDeletePicture(array $img, ?string $key = null): ?bool
 	{
 		if (!$this->checkRemoveId($img['hash'], $key)) {
-			return false;
+			return null;
 		}
 
-		$this->delete($img);
-		return true;
+		return $this->delete($img);
 	}
 
 	public function deletePicture(string $hash): bool
@@ -1691,7 +1699,7 @@ class Fotoo_Hosting
 		return true;
 	}
 
-	protected function delete(array $img): void
+	protected function delete(array $img): bool
 	{
 		$file = $this->_getPath($img);
 
@@ -1706,6 +1714,20 @@ class Fotoo_Hosting
 		}
 
 		$this->query('DELETE FROM pictures WHERE hash = ?;', $img['hash']);
+
+		if (empty($img['album'])) {
+			return true;
+		}
+
+		$count = $this->querySingleColumn('SELECT COUNT(*) FROM pictures WHERE album = ?;', $img['album']);
+
+		// Delete album if empty
+		if (!$count) {
+			$this->deleteAlbum($img['album']);
+			return false;
+		}
+
+		return true;
 	}
 
 	protected function getListQuery(bool $private = false)
@@ -3859,20 +3881,26 @@ if ($fh->isClientBanned())
 }
 
 if (!empty($_POST['delete']) && !empty($_POST['key'])) {
-    if (($img = $fh->get($_POST['delete'])) && $fh->userDeletePicture($img, $_POST['key'])) {
-        if (!$img['album']) {
-            $url = $config->base_url.'?list';
-        }
-        else {
-            $url = $fh->getAlbumUrl($img['album'], true);
-        }
+    $img = $fh->get($_POST['delete']);
+    $r = null;
 
-        header('Location: ' . $url);
+    if ($img) {
+        $r = $fh->userDeletePicture($img, $_POST['key']);
+    }
+
+    if ($r === null) {
+        page('<h1 class="error">Cannot delete this image</h1>');
+        exit;
+    }
+
+    if (!$r || !$img['album']) {
+        $url = $config->base_url.'?list';
     }
     else {
-        page('<h1 class="error">Cannot delete this image</h1>');
+        $url = $fh->getAlbumUrl($img['album'], true);
     }
 
+    header('Location: ' . $url);
     exit;
 }
 elseif (!empty($_POST['deleteAlbum']) && !empty($_POST['key'])) {
@@ -4248,7 +4276,14 @@ elseif (!empty($_GET['a']))
                 </dt>
                 <dd><input type="text" id="admin" onclick="this.select();" value="%s" />
                 <dd><form method="post"><button class="icon delete" type="submit" name="deleteAlbum" value="%s" onclick="return confirm(\'Really?\');">Delete this album now</button><input type="hidden" name="key" value="%s" /></form></dd>
-            </dl>',
+            </dl>
+            <form method="post" action="?append=%2$s">
+            <p>
+                <input type="hidden" name="key" value="%3$s" />
+                <input type="submit" value="Add images to this album" class="icon select" />
+            </p>
+            </form>
+            ',
             $url,
             $hash,
             $key
@@ -4311,7 +4346,7 @@ elseif (!empty($_GET['a']))
         </nav>';
     }
 }
-elseif (!isset($_GET['album']) && !isset($_GET['error']) && !empty($_SERVER['QUERY_STRING']))
+elseif (!isset($_GET['album']) && !isset($_GET['error']) && !isset($_GET['append']) && !empty($_SERVER['QUERY_STRING']))
 {
     $query = explode('.', $_SERVER['QUERY_STRING']);
     $hash = ($query[0] == 'r') ? $query[1] : $query[0];
@@ -4474,6 +4509,8 @@ elseif (!$config->allow_upload)
 }
 else
 {
+    $append = $_GET['append'] ?? null;
+    $append_key = $_POST['key'] ?? null;
     $current = 1;
     $js_url = file_exists(__DIR__ . '/upload.js')
         ? $config->base_url . 'upload.js?2024'
@@ -4501,26 +4538,38 @@ else
         $expiry_options .= sprintf('<option value="%s"%s>%s</option>', $a, $a == $default_expiry ? ' selected="selected"' : '', $b);
     }
 
-    $html .= <<<EOF
-    <form method="post" enctype="multipart/form-data" action="{$config->base_url}?upload" id="f_upload">
-    <input type="hidden" name="MAX_FILE_SIZE" value="{$max_file_size}" />
-    <article class="upload">
-        <header>
-            <h2>Upload images</h2>
-            <p class="info">
-                Maximum file size: {$max_file_size_human} MB
-                | Image types accepted: {$formats}
-            </p>
-        </header>
-        <fieldset>
-            <dl>
-                <dt><label for="f_title">Title:</label></dt>
+    $html .= sprintf('<form method="post" enctype="multipart/form-data" action="%s?upload" id="f_upload" class="%s">
+        <input type="hidden" name="MAX_FILE_SIZE" value="%d" />
+        <article class="upload"><header><h2>%s</h2>
+        <p class="info">
+            Maximum file size: %s MB
+            | Image types accepted: %s
+        </p>
+        </header><fieldset><dl>',
+        $config->base_url,
+        $append ? 'append' : 'new',
+        $max_file_size,
+        $append ? 'Add images to album' : 'Upload images',
+        $max_file_size_human,
+        $formats
+    );
+
+    if (!$append) {
+        $html .= '<dt><label for="f_title">Title:</label></dt>
                 <dd><input type="text" name="title" id="f_title" maxlength="100" required="required" /></dd>
                 <dd><label><input type="checkbox" name="private" id="f_private" value="1" />
                     <strong>Private</strong><br />
-                    <small>(If checked, the pictures won't be listed in &quot;browse images&quot;)</small></label></dd>
-                <dd><label for="f_expiry"><strong>Expiry:</strong></label> <select name="expiry" id="f_expiry">{$expiry_options}</select><br /><small>(The images will be deleted after this time)</small></dd>
-                <dd id="f_file_container"><input type="file" name="upload" id="f_files" multiple="multiple" accept="image/jpeg,image/webp,image/png,image/gif,image/svg+xml" /></dd>
+                    <small>(If checked, the pictures won\'t be listed in &quot;browse images&quot;)</small></label></dd>
+                <dd><label for="f_expiry"><strong>Expiry:</strong></label> <select name="expiry" id="f_expiry">' . $expiry_options . '</select><br /><small>(The images will be deleted after this time)</small></dd>';
+    }
+    else {
+        $html .= sprintf('<input type="hidden" name="append" value="%s" /><input type="hidden" name="append_key" value="%s" />',
+            htmlspecialchars($append),
+            htmlspecialchars($append_key)
+        );
+    }
+
+    $html .= '<dd id="f_file_container"><input type="file" name="upload" id="f_files" multiple="multiple" accept="image/jpeg,image/webp,image/png,image/gif,image/svg+xml" /></dd>
             </dl>
             <p class="submit">
                 <input type="submit" value="Upload images" class="icon upload" />
@@ -4532,8 +4581,7 @@ else
         </p>
     </article>
     </form>
-    <script type="text/javascript" src="{$js_url}"></script>
-EOF;
+    <script type="text/javascript" src="' . $js_url . '"></script>';
 }
 
 page($html, $title, $current);
