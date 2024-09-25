@@ -4277,7 +4277,7 @@ elseif (!empty($_GET['a']))
                 <dd><input type="text" id="admin" onclick="this.select();" value="%s" />
                 <dd><form method="post"><button class="icon delete" type="submit" name="deleteAlbum" value="%s" onclick="return confirm(\'Really?\');">Delete this album now</button><input type="hidden" name="key" value="%s" /></form></dd>
             </dl>
-            <form method="post" action="?append=%2$s">
+            <form method="post" action="%s?append=%2$s">
             <p>
                 <input type="hidden" name="key" value="%3$s" />
                 <input type="submit" value="Add images to this album" class="icon select" />
@@ -4286,7 +4286,8 @@ elseif (!empty($_GET['a']))
             ',
             $url,
             $hash,
-            $key
+            $key,
+            $config->base_url
         );
     }
 
