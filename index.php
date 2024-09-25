@@ -281,20 +281,26 @@ if ($fh->isClientBanned())
 }
 
 if (!empty($_POST['delete']) && !empty($_POST['key'])) {
-    if (($img = $fh->get($_POST['delete'])) && $fh->userDeletePicture($img, $_POST['key'])) {
-        if (!$img['album']) {
-            $url = $config->base_url.'?list';
-        }
-        else {
-            $url = $fh->getAlbumUrl($img['album'], true);
-        }
+    $img = $fh->get($_POST['delete']);
+    $r = null;
 
-        header('Location: ' . $url);
+    if ($img) {
+        $r = $fh->userDeletePicture($img, $_POST['key']);
+    }
+
+    if ($r === null) {
+        page('<h1 class="error">Cannot delete this image</h1>');
+        exit;
+    }
+
+    if (!$r || !$img['album']) {
+        $url = $config->base_url.'?list';
     }
     else {
-        page('<h1 class="error">Cannot delete this image</h1>');
+        $url = $fh->getAlbumUrl($img['album'], true);
     }
 
+    header('Location: ' . $url);
     exit;
 }
 elseif (!empty($_POST['deleteAlbum']) && !empty($_POST['key'])) {

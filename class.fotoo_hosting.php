@@ -572,14 +572,13 @@ class Fotoo_Hosting
 		return $res;
 	}
 
-	public function userDeletePicture(array $img, ?string $key = null): bool
+	public function userDeletePicture(array $img, ?string $key = null): ?bool
 	{
 		if (!$this->checkRemoveId($img['hash'], $key)) {
-			return false;
+			return null;
 		}
 
-		$this->delete($img);
-		return true;
+		return $this->delete($img);
 	}
 
 	public function deletePicture(string $hash): bool
@@ -594,7 +593,7 @@ class Fotoo_Hosting
 		return true;
 	}
 
-	protected function delete(array $img): void
+	protected function delete(array $img): bool
 	{
 		$file = $this->_getPath($img);
 
@@ -609,6 +608,20 @@ class Fotoo_Hosting
 		}
 
 		$this->query('DELETE FROM pictures WHERE hash = ?;', $img['hash']);
+
+		if (empty($img['album'])) {
+			return true;
+		}
+
+		$count = $this->querySingleColumn('SELECT COUNT(*) FROM pictures WHERE album = ?;', $img['album']);
+
+		// Delete album if empty
+		if (!$count) {
+			$this->deleteAlbum($img['album']);
+			return false;
+		}
+
+		return true;
 	}
 
 	protected function getListQuery(bool $private = false)
