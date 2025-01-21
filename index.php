@@ -268,8 +268,7 @@ if (file_exists($config_file))
 }
 
 // Check upload access
-if (!is_bool($config->allow_upload) && is_callable($config->allow_upload))
-{
+if (!is_bool($config->allow_upload)) {
     $config->allow_upload = (bool) call_user_func($config->allow_upload);
 }
 
