@@ -3660,7 +3660,7 @@ class Fotoo_Hosting_Config
 
     private int $max_file_size;
     private array $allowed_formats = ['png', 'jpeg', 'gif', 'svg', 'webp'];
-    private bool $allow_upload = true;
+    private $allow_upload = true;
     private bool $allow_album_zip = false;
     private int $nb_pictures_by_page = 20;
 
